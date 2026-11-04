@@ -37,6 +37,18 @@ test('rejects script IDs that escape the scripts directory', async ({ request })
 
 test.describe('Playground Smoke Tests', () => {
   test.beforeEach(async ({ page }) => {
+    // Keep the panel screenshots independent of whichever game lives in the test workspace.
+    await page.route('**/files', route => route.fulfill({ json: ['script'] }));
+    await page.route('**/api/scripts/script', route => route.fulfill({ json: `
+import { Engine, Text, Vector2 } from 'dino-ge';
+new Engine({
+  onLoad: () => {
+    console.log('Game Ready!');
+    new Text({ text: 'Dino GE Playground', position: new Vector2(100, 100), colour: 'white' });
+  },
+  update: () => {}
+}, { containerId: 'playground-canvas-container', backgroundColour: '#264653' });
+` }));
     // Go to the playground root and wait for the engine to initialize
     await page.goto('/');
     // Wait for the loader to disappear
@@ -52,7 +64,7 @@ test.describe('Playground Smoke Tests', () => {
     await expect(page.locator('#canvas')).toBeVisible();
 
     // Check Editor tab is active
-    await expect(page.locator('.panel-header span').filter({ hasText: 'Editor' })).toBeVisible();
+    await expect(page.getByRole('tab', { name: 'Editor' })).toBeVisible();
 
     // Take a screenshot of the initial state for visual testing
     await expect(page).toHaveScreenshot('initial-load.png', {
@@ -113,8 +125,8 @@ test.describe('Playground Smoke Tests', () => {
   });
 
   test('should switch between Editor and Console tabs', async ({ page }) => {
-    const consoleTab = page.locator('.panel-header span').filter({ hasText: 'Console' });
-    const editorTab = page.locator('.panel-header span').filter({ hasText: 'Editor' });
+    const consoleTab = page.getByRole('tab', { name: 'Console' });
+    const editorTab = page.getByRole('tab', { name: 'Editor' });
 
     // Switch to Console
     await consoleTab.click();

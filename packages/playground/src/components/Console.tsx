@@ -1,60 +1,26 @@
-import React, { useState, useEffect, useRef, useMemo } from 'react';
-import { LogManager, LogEntry, LogLevel } from '../utils/LogManager';
+import React, { useState, useEffect, useRef, useSyncExternalStore } from 'react';
+import { playgroundLogs, type LogLevel } from '../utils/LogManager';
 import '../styles/console.css';
 
 const Console: React.FC = () => {
-  const [logs, setLogs] = useState<LogEntry[]>([]);
+  const logs = useSyncExternalStore(playgroundLogs.subscribe, playgroundLogs.getSnapshot);
   const [filter, setFilter] = useState<LogLevel | 'all'>('all');
   const consoleTextRef = useRef<HTMLDivElement>(null);
   
-  const logManager = useMemo(() => new LogManager((updatedLogs) => {
-    setLogs([...updatedLogs]);
-  }), []);
-
-  useEffect(() => {
-    const originalLog = window.console.log;
-    const originalInfo = window.console.info;
-    const originalWarn = window.console.warn;
-    const originalError = window.console.error;
-    
-    window.console.log = (...args: unknown[]) => {
-      originalLog(...args);
-      logManager.add('log', ...args);
-    };
-    window.console.info = (...args: unknown[]) => {
-      originalInfo(...args);
-      logManager.add('info', ...args);
-    };
-    window.console.warn = (...args: unknown[]) => {
-      originalWarn(...args);
-      logManager.add('warn', ...args);
-    };
-    window.console.error = (...args: unknown[]) => {
-      originalError(...args);
-      logManager.add('error', ...args);
-    };
-
-    return () => {
-      window.console.log = originalLog;
-      window.console.info = originalInfo;
-      window.console.warn = originalWarn;
-      window.console.error = originalError;
-    };
-  }, [logManager]);
+  const visibleLogs = filter === 'all' ? logs : logs.filter(log => log.level === filter);
 
   useEffect(() => {
     if (consoleTextRef.current) {
       consoleTextRef.current.scrollTop = consoleTextRef.current.scrollHeight;
     }
-  }, [logs]);
+  }, [logs, filter]);
 
   const clearConsole = () => {
-    logManager.clear();
+    playgroundLogs.clear();
   };
 
   const handleFilterChange = (newFilter: LogLevel | 'all') => {
     setFilter(newFilter);
-    logManager.setFilter(newFilter);
   };
 
   return (
@@ -81,7 +47,7 @@ const Console: React.FC = () => {
         />
       </div>
       <div className="console-text" ref={consoleTextRef}>
-        {logs.map((log) => (
+        {visibleLogs.map((log) => (
           <div key={log.id} className={`console-line ${log.level}`}>
             <span className="bash">$</span>
             <pre>{log.message}</pre>

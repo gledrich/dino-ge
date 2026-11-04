@@ -1,9 +1,12 @@
 {
   "name": "dino-ge-monorepo",
-  "version": "1.11.9",
+  "version": "1.12.0-beta.1",
   "description": "Monorepo for Dino GE",
   "type": "module",
   "private": true,
+  "engines": {
+    "node": "^24.22.1 || ^26.13.0"
+  },
   "workspaces": [
     "packages/*"
   ],
@@ -16,23 +19,32 @@
     "example": "npm run start -w dino-ge-example",
     "playground": "npm run start -w dino-ge-playground",
     "playground:dev": "npm run dev -w dino-ge-playground",
-    "test:e2e:docker": "docker build -t tsge-e2e -f docker/e2e.Dockerfile . && docker run --rm -e CI=true -v $(pwd)/packages/playground/playwright-report:/app/packages/playground/playwright-report -v $(pwd)/packages/playground/e2e:/app/packages/playground/e2e tsge-e2e",
-    "test:e2e": "npx playwright test -c packages/playground/playwright.config.ts"
+    "test:e2e:docker": "docker build --build-arg NODE_VERSION=$(cat .nvmrc) -t tsge-e2e -f docker/e2e.Dockerfile . && docker run --rm -e CI=true -v $(pwd)/packages/playground/playwright-report:/app/packages/playground/playwright-report -v $(pwd)/packages/playground/e2e:/app/packages/playground/e2e tsge-e2e",
+    "test:e2e": "npx playwright test -c packages/playground/playwright.config.ts",
+    "test:example": "playwright test -c packages/example/playwright.config.ts"
   },
   "author": "Rich <richgled25@gmail.com>",
   "license": "MIT",
   "devDependencies": {
+    "@eslint/js": "^9.39.5",
     "@types/jest": "^30.0.0",
-    "@typescript-eslint/eslint-plugin": "^8.25.0",
-    "@typescript-eslint/parser": "^8.25.0",
-    "eslint": "^9.21.0",
+    "@typescript-eslint/eslint-plugin": "^8.72.1",
+    "@typescript-eslint/parser": "^8.72.1",
+    "eslint": "^9.39.5",
     "eslint-plugin-react": "^7.37.5",
-    "eslint-plugin-react-hooks": "^7.0.1",
-    "globals": "^17.4.0",
-    "jest": "^30.3.0",
-    "jest-environment-jsdom": "^30.3.0",
-    "ts-jest": "^29.4.9",
-    "typedoc": "^0.28.18",
-    "typescript": "^5.8.2"
+    "eslint-plugin-react-hooks": "^7.1.1",
+    "globals": "^17.14.0",
+    "jest": "^30.5.2",
+    "jest-environment-jsdom": "^30.5.2",
+    "react": "19.3.1",
+    "react-dom": "19.3.1",
+    "ts-jest": "^29.4.15",
+    "typedoc": "^0.28.20",
+    "typescript": "~6.0.3"
+  },
+  "overrides": {
+    "monaco-editor": {
+      "dompurify": "3.4.17"
+    }
   }
 }

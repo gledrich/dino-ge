@@ -5,6 +5,7 @@ import fs from 'fs/promises';
 import { fileURLToPath } from 'url';
 import { createRequire } from 'module';
 import { constants, existsSync } from 'fs';
+import { ProjectError, ProjectStore } from './lib/projects.js';
 
 const require = createRequire(import.meta.url);
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -23,6 +24,10 @@ if (!(await fs.lstat(SCRIPTS_DIR)).isDirectory()) {
 
 const scriptsRoot = await fs.realpath(SCRIPTS_DIR);
 const noFollow = constants.O_NOFOLLOW ?? 0;
+const projects = new ProjectStore(scriptsRoot);
+const bundledTemplate = path.join(DIST_DIR, 'templates/amber-ruins');
+const template = existsSync(bundledTemplate) ? bundledTemplate : path.join(__dirname, '../example/amber-ruins');
+await projects.seed(template);
 
 // Resolve dino-ge dist path
 let DINO_GE_DIST;
@@ -35,9 +40,16 @@ try {
   DINO_GE_DIST = path.join(__dirname, '../dino-ge/dist');
 }
 
+app.post('/api/projects', express.json({ limit: '24mb' }), async (req, res) => {
+  try {
+    res.status(201).json({ id: await projects.import(req.body) });
+  } catch (err) {
+    res.status(err instanceof ProjectError ? err.status : 500).json({ error: err.message });
+  }
+});
 app.use(express.json());
 
-app.use('/scripts', async (req, res, next) => {
+const serveWorkspace = [async (req, res, next) => {
   try {
     const requested = path.resolve(scriptsRoot, `.${decodeURIComponent(req.path)}`);
     const resolved = await fs.realpath(requested);
@@ -46,7 +58,10 @@ app.use('/scripts', async (req, res, next) => {
     if (!(err instanceof URIError) && err.code !== 'ENOENT' && err.code !== 'ENOTDIR') return next(err);
   }
   res.sendStatus(404);
-}, express.static(scriptsRoot, { fallthrough: false, index: false, redirect: false }));
+}, express.static(scriptsRoot, { fallthrough: false, index: false, redirect: false })];
+app.use('/scripts', serveWorkspace);
+// A fresh URL prefix gives every run a separate browser module graph.
+app.use('/project-runs/:run', serveWorkspace);
 
 // Explicit Static File Serving based on ENVIRONMENT
 if (ENV === 'prod') {
@@ -82,25 +97,16 @@ app.get('/api/types', async (req, res) => {
   }
 });
 
-const getFilePath = (id) =>
-  path.join(scriptsRoot, id.endsWith('.js') ? id : `${id}.js`);
-
-app.param('id', (req, res, next, id) => {
-  if (id.includes('/') || id.includes('\\') || id.includes('\0') ||
-      (process.platform === 'win32' && id.includes(':'))) {
-    return res.status(400).json({ error: 'Invalid script ID' });
-  }
-  next();
-});
+const scriptErrorStatus = err => {
+  if (err instanceof ProjectError) return err.status;
+  if (err.code === 'EEXIST') return 409;
+  return ['ENOENT', 'ELOOP'].includes(err.code) ? 404 : 500;
+};
 
 // API Routes
 app.get('/files', async (req, res) => {
   try {
-    const files = await fs.readdir(scriptsRoot, { withFileTypes: true });
-    const scripts = files
-      .filter((file) => file.isFile() && file.name.endsWith('.js'))
-      .map((file) => file.name.slice(0, -3));
-    res.json(scripts);
+    res.json(await projects.list());
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -108,32 +114,34 @@ app.get('/files', async (req, res) => {
 
 app.get('/api/scripts/:id', async (req, res) => {
   try {
-    const filePath = getFilePath(req.params.id);
+    const filePath = await projects.scriptPath(req.params.id);
     if (!(await fs.lstat(filePath)).isFile()) return res.sendStatus(404);
     const file = await fs.readFile(filePath, { encoding: 'utf8', flag: constants.O_RDONLY | noFollow });
     res.json(file);
   } catch (err) {
-    res.status(['ENOENT', 'ELOOP'].includes(err.code) ? 404 : 500).json({ error: err.message });
+    res.status(scriptErrorStatus(err)).json({ error: err.message });
   }
 });
 
 app.put('/api/scripts/:id', async (req, res) => {
   try {
-    const filePath = getFilePath(req.params.id);
+    const { create, data, upsert } = req.body ?? {};
+    if (typeof data !== 'string') return res.status(400).json({ error: 'Script contents must be text.' });
+    const filePath = await projects.scriptPath(req.params.id);
     const existing = await fs.lstat(filePath, { throwIfNoEntry: false });
     if (existing && !existing.isFile()) return res.sendStatus(404);
-    const data = String(req.body.data);
-    const mode = req.body.upsert ? constants.O_APPEND : constants.O_TRUNC;
+    const mode = create === true ? constants.O_EXCL : upsert ? constants.O_APPEND : constants.O_TRUNC;
     await fs.writeFile(filePath, data, { flag: constants.O_WRONLY | constants.O_CREAT | mode | noFollow });
     res.json({ success: true });
   } catch (err) {
-    res.status(err.code === 'ELOOP' ? 404 : 500).json({ error: err.message });
+    res.status(scriptErrorStatus(err)).json({ error: err.code === 'EEXIST' ? 'A script with that name already exists.' : err.message });
   }
 });
 
 const PORT = process.env.PORT || 3000;
-const server = app.listen(PORT, () => {
-  console.log(`Dino GE Playground (${ENV}): http://localhost:${PORT}`);
+const host = process.env.HOST || '127.0.0.1';
+const server = app.listen(PORT, host, () => {
+  console.log(`Dino GE Playground (${ENV}): http://${host}:${server.address().port}`);
   console.log(`Scripts directory: ${SCRIPTS_DIR}`);
 });
 

@@ -101,6 +101,9 @@
 }
 
 .save-prop-icon {
+  border: 0;
+  background: transparent;
+  padding: 2px;
   font-size: 10px;
   color: var(--text-secondary);
   cursor: pointer;
@@ -110,7 +113,8 @@
 }
 
 .prop-row:hover .save-prop-icon,
-.prop-row.modified .save-prop-icon {
+.prop-row.modified .save-prop-icon,
+.save-prop-icon:focus-visible {
   opacity: 1;
   pointer-events: all;
 }

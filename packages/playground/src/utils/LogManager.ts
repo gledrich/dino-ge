@@ -10,16 +10,19 @@ export interface LogEntry {
 export class LogManager {
   private _logs: LogEntry[] = [];
   private _nextId = 0;
-  private _onUpdate?: (logs: LogEntry[]) => void;
-  private _filter: LogLevel | 'all' = 'all';
+  private readonly listeners = new Set<() => void>();
 
-  constructor(onUpdate?: (logs: LogEntry[]) => void) {
-    this._onUpdate = onUpdate;
-  }
+  getSnapshot = () => this._logs;
+
+  subscribe = (listener: () => void) => {
+    this.listeners.add(listener);
+    return () => { this.listeners.delete(listener); };
+  };
 
   add(level: LogLevel, ...args: unknown[]) {
     const message = args
       .map((arg) => {
+        if (arg instanceof Error) return arg.stack ?? arg.message;
         if (typeof arg === 'object' && arg !== null) {
           try {
             return JSON.stringify(arg, null, 2);
@@ -38,7 +41,7 @@ export class LogManager {
       timestamp: Date.now()
     };
 
-    this._logs.push(entry);
+    this._logs = [...this._logs.slice(-499), entry];
     this._notify();
   }
 
@@ -47,17 +50,21 @@ export class LogManager {
     this._notify();
   }
 
-  setFilter(filter: LogLevel | 'all') {
-    this._filter = filter;
-    this._notify();
-  }
-
-  get filteredLogs(): LogEntry[] {
-    if (this._filter === 'all') return this._logs;
-    return this._logs.filter(l => l.level === this._filter);
-  }
-
   private _notify() {
-    this._onUpdate?.(this.filteredLogs);
+    this.listeners.forEach(listener => listener());
   }
+}
+
+export const playgroundLogs = new LogManager();
+
+export function captureConsole() {
+  const levels: LogLevel[] = ['log', 'info', 'warn', 'error'];
+  const originals = levels.map(level => window.console[level]);
+  levels.forEach((level, index) => {
+    window.console[level] = (...args: unknown[]) => {
+      originals[index].apply(window.console, args);
+      playgroundLogs.add(level, ...args);
+    };
+  });
+  return () => levels.forEach((level, index) => { window.console[level] = originals[index]; });
 }

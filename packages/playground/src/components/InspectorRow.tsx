@@ -1,4 +1,4 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useId, useRef } from 'react';
 import * as Dino from 'dino-ge';
 import { getSurgicalEdit } from '../utils/ast-utils';
 
@@ -72,6 +72,7 @@ const InspectorRow: React.FC<{
   selectedObject: InspectableObject;
 }> = ({ def, selectedObject }) => {
   const inputRef = useRef<HTMLInputElement>(null);
+  const inputId = useId();
   const [prevSelectedObject, setPrevSelectedObject] = React.useState(selectedObject);
   const [lastSyncedValue, setLastSyncedValue] = React.useState<any>(() => {
     const resolved = resolveComponentPath(selectedObject, def.propertyPath);
@@ -146,7 +147,7 @@ const InspectorRow: React.FC<{
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const val = parseValue(e.target);
     const resolved = resolveComponentPath(selectedObject, def.propertyPath);
-    if (resolved && resolved.target) {
+    if (resolved && resolved.target && (def.type !== 'number' || Number.isFinite(val))) {
       resolved.target[resolved.prop] = val;
     }
   };
@@ -160,6 +161,8 @@ const InspectorRow: React.FC<{
     }
 
     const val = parseValue(inputRef.current);
+    if (def.type === 'number' && !Number.isFinite(val)) return;
+    window.dispatchEvent(new Event('playground-sync-source-mapping'));
     const edit = getSurgicalEdit(sourceId, def.propertyPath, val, (path) => {
       const res = resolveComponentPath(selectedObject, path);
       return res && res.target ? res.target[res.prop] : undefined;
@@ -176,19 +179,21 @@ const InspectorRow: React.FC<{
 
   return (
     <div className={`prop-row ${isModified ? 'modified' : ''}`}>
-      <label>{def.label}</label>
+      <label htmlFor={inputId}>{def.label}</label>
       <div className="input-group">
         <input
+          id={inputId}
           type={def.type}
           step="any"
           ref={inputRef}
           onChange={handleChange}
         />
-        <i 
-          className="fa-solid fa-floppy-disk save-prop-icon" 
+        <button type="button"
+          className="save-prop-icon"
           onClick={handleSync}
+          aria-label={`Save ${def.label} to code`}
           title="Save this property to code"
-        />
+        ><i className="fa-solid fa-floppy-disk" aria-hidden="true" /></button>
       </div>
     </div>
   );

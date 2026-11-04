@@ -8,6 +8,7 @@ import Console from './components/Console';
 import Viewport from './components/Viewport';
 import { usePlayground } from './context/PlaygroundContext';
 import { usePlaygroundScripts } from './hooks/usePlaygroundScripts';
+import { captureConsole } from './utils/LogManager';
 import './App.css';
 
 function App() {
@@ -25,6 +26,7 @@ function App() {
   } = usePlayground();
 
   const { handleRefresh } = usePlaygroundScripts();
+  useEffect(captureConsole, []);
 
   const explorerPanelRef = usePanelRef();
   const editorPanelRef = usePanelRef();
@@ -168,21 +170,33 @@ function App() {
                 });
               }}
             >
-              {isEditorVisible && (
-                <div className="panel-container">
+                <div className="panel-container" hidden={!isEditorVisible}>
                   <div className="panel-header" style={{ display: 'flex', gap: '10px' }}>
-                    <span 
-                      style={{ cursor: 'pointer', color: activeTab === 'editor' ? 'var(--accent-primary)' : 'inherit' }}
+                    <div className="playground-tabs" aria-label="Bottom panel" role="tablist"
+                      onKeyDown={event => {
+                        if (!['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) return;
+                        event.preventDefault();
+                        event.stopPropagation();
+                        const next = event.key === 'Home' ? 'editor' : event.key === 'End' ? 'console'
+                          : activeTab === 'editor' ? 'console' : 'editor';
+                        setActiveTab(next);
+                        document.getElementById(`playground-tab-${next}`)?.focus();
+                      }}>
+                    <button type="button" id="playground-tab-editor" role="tab"
+                      aria-selected={activeTab === 'editor'} aria-controls="playground-panel-editor"
+                      tabIndex={activeTab === 'editor' ? 0 : -1}
                       onClick={() => setActiveTab('editor')}
                     >
                       Editor
-                    </span>
-                    <span 
-                      style={{ cursor: 'pointer', color: activeTab === 'console' ? 'var(--accent-primary)' : 'inherit' }}
+                    </button>
+                    <button type="button" id="playground-tab-console" role="tab"
+                      aria-selected={activeTab === 'console'} aria-controls="playground-panel-console"
+                      tabIndex={activeTab === 'console' ? 0 : -1}
                       onClick={() => setActiveTab('console')}
                     >
                       Console
-                    </span>
+                    </button>
+                    </div>
                     <span style={{ flex: 1 }} />
                     <button
                       type="button"
@@ -195,17 +209,19 @@ function App() {
                     </button>
                   </div>
                   <div className="panel-content">
-                    {activeTab === 'editor' ? (
+                    <div className="editor-tab-panel" id="playground-panel-editor" role="tabpanel"
+                      aria-labelledby="playground-tab-editor" hidden={activeTab !== 'editor'}>
                       <Editor 
                         currentScriptId={currentScriptId} 
                         onRefresh={handleRefresh}
                       />
-                    ) : (
-                      <Console />
-                    )}
+                    </div>
+                    <div className="editor-tab-panel" id="playground-panel-console" role="tabpanel"
+                      aria-labelledby="playground-tab-console" hidden={activeTab !== 'console'}>
+                      {activeTab === 'console' && <Console />}
+                    </div>
                   </div>
                 </div>
-              )}
             </Panel>
           </Group>
         </Panel>

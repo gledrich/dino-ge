@@ -1,6 +1,54 @@
 import { expect, test } from '@playwright/test';
 import type { Monaco } from '@monaco-editor/react';
 
+test('keeps unsaved edits across tabs and panel collapse, and retains hidden console messages', async ({ page }) => {
+  await page.route('**/files', route => route.fulfill({ json: ['script'] }));
+  await page.route('**/api/scripts/script', route => route.fulfill({ json: 'const initial = true;' }));
+  await page.goto('/');
+  const editor = page.locator('.monaco-editor');
+  await expect(editor).toContainText('initial');
+  await editor.locator('.view-lines').click();
+  await page.keyboard.insertText('// local draft');
+  await expect(editor).toContainText('local draft');
+  await page.evaluate(() => console.warn('Warning recorded while Console was closed'));
+  await page.getByRole('tab', { name: 'Editor' }).focus();
+  await page.keyboard.press('ArrowRight');
+  await expect(page.getByRole('tab', { name: 'Console' })).toHaveAttribute('aria-selected', 'true');
+  await expect(page.getByText('Warning recorded while Console was closed')).toBeVisible();
+  await page.getByRole('tab', { name: 'Editor' }).click();
+  await page.getByRole('button', { name: 'Collapse editor' }).click();
+  await page.getByRole('button', { name: 'Expand editor' }).click();
+  await expect(editor).toContainText('local draft');
+});
+
+test('selects an object in Explorer and writes an Inspector change back to the script', async ({ page }) => {
+  await page.route('**/files', route => route.fulfill({ json: ['script'] }));
+  await page.route('**/api/scripts/script', route => route.fulfill({ json: `
+import { Engine, Rectangle, Vector2 } from 'dino-ge';
+new Engine({
+  onLoad: () => new Rectangle({
+    tag: 'beta-box', position: new Vector2(12, 24), width: 30, height: 30, colour: '#abc',
+  }),
+  update: () => {},
+}, { containerId: 'playground-canvas-container' });
+` }));
+  await page.goto('/');
+  await page.getByRole('button', { name: 'beta-box' }).press('Enter');
+  const x = page.getByRole('spinbutton', { name: 'X', exact: true });
+  await x.fill('120');
+  await page.getByRole('button', { name: 'Save X to code', exact: true }).click();
+  await expect.poll(() => page.evaluate(() => {
+    const { monaco } = window as typeof window & { monaco: Monaco };
+    return monaco.editor.getModels().find(model => model.getLanguageId() === 'javascript')?.getValue();
+  })).toContain('new Vector2(120, 24)');
+  await page.getByRole('textbox', { name: 'Tag', exact: true }).fill("beta's box");
+  await page.getByRole('button', { name: 'Save Tag to code', exact: true }).click();
+  await expect.poll(() => page.evaluate(() => {
+    const { monaco } = window as typeof window & { monaco: Monaco };
+    return monaco.editor.getModels().find(model => model.getLanguageId() === 'javascript')?.getValue();
+  })).toContain(`tag: "beta's box"`);
+});
+
 test('keyboard format and save act on the selected script after switching files', async ({ page }) => {
   await page.route('**/files', route => route.fulfill({ json: ['script', 'second'] }));
   await page.route('**/api/scripts/*', route => {
@@ -24,7 +72,8 @@ test('keyboard format and save act on the selected script after switching files'
   await page.keyboard.press('Shift+Alt+f');
   await expect.poll(() => page.evaluate(() => {
     const { monaco } = window as typeof window & { monaco: Monaco };
-    return monaco.editor.getModels().find(model => model.getLanguageId() === 'javascript')?.getValue();
+    return monaco.editor.getModels().find(model => model.getLanguageId() === 'javascript')
+      ?.getValue().replace(/\r\n/g, '\n');
   })).toBe('const secondScript = 3;\n');
 
   const saved = page.waitForRequest(
@@ -34,11 +83,13 @@ test('keyboard format and save act on the selected script after switching files'
   await page.keyboard.press(`${modifier}+s`);
   const request = await saved;
   expect(request.url()).toMatch(/\/api\/scripts\/second$/);
-  expect(request.postDataJSON().data).toBe('const secondScript = 3;\n');
+  expect(request.postDataJSON().data.replace(/\r\n/g, '\n')).toBe('const secondScript = 3;\n');
 });
 
 test('saves while declarations load and resolves Dino GE imports afterwards', async ({ page }) => {
   const script = "import { Vector2 } from 'dino-ge';\nnew Vector2(1, 2);";
+  await page.route('**/files', route => route.fulfill({ json: ['script'] }));
+  await page.route('https://cdn.jsdelivr.net/**', route => route.abort());
   let releaseTypes!: () => void;
   const typesGate = new Promise<void>(resolve => { releaseTypes = resolve; });
   await page.route('**/api/types', async route => {
@@ -71,7 +122,7 @@ test('saves while declarations load and resolves Dino GE imports afterwards', as
 
   await page.waitForFunction(() => {
     const { monaco } = window as typeof window & { monaco: Monaco };
-    return !!monaco.languages.typescript.javascriptDefaults.getCompilerOptions().paths?.['dino-ge'];
+    return !!monaco.typescript.javascriptDefaults.getCompilerOptions().paths?.['dino-ge'];
   });
 
   await expect.poll(() => page.evaluate(async () => {
@@ -81,7 +132,7 @@ test('saves while declarations load and resolves Dino GE imports afterwards', as
     );
     if (!model) return null;
 
-    const getWorker = await monaco.languages.typescript.getJavaScriptWorker();
+    const getWorker = await monaco.typescript.getJavaScriptWorker();
     const worker = await getWorker(model.uri);
     const fileName = model.uri.toString();
     const diagnostics = await worker.getSemanticDiagnostics(fileName);

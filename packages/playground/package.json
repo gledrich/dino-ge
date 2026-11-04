@@ -1,11 +1,14 @@
 {
   "name": "dino-ge-playground",
-  "version": "1.11.9",
+  "version": "1.12.0-beta.1",
   "description": "Interactive, live-editing playground and inspector for Dino GE",
   "bin": {
     "dino-ge-playground": "server.js"
   },
   "type": "module",
+  "engines": {
+    "node": "^24.22.1 || ^26.13.0"
+  },
   "scripts": {
     "start": "ENVIRONMENT=prod node server.js",
     "dev": "ENVIRONMENT=dev concurrently \"nodemon server.js\" \"vite\"",
@@ -15,30 +18,32 @@
   },
   "files": [
     "server.js",
-    "dist/",
-    "scripts/"
+    "lib/",
+    "dist/"
   ],
   "dependencies": {
-    "@monaco-editor/react": "^4.7.0",
-    "acorn": "^8.16.0",
-    "dino-ge": "^1.11.9",
-    "express": "^4.21.2",
-    "monaco-editor": "^0.55.1",
-    "prettier": "^3.8.1",
-    "react": "^18.3.1",
-    "react-dom": "^18.3.1",
-    "react-resizable-panels": "^4.9.0"
+    "dino-ge": "1.12.0-beta.1",
+    "express": "^5.3.0"
   },
   "devDependencies": {
-    "@playwright/test": "^1.59.1",
-    "@types/prettier": "^2.7.3",
-    "@types/react": "^18.3.1",
-    "@types/react-dom": "^18.3.1",
-    "@vitejs/plugin-react": "^4.3.1",
-    "concurrently": "^9.2.1",
-    "nodemon": "^3.1.9",
-    "typescript": "^5.5.4",
-    "vite": "^5.4.2"
+    "@fortawesome/fontawesome-free": "^7.3.1",
+    "@monaco-editor/react": "^4.7.0",
+    "@playwright/test": "1.64.1",
+    "@types/react": "^19.3.0",
+    "@types/react-dom": "^19.3.0",
+    "@vitejs/plugin-react": "^6.2.1",
+    "acorn": "^8.19.0",
+    "concurrently": "^10.0.6",
+    "dompurify": "3.4.17",
+    "monaco-editor": "0.57.0",
+    "nodemon": "^3.1.14",
+    "oxc-transform-react": "~0.156.0",
+    "prettier": "^3.9.10",
+    "react": "^19.3.1",
+    "react-dom": "^19.3.1",
+    "react-resizable-panels": "^4.18.0",
+    "typescript": "~6.0.3",
+    "vite": "^8.3.5"
   },
   "author": "Rich <richgled25@gmail.com>",
   "license": "MIT",

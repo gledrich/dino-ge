@@ -78,12 +78,49 @@ export interface InstrumentationResult {
   error?: string;
 }
 
+/** Preserves an imported entry module's file location when the Playground runs it inline. */
+export function rebaseModule(code: string, moduleUrl: URL): string {
+  const ast = acorn.parse(code, { ecmaVersion: 'latest', sourceType: 'module' });
+  const replacements: Edit[] = [];
+  const visit = (node: any) => {
+    if (['ImportDeclaration', 'ExportNamedDeclaration', 'ExportAllDeclaration', 'ImportExpression'].includes(node.type)) {
+      const source = node.source;
+      if (typeof source?.value === 'string' && /^\.{1,2}\//.test(source.value)) {
+        replacements.push({
+          start: source.start, end: source.end,
+          newText: JSON.stringify(new URL(source.value, moduleUrl).href),
+        });
+      } else if (node.type === 'ImportExpression' && source && typeof source.value !== 'string') {
+        // Wrap only the expression so nested edits, including import.meta.url, still apply.
+        replacements.push({
+          start: source.start, end: source.start,
+          newText: `((specifier) => typeof specifier === 'string' && /^\\.{1,2}\\//.test(specifier) ? new URL(specifier, ${JSON.stringify(moduleUrl.href)}).href : specifier)(`,
+        }, { start: source.end, end: source.end, newText: ')' });
+      }
+    } else if (node.type === 'MemberExpression' && node.object.type === 'MetaProperty' &&
+        node.object.meta.name === 'import' && node.object.property.name === 'meta' &&
+        (node.computed ? node.property.value === 'url' : node.property.name === 'url')) {
+      replacements.push({ start: node.start, end: node.end, newText: JSON.stringify(moduleUrl.href) });
+    }
+    for (const child of Object.values(node)) {
+      for (const item of Array.isArray(child) ? child : [child]) {
+        if (item && typeof item === 'object' && 'type' in item) visit(item);
+      }
+    }
+  };
+  visit(ast);
+  for (const edit of replacements.sort((a, b) => b.start - a.start || b.end - a.end)) {
+    code = code.slice(0, edit.start) + edit.newText + code.slice(edit.end);
+  }
+  return code;
+}
+
 /**
  * Instruments the provided code by injecting __sourceId into Dino GE object instantiations.
  * Also builds the source mapping registry.
  */
-export const instrumentCode = (code: string): InstrumentationResult => {
-  resetSourceMapping();
+export const instrumentCode = (code: string, trackEditorSource = true): InstrumentationResult => {
+  if (trackEditorSource) resetSourceMapping();
   const occurrenceCounts: Record<string, number> = {};
   
   // Parse code to AST
@@ -133,7 +170,7 @@ export const instrumentCode = (code: string): InstrumentationResult => {
         const sourceId = `${idKey}-${index}`;
         
         // Record property locations (using original offsets)
-        sourceMappingRegistry[sourceId] = {
+        if (trackEditorSource) sourceMappingRegistry[sourceId] = {
           sourceId,
           type: node.callee.name,
           start: node.start,
@@ -144,7 +181,7 @@ export const instrumentCode = (code: string): InstrumentationResult => {
         };
 
         // Inject __sourceId into the object literal in the instrumented version
-        const injection = `__sourceId: '${sourceId}', `;
+        const injection = `__sourceId: ${JSON.stringify(sourceId)}, `;
         const insertPos = args[0].start + 1 + offset;
         instrumentedCode = instrumentedCode.slice(0, insertPos) + injection + instrumentedCode.slice(insertPos);
         offset += injection.length;
@@ -191,7 +228,7 @@ export const getSurgicalEdit = (
   }
 
   const paths = actualPath.split('.');
-  const formattedVal = typeof value === 'string' ? `'${value}'` : String(value);
+  const formattedVal = typeof value === 'string' ? JSON.stringify(value) : String(value);
 
   // Helper to find property mapping deeply
   const findPropMapping = (props: Record<string, PropertyLocation>, pathArr: string[]): { mapping: PropertyLocation, depth: number } | null => {

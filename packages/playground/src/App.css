@@ -104,6 +104,21 @@
   flex-direction: column;
 }
 
+.editor-tab-panel { display: flex; flex: 1; min-height: 0; }
+.panel-container[hidden], .editor-tab-panel[hidden] { display: none; }
+.playground-tabs { display: flex; gap: 10px; }
+.playground-tabs button {
+  background: transparent;
+  border: 0;
+  color: inherit;
+  cursor: pointer;
+  padding: 0;
+  font: inherit;
+  text-transform: inherit;
+  letter-spacing: inherit;
+}
+.playground-tabs button[aria-selected='true'] { color: var(--accent-primary); }
+
 /* Specific component overrides for new layout */
 .inspector-container {
   position: static !important;
@@ -149,22 +164,47 @@
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5);
 }
 
-.toolbar i {
-  font-size: 18px;
+.viewport-panel:has([data-playground-game]) .toolbar {
+  top: 42px;
+  bottom: auto;
+  right: 10px;
+  left: auto;
+  transform: none;
+}
+
+.toolbar button {
+  display: grid;
+  place-items: center;
+  width: 25px;
+  height: 25px;
+  padding: 2px;
+  border: 0;
+  border-radius: 3px;
+  background: transparent;
   cursor: pointer;
   color: var(--text-primary);
   transition: all 0.2s ease;
 }
 
-.toolbar i.active-debug {
-  color: var(--accent-secondary) !important;
+.toolbar button svg {
+  width: 18px;
+  height: 18px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
 }
 
-.toolbar i:hover {
+.toolbar button[aria-pressed='true'] {
+  color: var(--accent-secondary);
+}
+
+.toolbar button:hover {
   color: var(--accent-primary);
   transform: scale(1.2);
 }
 
-.toolbar i:active {
+.toolbar button:active {
   transform: scale(0.95);
 }

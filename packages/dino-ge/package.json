@@ -1,6 +1,6 @@
 {
   "name": "dino-ge",
-  "version": "1.11.9",
+  "version": "1.12.0-beta.1",
   "description": "Lightweight, performant 2D game engine built with TypeScript",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
@@ -17,8 +17,8 @@
   "author": "Rich <richgled25@gmail.com>",
   "license": "MIT",
   "devDependencies": {
-    "typedoc": "^0.28.18",
-    "typescript": "^5.8.2"
+    "typedoc": "^0.28.20",
+    "typescript": "~6.0.3"
   },
   "keywords": [
     "game-engine",

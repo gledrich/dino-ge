@@ -96,6 +96,7 @@ const Inspector: React.FC<InspectorProps> = ({ visible }) => {
     }
 
     setIsApplying(true);
+    window.dispatchEvent(new Event('playground-sync-source-mapping'));
 
     const edits: Edit[] = [];
 
@@ -112,7 +113,9 @@ const Inspector: React.FC<InspectorProps> = ({ visible }) => {
             const res = resolveComponentPath(selectedObject, path);
             return res && res.target ? res.target[res.prop] : undefined;
           });
-          if (edit) {
+          if (edit && !edits.some(item =>
+            item.start === edit.start && item.end === edit.end && item.newText === edit.newText
+          )) {
             edits.push(edit);
           }
         }
@@ -159,8 +162,9 @@ const Inspector: React.FC<InspectorProps> = ({ visible }) => {
             <div className="inspector-section">
               <h3>Debug Settings</h3>
               <div className="inspector-row">
-                <label>Physics Vectors</label>
+                <label htmlFor="inspector-physics-vectors">Physics Vectors</label>
                 <input 
+                  id="inspector-physics-vectors"
                   type="checkbox" 
                   checked={Engine.showPhysicsVectors} 
                   onChange={(e) => {
@@ -170,8 +174,9 @@ const Inspector: React.FC<InspectorProps> = ({ visible }) => {
                 />
               </div>
               <div className="inspector-row">
-                <label>Collision Normals</label>
+                <label htmlFor="inspector-collision-normals">Collision Normals</label>
                 <input 
+                  id="inspector-collision-normals"
                   type="checkbox" 
                   checked={Engine.showCollisionLines} 
                   onChange={(e) => {

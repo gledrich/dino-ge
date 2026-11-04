@@ -1,0 +1,9 @@
+.git
+.superpowers
+**/node_modules
+**/dist
+**/coverage
+**/playwright-report
+**/test-results
+packages/dino-ge/package-lock.json
+packages/playground/scripts/*.js

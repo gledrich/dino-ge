@@ -32,7 +32,34 @@
   align-items: center;
   gap: 12px;
   margin-left: auto;
+  flex-wrap: wrap;
 }
+
+.import-game-button,
+.import-game-options button,
+.import-game-options select {
+  background: var(--bg-primary);
+  color: var(--text-primary);
+  border: 1px solid var(--border-color);
+  border-radius: 4px;
+  padding: 3px 7px;
+  font: inherit;
+  font-size: 11px;
+}
+
+.import-game-button,
+.import-game-options button { cursor: pointer; }
+
+.import-game-options {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding: 6px 10px;
+  font-size: 11px;
+}
+
+.import-game-error { margin: 4px 10px; color: #ff988f; }
 
 .icons-container i {
   cursor: pointer;
@@ -44,6 +71,16 @@
 .icons-container i:hover {
   color: var(--accent-primary);
 }
+
+.editor-icon-button {
+  border: 0;
+  padding: 2px;
+  background: transparent;
+  cursor: pointer;
+  color: var(--text-secondary);
+}
+
+.editor-icon-button i { color: inherit; }
 
 .format-btn.active {
   color: #f9c74f;

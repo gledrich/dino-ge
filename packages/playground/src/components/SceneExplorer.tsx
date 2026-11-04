@@ -33,7 +33,16 @@ const SceneNode: React.FC<SceneNodeProps> = ({ object, selectedId, onSelect, dep
       <div 
         className={`scene-node ${isSelected ? 'selected' : ''}`}
         style={{ paddingLeft: `${depth * 12 + 5}px` }}
+        role="button"
+        tabIndex={0}
+        aria-pressed={isSelected}
         onClick={() => onSelect(object)}
+        onKeyDown={event => {
+          if (event.key !== 'Enter' && event.key !== ' ') return;
+          event.preventDefault();
+          event.stopPropagation();
+          onSelect(object);
+        }}
       >
         {hasChildren ? (
           <i 
