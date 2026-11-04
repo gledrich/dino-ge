@@ -290,6 +290,7 @@ const CodeEditor: React.FC<EditorProps> = ({ currentScriptId, onRefresh }) => {
           const newValueRaw = applyEdits([{ range, text: newText }]);
           if (newValueRaw) {
             const formatted = await formatCode(newValueRaw, { start, end: start + newText.length });
+            if (editor.getModel() !== model || model.getValue() !== newValueRaw) return;
             if (formatted !== newValueRaw) {
               pushEditOperations(formatted);
               setEditorValue(formatted);
@@ -333,6 +334,7 @@ const CodeEditor: React.FC<EditorProps> = ({ currentScriptId, onRefresh }) => {
           const newValueRaw = applyEdits(monacoEdits);
           if (newValueRaw) {
             const formatted = await formatCode(newValueRaw, { start: minStart, end: maxEnd });
+            if (editor.getModel() !== model || model.getValue() !== newValueRaw) return;
             if (formatted !== newValueRaw) {
               pushEditOperations(formatted);
               setEditorValue(formatted);
