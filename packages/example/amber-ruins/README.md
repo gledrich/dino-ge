@@ -11,6 +11,8 @@ have separate controls and can be muted together.
 The example uses `Tilemap.fromTiled` to import `assets/rooms.tmj`, `Sprite`
 for the explorer and relics, `Input.getGamepadAxes` for movement and `Sound`
 for music and effects. The example owns the game rules and restart state.
+It draws the HUD, menus and volume controls through Dino GE's `ScreenUI`
+and responds to the engine's pause event to suspend or resume its mixer.
 
 ImageGen created the tile atlas, explorer and amber art. The original mono
 PCM audio is reproducible with `python3 packages/example/amber-ruins/generate-audio.py`.

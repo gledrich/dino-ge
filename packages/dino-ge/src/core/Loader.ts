@@ -22,6 +22,7 @@ const INITIAL_STATE: LoaderState = {
  * Handles asynchronous loading of assets like images.
  */
 export default class ResourceLoader {
+  private static generation = 0;
   /** Internal helper to access the global shared state. */
   private static get _state(): LoaderState {
     const global = globalThis as unknown as { __DINO_LOADER_STATE__: LoaderState };
@@ -56,12 +57,17 @@ export default class ResourceLoader {
    */
   static async loadAll(onProgress?: (percent: number) => void): Promise<void> {
     if (this.loadingQueue.size === 0) return Promise.resolve();
+    const generation = this.generation;
 
     const promises = Array.from(this.loadingQueue.entries()).map(([tag, src]) => {
       return new Promise<void>((resolve, reject) => {
         const img = new Image();
         img.src = src;
         img.onload = () => {
+          if (generation !== this.generation) {
+            resolve();
+            return;
+          }
           this.assets.set(tag, img);
           this.loadedCount++;
           if (onProgress) {
@@ -70,6 +76,10 @@ export default class ResourceLoader {
           resolve();
         };
         img.onerror = () => {
+          if (generation !== this.generation) {
+            resolve();
+            return;
+          }
           console.error(`Failed to load asset: ${src}`);
           reject();
         };
@@ -77,6 +87,9 @@ export default class ResourceLoader {
     });
 
     await Promise.all(promises);
+    if (generation !== this.generation) {
+      throw new DOMException('The asset load was cancelled.', 'AbortError');
+    }
     this.loadingQueue.clear();
     this.totalToLoad = 0;
     this.loadedCount = 0;
@@ -110,6 +123,7 @@ export default class ResourceLoader {
    * Clears all loaded assets and the loading queue.
    */
   static clear() {
+    this.generation++;
     this.assets.clear();
     this.loadingQueue.clear();
     this.totalToLoad = 0;

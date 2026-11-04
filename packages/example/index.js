@@ -500,20 +500,31 @@ class GameOverScene extends Scene {
 
 class DinoSurvival {
   constructor() {
+    let disposed = false;
+    const onGameOver = event => this.showGameOver(event.detail);
+    const onStart = () => this.startGame();
+    const onMenu = () => this.showMenu();
     this.game = new Engine(
       {
         onLoad: async () => {
-          ResourceLoader.queueImage('dino', './sprites/DinoSprites - doux.png');
+          ResourceLoader.queueImage('dino', new URL('./sprites/DinoSprites - doux.png', import.meta.url).href);
           await ResourceLoader.loadAll((percent) => {
             console.log(`Loading: ${Math.round(percent)}%`);
           });
+          if (disposed) return;
 
           // Use Event Bus for Game State management
-          Engine.on('GAME_OVER', (e) => this.showGameOver(e.detail));
-          Engine.on('START_GAME', () => this.startGame());
-          Engine.on('SHOW_MENU', () => this.showMenu());
+          Engine.on('GAME_OVER', onGameOver);
+          Engine.on('START_GAME', onStart);
+          Engine.on('SHOW_MENU', onMenu);
 
           this.showMenu();
+        },
+        onDispose: () => {
+          disposed = true;
+          Engine.off('GAME_OVER', onGameOver);
+          Engine.off('START_GAME', onStart);
+          Engine.off('SHOW_MENU', onMenu);
         },
         update: () => {}
       },

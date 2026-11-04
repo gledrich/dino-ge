@@ -428,6 +428,22 @@ describe('Engine', () => {
     (engine as unknown as { _update: (ts: number) => void })._update(1000); // Should return immediately
   });
 
+  it('stops an old game’s pending callbacks and disposes its resources once', () => {
+    const onLoad = jest.fn();
+    const onDispose = jest.fn();
+    const delayed = jest.fn();
+    const old = new Engine({ ...callbacks, onLoad, onDispose });
+    old.setTimeout(delayed, 1000);
+
+    new Engine(callbacks);
+    old.terminate();
+    jest.advanceTimersByTime(1100);
+
+    expect(onDispose).toHaveBeenCalledTimes(1);
+    expect(onLoad).not.toHaveBeenCalled();
+    expect(delayed).not.toHaveBeenCalled();
+  });
+
   it('handles currentScene setter branches', () => {
     const scene = new MockScene();
     Engine.currentScene = scene;

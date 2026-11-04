@@ -9,6 +9,8 @@ export interface SoundPlaybackOptions {
 /** A decoded sound that can be played repeatedly through the engine's audio mixer. */
 export default class Sound {
   private static mixer?: { context: AudioContext; gains: Record<SoundVolumeChannel, GainNode> };
+  private static paused = false;
+  private static unlocked = false;
   private static readonly volume: Record<SoundVolumeChannel, number> = {
     master: 1,
     music: 1,
@@ -42,10 +44,27 @@ export default class Sound {
     try {
       const context = Sound.getMixer()?.context;
       if (!context) return false;
+      if (Sound.unlocked && Sound.paused) return true;
       if (context.state !== 'running') await context.resume();
-      return context.state === 'running';
+      if (context.state !== 'running') return false;
+      Sound.unlocked = true;
+      if (Sound.paused) await context.suspend();
+      return true;
     } catch {
       return false;
+    }
+  }
+
+  /** Suspends or resumes the mixer without restarting any sources. */
+  static async setPaused(paused: boolean): Promise<void> {
+    Sound.paused = paused;
+    const context = Sound.mixer?.context;
+    if (!context || !Sound.unlocked || context.state === 'closed') return;
+    try {
+      if (paused) await context.suspend();
+      else await context.resume();
+    } catch {
+      // Playback may remain unavailable until the next user gesture.
     }
   }
 
@@ -70,7 +89,8 @@ export default class Sound {
   /** Starts playback and returns a function that stops that playback. */
   play({ loop = false, channel = 'effects' }: SoundPlaybackOptions = {}): () => void {
     const mixer = Sound.mixer;
-    if (!mixer || mixer.context.state !== 'running') return () => {};
+    if (!mixer || !Sound.unlocked ||
+        (mixer.context.state !== 'running' && !Sound.paused)) return () => {};
 
     const source = mixer.context.createBufferSource();
     source.buffer = this.buffer;

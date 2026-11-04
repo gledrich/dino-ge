@@ -12,14 +12,14 @@ const exitCell = [23, 4];
 const controlsHint = 'Move with WASD, arrow keys or the left stick.';
 const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)');
 
-const hud = Object.fromEntries(
-  ['room', 'health', 'relics', 'hint', 'overlay', 'overlay-title', 'instructions', 'start', 'mute', 'music', 'effects']
-    .map(id => [id, document.getElementById(id)])
-);
+const embedded = !!document.getElementById('playground-canvas-container');
 
 let tilemap;
 let player;
+let amberImage;
 let relics = [];
+let phase = 'loading';
+let hint = controlsHint;
 let active = false;
 let health = 3;
 let collected = 0;
@@ -30,14 +30,13 @@ let vulnerableAt = 0;
 let walk;
 let previousFrame;
 let muted = false;
+const volume = { music: 0.4, effects: 0.7 };
+let relicPulse = 0;
+let healthPulse = 0;
 let audioLoading;
+let stopMusic;
+const lifetime = new AbortController();
 const sounds = {};
-
-function showStatus() {
-  hud.room.textContent = rooms[Math.min(rooms.length - 1, Math.floor(column / 8))];
-  hud.health.textContent = `Health ${health} / 3`;
-  hud.relics.textContent = `Relics ${collected} / ${relicCells.length}`;
-}
 
 function position(sprite, x, y, size) {
   const inset = (cellSize - size) / 2;
@@ -62,7 +61,7 @@ function makeSprite(tag, image, x, y, size, framesAcross = 1) {
 
 async function loadAudio() {
   if (!(await Sound.unlock())) {
-    hud.hint.textContent = 'Sound is unavailable. You can still explore.';
+    hint = 'Sound is unavailable. You can still explore.';
     return;
   }
   const names = ['pickup', 'damage', 'unlock', 'ruins-loop'];
@@ -71,7 +70,7 @@ async function loadAudio() {
     if (result.status === 'fulfilled') sounds[names[index]] = result.value;
     else console.warn(`Could not load ${names[index]} audio`, result.reason);
   }
-  sounds['ruins-loop']?.play({ loop: true, channel: 'music' });
+  if (!lifetime.signal.aborted) stopMusic = sounds['ruins-loop']?.play({ loop: true, channel: 'music' });
 }
 
 function start() {
@@ -89,26 +88,22 @@ function start() {
   player.flip = false;
   player.getComponent(VisibilityComponent).visible = true;
   player.currentFrame = 0;
+  healthPulse = 0;
+  relicPulse = 0;
   active = true;
-  hud.hint.textContent = controlsHint;
-  hud.overlay.hidden = true;
-  hud.start.blur();
-  showStatus();
+  phase = 'playing';
+  hint = controlsHint;
 }
 
 function finish(won) {
   active = false;
-  hud['overlay-title'].textContent = won ? 'Expedition complete' : 'Expedition lost';
-  hud.instructions.textContent = won
-    ? 'You opened the vault and brought back all three relics.'
-    : 'The ruins claimed your last heart. Take another route past the traps.';
-  hud.start.textContent = 'Try again';
-  hud.overlay.hidden = false;
-  hud.start.focus();
+  phase = won ? 'won' : 'lost';
 }
 
 function move(now) {
-  if (now < nextMove || document.activeElement instanceof HTMLInputElement) return;
+  const target = document.activeElement;
+  if (now < nextMove || target instanceof HTMLInputElement ||
+      target instanceof HTMLTextAreaElement || target?.isContentEditable) return;
   const pressed = (...keys) => Number(keys.some(key => Input.isKeyDown(key)));
   let x = pressed('d', 'ArrowRight') - pressed('a', 'ArrowLeft');
   let y = pressed('s', 'ArrowDown') - pressed('w', 'ArrowUp');
@@ -127,7 +122,7 @@ function move(now) {
   nextMove = now + stepDuration;
   if (tile === undefined || tile === 1) return;
   if (tile === 3 && collected < relicCells.length) {
-    hud.hint.textContent = 'The vault gate needs all three amber relics.';
+    hint = 'The vault gate needs all three amber relics.';
     return;
   }
 
@@ -142,26 +137,17 @@ function move(now) {
     visibility.visible = false;
     collected++;
     sounds.pickup?.play();
-    pulse(hud.relics, '#fff1c3');
+    relicPulse = now + 260;
     if (collected === relicCells.length) {
       tilemap.data[exitCell[1]][exitCell[0]] = 0;
-      hud.hint.textContent = 'The gate is open. Head to the far side of the Amber Vault.';
+      hint = 'The gate is open. Head to the far side of the Amber Vault.';
       sounds.unlock?.play();
     } else {
-      hud.hint.textContent = 'Amber relic recovered. Keep exploring.';
+      hint = 'Amber relic recovered. Keep exploring.';
     }
   }
 
-  showStatus();
   if (column === exitCell[0] && row === exitCell[1]) finish(true);
-}
-
-function pulse(element, colour) {
-  if (reducedMotion.matches) return;
-  element.animate([{ color: colour, scale: 1.16 }, { scale: 1 }], {
-    duration: 260,
-    easing: 'ease-out',
-  });
 }
 
 function animate(now) {
@@ -186,13 +172,14 @@ function animate(now) {
 
 function update() {
   if (!player) return;
-  const now = performance.now();
+  const now = Engine.totalTime;
   if (active) move(now);
   animate(now);
 
   const camera = Engine.camera;
   const roomIndex = Math.min(rooms.length - 1, Math.floor(column / 8));
-  camera.zoom = Math.min(game.width / (9 * cellSize), game.height / (9 * cellSize), 1.55);
+  const boardHeight = Math.max(80, game.height - (embedded ? 160 : 110));
+  camera.zoom = Math.min(game.width / (9 * cellSize), boardHeight / (9 * cellSize), 1.55);
   const viewWidth = game.width / camera.zoom;
   const mapWidth = tilemap.data[0].length * cellSize;
   const roomLeft = (4.5 + roomIndex * 8) * cellSize - viewWidth / 2;
@@ -200,29 +187,30 @@ function update() {
   const blend = previousFrame === undefined || reducedMotion.matches
     ? 1 : 1 - Math.exp(-(now - previousFrame) / 95);
   camera.position.set(camera.position.x + (targetX - camera.position.x) * blend,
-    4.5 * cellSize - game.height / (2 * camera.zoom));
+    4.5 * cellSize - (54 + boardHeight / 2) / camera.zoom);
   previousFrame = now;
 
   if (active && tilemap.data[row][column] === 2 && now >= vulnerableAt) {
     vulnerableAt = now + damageGrace;
     health--;
     sounds.damage?.play();
-    pulse(hud.health, '#ff9474');
-    hud.hint.textContent = 'Watch out for the obsidian spikes!';
-    showStatus();
+    healthPulse = now + 260;
+    hint = 'Watch out for the obsidian spikes!';
     if (health === 0) finish(false);
   }
 }
 
 async function loadLevel() {
-  const response = await fetch(asset('rooms.tmj'));
+  const response = await fetch(asset('rooms.tmj'), { signal: lifetime.signal });
   if (!response.ok) throw new Error(`Could not load rooms (HTTP ${response.status})`);
   const map = await response.json();
+  if (lifetime.signal.aborted) return;
 
   for (const [name, file] of [['tiles', 'ruins-atlas.png'], ['explorer', 'explorer-walk.png'], ['amber', 'amber.png']]) {
     Loader.queueImage(name, asset(file));
   }
   await Loader.loadAll();
+  if (lifetime.signal.aborted) return;
 
   tilemap = Tilemap.fromTiled(map, {
     tileset: 'tiles',
@@ -231,36 +219,121 @@ async function loadLevel() {
   });
   const scale = cellSize / tilemap.tileSize;
   tilemap.transform.scale.set(scale, scale);
-  const amber = Loader.getImage('amber');
-  relics = relicCells.map(([x, y], index) => makeSprite(`relic-${index + 1}`, amber, x, y, 62));
+  amberImage = Loader.getImage('amber');
+  relics = relicCells.map(([x, y], index) => makeSprite(`relic-${index + 1}`, amberImage, x, y, 62));
   player = makeSprite('explorer', Loader.getImage('explorer'), column, row, 44, 2);
-  hud.start.disabled = false;
+  phase = 'ready';
 }
 
-hud.start.addEventListener('click', start);
-hud.mute.addEventListener('click', () => {
+function toggleMute() {
   muted = !muted;
   Sound.setVolume('master', muted ? 0 : 1);
-  hud.mute.setAttribute('aria-pressed', String(muted));
-  hud.mute.textContent = muted ? 'Unmute sound' : 'Mute sound';
-});
-for (const channel of ['music', 'effects']) {
-  const setVolume = () => Sound.setVolume(channel, Number(hud[channel].value));
-  setVolume();
-  hud[channel].addEventListener('input', setVolume);
 }
-window.addEventListener('keydown', event => {
-  if (active && event.key.startsWith('Arrow') && !(event.target instanceof HTMLInputElement)) {
-    event.preventDefault();
+
+function changeVolume(channel, delta) {
+  volume[channel] = Math.max(0, Math.min(1, Math.round((volume[channel] + delta) * 10) / 10));
+  Sound.setVolume(channel, volume[channel]);
+}
+
+function drawUI(ui) {
+  const { width, height } = ui;
+  const now = Engine.totalTime;
+  const gold = '#f6b754';
+  const pale = '#f4ead6';
+  const small = 'bold 13px system-ui, sans-serif';
+  const centre = ui.anchor('centre', 'top').x;
+  const pad = width < 400 ? 9 : 15;
+  const roomName = rooms[Math.min(rooms.length - 1, Math.floor(column / 8))];
+  ui.panel({ x: 0, y: 0, width, height: 54 }, '#17282a');
+  ui.label({ x: pad, y: 17, text: 'AMBER RUINS', font: small, colour: gold, maxWidth: width / 3 - pad });
+  ui.label({ x: pad, y: 37, text: roomName, font: small, colour: pale, maxWidth: width / 3 - pad });
+  ui.label({ x: centre, y: 18, text: `Health ${health} / 3`, align: 'center', font: small,
+    colour: now < healthPulse && !reducedMotion.matches ? '#ff9474' : pale });
+  ui.progressBar({ x: centre - 32, y: 30, width: 64, height: 6, value: health / 3, colour: '#e47b60' });
+  ui.label({ x: width - pad, y: 19, text: `Relics ${collected} / 3`, align: 'right', font: small,
+    colour: now < relicPulse && !reducedMotion.matches ? '#fff1c3' : gold });
+
+  const audioTop = height - (embedded ? 86 : 43);
+  if (phase !== 'playing') {
+    const cardWidth = Math.min(370, width - 16);
+    const cardHeight = Math.min(208, Math.max(125, height - 100));
+    const cardY = Math.max(54, (height - cardHeight - (embedded ? 30 : 0)) / 2);
+    const title = {
+      loading: 'Opening the ruins…',
+      ready: 'Into the ruins',
+      won: 'Expedition complete',
+      lost: 'Expedition lost',
+      error: 'The ruins could not load',
+    }[phase];
+    const description = {
+      ready: 'Collect three relics and open the vault gate.',
+      won: 'You brought all three relics back.',
+      lost: 'Avoid the spikes and try another route.',
+      error: 'Reset or reload the game to try again.',
+    }[phase];
+    ui.panel({ x: 0, y: 54, width, height: Math.max(0, height - 54) }, '#0b171aa0');
+    ui.panel({ x: centre - cardWidth / 2, y: cardY, width: cardWidth, height: cardHeight }, '#203234');
+    if (cardHeight >= 180 && amberImage) {
+      ui.image(amberImage, { x: centre - 31, y: cardY + 5, width: 62, height: 62 });
+    }
+    ui.label({ x: centre, y: cardY + (cardHeight >= 180 ? 79 : 26), text: title,
+      font: 'bold 28px Georgia, serif', align: 'center', colour: pale, maxWidth: cardWidth - 18 });
+    if (description) ui.label({ x: centre, y: cardY + (cardHeight >= 180 ? 108 : 54),
+      text: description, align: 'center', colour: '#b8c6be', maxWidth: cardWidth - 16 });
+    if (['ready', 'won', 'lost'].includes(phase)) {
+      ui.button({ id: 'expedition', x: centre - 79, y: cardY + cardHeight - 55, width: 158, height: 38,
+        text: phase === 'ready' ? 'Start expedition' : 'Try again', onPress: start,
+        background: gold, hoverBackground: '#ffda94', colour: '#20180e' });
+    }
   }
-});
+
+  const barWidth = Math.min(width - pad * 2, 388);
+  const barX = centre - barWidth / 2;
+  ui.panel({ x: barX, y: audioTop, width: barWidth, height: 33 }, '#17282a');
+  const muteWidth = Math.min(105, barWidth * 0.27);
+  ui.button({ id: 'mute', x: barX, y: audioTop, width: muteWidth, height: 33,
+    text: muted ? 'Unmute sound' : 'Mute sound', onPress: toggleMute });
+  const groupWidth = (barWidth - muteWidth) / 2;
+  const stepWidth = Math.min(26, groupWidth / 4);
+  for (const [index, channel] of ['music', 'effects'].entries()) {
+    const left = barX + muteWidth + index * groupWidth;
+    ui.button({ id: `${channel}-down`, x: left, y: audioTop, width: stepWidth, height: 33, text: '−',
+      onPress: () => changeVolume(channel, -0.1) });
+    ui.label({ x: left + groupWidth / 2, y: audioTop + 16, align: 'center',
+      text: `${channel === 'music' ? 'Music' : 'Effects'} ${Math.round(volume[channel] * 100)}%`,
+      font: '12px system-ui, sans-serif', maxWidth: groupWidth - 2 * stepWidth - 2 });
+    ui.button({ id: `${channel}-up`, x: left + groupWidth - stepWidth, y: audioTop, width: stepWidth, height: 33,
+      text: '+', onPress: () => changeVolume(channel, 0.1) });
+  }
+  if (phase === 'playing') {
+    ui.label({ x: centre, y: audioTop - 13, align: 'center', text: hint,
+      colour: pale, font: '13px system-ui, sans-serif', maxWidth: width - pad * 2 });
+  }
+}
+
+Sound.setVolume('master', 1);
+for (const channel of ['music', 'effects']) Sound.setVolume(channel, volume[channel]);
+const onPaused = event => { void Sound.setPaused(event.detail); };
+Engine.on('paused', onPaused);
+void Sound.setPaused(Engine.paused);
 
 const game = new Engine({
   onLoad: () => {
     loadLevel().catch(error => {
-      hud.instructions.textContent = 'The ruins could not be loaded. Reload the page to try again.';
+      if (lifetime.signal.aborted) return;
+      phase = 'error';
       console.error(error);
     });
   },
+  onDispose: () => {
+    lifetime.abort();
+    stopMusic?.();
+    Engine.off('paused', onPaused);
+  },
   update,
-}, { title: 'Amber Ruins', containerId: 'viewport', backgroundColour: '#0b171a' });
+  drawUI,
+}, {
+  title: 'Amber Ruins',
+  containerId: embedded ? 'playground-canvas-container' : 'amber-ruins-viewport',
+  backgroundColour: '#0b171a',
+});

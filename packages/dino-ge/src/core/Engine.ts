@@ -2,6 +2,7 @@ import Canvas from './Canvas.js';
 import GameObject from './GameObject.js';
 import Input from './Input.js';
 import Scene from './Scene.js';
+import ScreenUI from './ScreenUI.js';
 import Camera from './Camera.js';
 import System from './System.js';
 import PhysicsSystem from '../systems/PhysicsSystem.js';
@@ -38,6 +39,10 @@ export interface EngineCallbacks {
   update: () => void;
   /** Optional callback for physics or fixed-step logic. */
   fixedUpdate?: () => void;
+  /** Draws game-owned interface elements after the world. */
+  drawUI?: (ui: ScreenUI) => void;
+  /** Releases game-owned resources when the engine is replaced or stopped. */
+  onDispose?: () => void;
 }
 
 /**
@@ -241,6 +246,8 @@ export default class Engine {
   }
 
   private _canvas: Canvas;
+  private readonly screenUI?: ScreenUI;
+  private readonly timers = new Set<number>();
   private _ctx: CanvasRenderingContext2D;
   private _window: HTMLDivElement;
   private _title: HTMLTitleElement;
@@ -290,9 +297,7 @@ export default class Engine {
   constructor(callbacks: EngineCallbacks, opts: Partial<EngineOpts> = {}) {
     // Terminate existing engine if any
     const global = globalThis as unknown as { __DINO_ENGINE_INSTANCE__?: Engine; };
-    if (global.__DINO_ENGINE_INSTANCE__) {
-      global.__DINO_ENGINE_INSTANCE__.terminate();
-    }
+    Engine.terminateCurrent();
     global.__DINO_ENGINE_INSTANCE__ = this;
 
     const defaultedOpts = {
@@ -316,16 +321,25 @@ export default class Engine {
 
     this.callbacks = {
       onLoad: () => {
-        callbacks.onLoad?.();
+        const loading = callbacks.onLoad?.();
+        void Promise.resolve(loading).catch(error => {
+          if (!this._destroyed) console.error('Could not initialise the game', error);
+        });
         this._onLoad();
       },
       update: callbacks.update,
       fixedUpdate: callbacks.fixedUpdate,
+      drawUI: callbacks.drawUI,
+      onDispose: callbacks.onDispose,
     };
 
     const container = defaultedOpts.containerId ? document.getElementById(defaultedOpts.containerId) : null;
     this._canvas = new Canvas(container || undefined);
     this._ctx = this._canvas.canvas.getContext('2d')!;
+    if (callbacks.drawUI) {
+      this._canvas.canvas.setAttribute('aria-label', defaultedOpts.title);
+      this.screenUI = new ScreenUI(this._ctx);
+    }
     this.width = this._canvas.canvas.width;
     this.height = this._canvas.canvas.height;
 
@@ -366,14 +380,26 @@ export default class Engine {
     };
     window.addEventListener('resize', this._resizeHandler);
 
-    setTimeout(() => this.callbacks.onLoad?.(), 0);
+    setTimeout(() => {
+      if (!this._destroyed) this.callbacks.onLoad?.();
+    }, 0);
   }
 
   /**
-   * Completely stops the engine and cleans up all resources.
+   * Stops the current engine, if one is running.
    */
+  public static terminateCurrent(): void {
+    const global = globalThis as unknown as { __DINO_ENGINE_INSTANCE__?: Engine | null };
+    global.__DINO_ENGINE_INSTANCE__?.terminate();
+  }
+
+  /** Completely stops this engine and cleans up its resources. */
   public terminate() {
+    if (this._destroyed) return;
     this._destroyed = true;
+    this.screenUI?.dispose();
+    this.timers.forEach(timer => window.clearTimeout(timer));
+    this.timers.clear();
     window.removeEventListener('resize', this._resizeHandler);
     this._canvas.destroy();
     if (this._isWindowInternal && this._window) {
@@ -386,6 +412,7 @@ export default class Engine {
     if (global.__DINO_ENGINE_INSTANCE__ === this) {
       global.__DINO_ENGINE_INSTANCE__ = null;
     }
+    this.callbacks.onDispose?.();
   }
 
   private _onLoad() {
@@ -467,6 +494,7 @@ export default class Engine {
     if (Engine.debug) {
       this._drawDebug(objects);
     }
+    if (this.screenUI && this.callbacks.drawUI) this.screenUI.render(this.callbacks.drawUI);
   }
 
   /**
@@ -551,7 +579,13 @@ export default class Engine {
    * @returns A timer ID.
    */
   public setTimeout(callback: () => void, delay: number): number {
-    return window.setTimeout(callback, delay);
+    const timer = window.setTimeout(() => {
+      this.timers.delete(timer);
+      if (!this._destroyed) callback();
+    }, delay);
+    if (this._destroyed) window.clearTimeout(timer);
+    else this.timers.add(timer);
+    return timer;
   }
 
   /**

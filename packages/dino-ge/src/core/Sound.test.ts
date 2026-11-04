@@ -31,6 +31,7 @@ describe('Sound', () => {
       state: 'suspended',
       destination: {},
       resume: jest.fn(async () => { audio.state = 'running'; }),
+      suspend: jest.fn(async () => { audio.state = 'suspended'; }),
       createGain: jest.fn(() => gains[gainIndex++]),
       createBufferSource: jest.fn(() => sources[sourceIndex++]),
       decodeAudioData: jest.fn().mockResolvedValue(buffer),
@@ -88,5 +89,20 @@ describe('Sound', () => {
     audio.decodeAudioData.mockRejectedValueOnce(new Error('Invalid audio'));
     await expect(Sound.load('/bad.wav')).rejects.toThrow('Invalid audio');
     expect(audio.createBufferSource).not.toHaveBeenCalled();
+  });
+
+  it('suspends and resumes the same looping source without restarting it', async () => {
+    const { audio, sources } = createBackend();
+    const { default: Sound } = await import('./Sound.js');
+    expect(await Sound.unlock()).toBe(true);
+    const sound = await Sound.load('/music.wav');
+    sound.play({ loop: true, channel: 'music' });
+
+    await Sound.setPaused(true);
+    expect(audio.state).toBe('suspended');
+    await Sound.setPaused(false);
+    expect(audio.state).toBe('running');
+    expect(audio.createBufferSource).toHaveBeenCalledTimes(1);
+    expect(sources[0].stop).not.toHaveBeenCalled();
   });
 });

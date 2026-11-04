@@ -131,4 +131,29 @@ describe('ResourceLoader', () => {
     expect(getPrivateState().totalToLoad).toBe(0);
     expect(getPrivateState().loadedCount).toBe(0);
   });
+
+  it('does not let a stopped game replace an asset loaded by the next game', async () => {
+    const originalImage = global.Image;
+    const images: { src?: string; onload?: () => void }[] = [];
+    global.Image = jest.fn(() => {
+      const image = {};
+      images.push(image);
+      return image;
+    }) as unknown as typeof Image;
+
+    try {
+      ResourceLoader.queueImage('player', 'old-player.png');
+      const cancelled = expect(ResourceLoader.loadAll()).rejects.toMatchObject({ name: 'AbortError' });
+      ResourceLoader.clear();
+      ResourceLoader.queueImage('player', 'new-player.png');
+      const active = ResourceLoader.loadAll();
+      images[1].onload?.();
+      await active;
+      images[0].onload?.();
+      await cancelled;
+      expect(ResourceLoader.getImage('player').src).toBe('new-player.png');
+    } finally {
+      global.Image = originalImage;
+    }
+  });
 });
