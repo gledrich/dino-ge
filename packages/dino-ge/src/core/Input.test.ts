@@ -57,6 +57,41 @@ describe('Input', () => {
     expect(Input.isKeyDown('w')).toBe(false);
   });
 
+  describe('gamepads', () => {
+    const original = Object.getOwnPropertyDescriptor(navigator, 'getGamepads');
+
+    afterEach(() => {
+      if (original) Object.defineProperty(navigator, 'getGamepads', original);
+      else Reflect.deleteProperty(navigator, 'getGamepads');
+    });
+
+    const mockGamepads = (getGamepads: unknown) => {
+      Object.defineProperty(navigator, 'getGamepads', { configurable: true, value: getGamepads });
+    };
+
+    it('returns neutral input when the browser has no Gamepad API', () => {
+      mockGamepads(undefined);
+      expect(Input.getGamepad()).toBeNull();
+      expect(Input.getGamepadAxes()).toEqual(new Vector2(0, 0));
+    });
+
+    it('polls sparse standard gamepads, applies a dead zone and detects disconnects', () => {
+      const standard = { connected: true, mapping: 'standard', axes: [0.2, -0.75] };
+      const other = { connected: true, mapping: '', axes: [1, 1] };
+      const pads = jest.fn().mockReturnValue([null, other, standard]);
+      mockGamepads(pads);
+
+      expect(Input.getGamepad()).toBe(standard);
+      expect(Input.getGamepad(1)).toBeNull();
+      expect(Input.getGamepad(2)).toBe(standard);
+      expect(Input.getGamepadAxes(2)).toEqual(new Vector2(0, -0.75));
+
+      pads.mockReturnValue([null, other, { ...standard, connected: false }]);
+      expect(Input.getGamepad()).toBeNull();
+      expect(Input.getGamepadAxes()).toEqual(new Vector2(0, 0));
+    });
+  });
+
   it('manages global click listeners', () => {
     const callback = jest.fn();
     Input.addClickListener(callback);

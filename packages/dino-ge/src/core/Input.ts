@@ -230,6 +230,30 @@ export default class Input {
     return this.keys.has(key.toLowerCase());
   }
 
+  /** Returns a connected standard-mapped pad, or the first one if no index is supplied. */
+  static getGamepad(index?: number): Gamepad | null {
+    if (typeof navigator === 'undefined' || typeof navigator.getGamepads !== 'function') return null;
+
+    try {
+      const pads = navigator.getGamepads();
+      const isStandard = (pad: Gamepad | null | undefined): pad is Gamepad =>
+        pad?.connected === true && pad.mapping === 'standard';
+
+      if (index === undefined) return Array.from(pads).find(isStandard) ?? null;
+      const pad = pads[index];
+      return isStandard(pad) ? pad : null;
+    } catch (error) {
+      if (error instanceof DOMException && error.name === 'SecurityError') return null;
+      throw error;
+    }
+  }
+
+  /** Returns the left stick axes with a dead zone of 0.2 on each axis. */
+  static getGamepadAxes(index?: number): Vector2 {
+    const [x = 0, y = 0] = this.getGamepad(index)?.axes ?? [];
+    return new Vector2(Math.abs(x) > 0.2 ? x : 0, Math.abs(y) > 0.2 ? y : 0);
+  }
+
   /**
    * Current mouse x position in world space.
    */
