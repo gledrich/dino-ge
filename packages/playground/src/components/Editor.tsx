@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import Editor from '@monaco-editor/react';
 import * as Dino from 'dino-ge';
 import { getScript, getFilesList, setCurrentScriptId, updateScript } from '../utils/helpers';
@@ -25,14 +25,24 @@ const CodeEditor: React.FC<EditorProps> = ({ currentScriptId, onRefresh }) => {
   }, [onRefresh]);
 
   const handleFormat = useCallback(async () => {
+    const model = monacoEditorRef.current?.getModel();
+    if (!model) return;
+    const value = model.getValue();
+
     setIsFormatting(true);
-    const formatted = await formatCode(editorValue);
-    if (formatted !== editorValue) {
+    const formatted = await formatCode(value);
+    if (formatted !== value && monacoEditorRef.current?.getModel() === model &&
+        model.getValue() === value) {
       pushEditOperations(formatted);
       setEditorValue(formatted);
     }
     setIsFormatting(false);
-  }, [editorValue, formatCode, pushEditOperations]);
+  }, [formatCode, monacoEditorRef, pushEditOperations]);
+
+  const editorCommands = useRef({ save: handleSave, format: handleFormat });
+  useEffect(() => {
+    editorCommands.current = { save: handleSave, format: handleFormat };
+  }, [handleSave, handleFormat]);
 
   useEffect(() => {
     const refreshScripts = async () => {
@@ -226,15 +236,47 @@ const CodeEditor: React.FC<EditorProps> = ({ currentScriptId, onRefresh }) => {
     }
   };
 
-  const handleEditorDidMount = (editor: any, monaco: any) => {
+  const handleEditorDidMount = async (editor: any, monaco: any) => {
     monacoEditorRef.current = editor;
+
     editor.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyCode.KeyS, () => {
-      handleSave(editor.getValue());
+      editorCommands.current.save(editor.getValue());
     });
 
     editor.addCommand(monaco.KeyMod.Shift | monaco.KeyMod.Alt | monaco.KeyCode.KeyF, () => {
-      handleFormat();
+      editorCommands.current.format();
     });
+
+    try {
+      const response = await fetch('/api/types');
+      if (!response.ok) {
+        throw new Error(`Could not load Dino GE declarations (HTTP ${response.status})`);
+      }
+
+      const types: Record<string, string> = await response.json();
+      const { javascriptDefaults, ScriptTarget, ModuleResolutionKind, ModuleKind } =
+        monaco.languages.typescript;
+
+      // The JavaScript worker resolves declarations from its virtual files.
+      const libraries = Object.entries(types).map(([path, content]) => ({
+        filePath: `file:///node_modules/dino-ge/${path}`,
+        content,
+      }));
+      javascriptDefaults.setExtraLibs(libraries);
+      javascriptDefaults.setCompilerOptions({
+        target: ScriptTarget.ESNext,
+        allowNonTsExtensions: true,
+        moduleResolution: ModuleResolutionKind.NodeJs,
+        module: ModuleKind.ESNext,
+        noEmit: true,
+        checkJs: true,
+        allowJs: true,
+        baseUrl: 'file:///',
+        paths: { 'dino-ge': ['node_modules/dino-ge/dist/index.d.ts'] },
+      });
+    } catch (err) {
+      console.error('Failed to load types:', err);
+    }
   };
 
   return (

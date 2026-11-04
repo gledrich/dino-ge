@@ -1,4 +1,39 @@
 import { test, expect } from '@playwright/test';
+import { randomUUID } from 'node:crypto';
+import { mkdtemp, readFile, rm, symlink, writeFile } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { fileURLToPath } from 'node:url';
+
+test('script routes refuse symbolic links to files outside the scripts directory', async ({ request }) => {
+  const outside = await mkdtemp(join(tmpdir(), 'dino-ge-script-test-'));
+  const target = join(outside, 'outside.js');
+  const name = `symlink-${randomUUID()}.js`;
+  const link = fileURLToPath(new URL(`../scripts/${name}`, import.meta.url));
+
+  try {
+    await writeFile(target, '// original');
+    await symlink(target, link);
+    expect.soft((await request.get(`/api/scripts/${name}`)).status()).toBe(404);
+    expect.soft((await request.get(`/scripts/${name}`)).status()).toBe(404);
+    const write = await request.put(`/api/scripts/${name}`, { data: { data: '// changed' } });
+    expect.soft(write.status()).toBe(404);
+    expect(await readFile(target, 'utf8')).toBe('// original');
+  } finally {
+    await rm(link, { force: true });
+    await rm(outside, { recursive: true, force: true });
+  }
+});
+
+test('rejects script IDs that escape the scripts directory', async ({ request }) => {
+  const read = await request.get('/api/scripts/..%2Fserver.js');
+  expect(read.status()).toBe(400);
+
+  const write = await request.put('/api/scripts/..%2Fmissing-test-directory%2Fscript.js', {
+    data: { data: '' },
+  });
+  expect(write.status()).toBe(400);
+});
 
 test.describe('Playground Smoke Tests', () => {
   test.beforeEach(async ({ page }) => {
@@ -65,8 +100,7 @@ test.describe('Playground Smoke Tests', () => {
     const editorHeader = page.locator('.panel-header').filter({ hasText: 'Editor' });
     await expect(editorHeader).toBeVisible();
 
-    // Collapsing - click the chevron down in the header
-    const collapseButton = page.locator('.panel-header .fa-chevron-down');
+    const collapseButton = page.getByRole('button', { name: 'Collapse editor' });
     await collapseButton.click();
     await expect(editorHeader).not.toBeVisible();
 

@@ -128,7 +128,10 @@ function App() {
             </Panel>
             
             {!isEditorVisible && (
-              <div 
+              <button
+                type="button"
+                aria-label="Expand editor"
+                className="editor-panel-toggle"
                 style={{ 
                   width: '100%', 
                   height: '15px', 
@@ -141,8 +144,8 @@ function App() {
                 onClick={() => setIsEditorVisible(true)}
                 data-testid="editor-expand-button"
               >
-                <i className="fa-solid fa-chevron-up" style={{ fontSize: '12px' }} />
-              </div>
+                <span aria-hidden="true">▴</span>
+              </button>
             )}
 
             <Separator 
@@ -181,12 +184,15 @@ function App() {
                       Console
                     </span>
                     <span style={{ flex: 1 }} />
-                    <span 
+                    <button
+                      type="button"
+                      aria-label="Collapse editor"
+                      className="editor-panel-toggle"
                       style={{ cursor: 'pointer', opacity: 0.6 }}
                       onClick={() => setIsEditorVisible(false)}
                     >
-                      <i className="fa-solid fa-chevron-down" style={{ fontSize: '10px' }} />
-                    </span>
+                      <span aria-hidden="true">▾</span>
+                    </button>
                   </div>
                   <div className="panel-content">
                     {activeTab === 'editor' ? (

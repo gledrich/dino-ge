@@ -91,6 +91,12 @@
   flex-shrink: 0;
 }
 
+.editor-panel-toggle {
+  background: transparent;
+  border: 0;
+  color: inherit;
+}
+
 .panel-content {
   flex: 1;
   min-height: 0;
