@@ -1,12 +1,14 @@
 import * as acorn from 'acorn';
+import { sceneObjectDefaults, sceneSourceKey, type SceneObjectPlacement } from './scene-objects';
 
 export interface PropertyLocation {
   nodeStart: number;
   nodeEnd: number;
   valueStart: number;
   valueEnd: number;
+  numeric: boolean;
   // For special types like Vector2
-  args?: Array<{ start: number, end: number }>;
+  args?: Array<{ start: number, end: number, numeric: boolean }>;
   // For nested objects
   properties?: Record<string, PropertyLocation>;
 }
@@ -39,31 +41,38 @@ export const getSourceMapping = () => sourceMappingRegistry;
 /**
  * Recursively maps properties of an ObjectExpression.
  */
-const mapProperties = (objExpr: any): Record<string, PropertyLocation> => {
+const mapProperties = (objExpr: any, imports: Map<string, string>): Record<string, PropertyLocation> => {
   const mapping: Record<string, PropertyLocation> = {};
   if (!objExpr || objExpr.type !== 'ObjectExpression') return mapping;
 
   objExpr.properties.forEach((prop: any) => {
-    if (prop.key.type === 'Identifier') {
+    if (prop.key?.type === 'Identifier') {
+      const isNumeric = (node: any): boolean =>
+        (node.type === 'Literal' && typeof node.value === 'number') ||
+        (node.type === 'UnaryExpression' && ['-', '+'].includes(node.operator) &&
+          node.argument.type === 'Literal' && typeof node.argument.value === 'number');
       const propLoc: PropertyLocation = {
         nodeStart: prop.start,
         nodeEnd: prop.end,
         valueStart: prop.value.start,
         valueEnd: prop.value.end,
+        numeric: isNumeric(prop.value),
       };
 
       // Handle Vector2 instantiations
       if (prop.value.type === 'NewExpression' && 
-          (prop.value.callee.name === 'Vector2' || (prop.value.callee.property && prop.value.callee.property.name === 'Vector2'))) {
+          (prop.value.callee.name === 'Vector2' || imports.get(prop.value.callee.name) === 'Vector2' ||
+            prop.value.callee.property?.name === 'Vector2')) {
         propLoc.args = prop.value.arguments.map((arg: any) => ({
           start: arg.start,
-          end: arg.end
+          end: arg.end,
+          numeric: isNumeric(arg),
         }));
       }
 
       // Handle nested objects
       if (prop.value.type === 'ObjectExpression') {
-        propLoc.properties = mapProperties(prop.value);
+        propLoc.properties = mapProperties(prop.value, imports);
       }
 
       mapping[prop.key.name] = propLoc;
@@ -72,6 +81,29 @@ const mapProperties = (objExpr: any): Record<string, PropertyLocation> => {
 
   return mapping;
 };
+
+function dinoImports(ast: acorn.Program): Map<string, string> {
+  const imports = new Map<string, string>();
+  for (const node of ast.body) {
+    if (node.type !== 'ImportDeclaration' || node.source.value !== 'dino-ge') continue;
+    for (const specifier of node.specifiers) {
+      if (specifier.type === 'ImportSpecifier' && specifier.imported.type === 'Identifier') {
+        imports.set(specifier.local.name, specifier.imported.name);
+      }
+    }
+  }
+  return imports;
+}
+
+function sceneDeclarations(ast: acorn.Program, imports: Map<string, string>) {
+  return ast.body.flatMap(node => {
+    const declaration = node.type === 'ExportNamedDeclaration' || node.type === 'ExportDefaultDeclaration'
+      ? node.declaration : node;
+    return declaration?.type === 'ClassDeclaration' && declaration.id &&
+      declaration.superClass?.type === 'Identifier' && imports.get(declaration.superClass.name) === 'Scene'
+      ? [declaration] : [];
+  });
+}
 
 export interface InstrumentationResult {
   code: string;
@@ -119,7 +151,7 @@ export function rebaseModule(code: string, moduleUrl: URL): string {
  * Instruments the provided code by injecting __sourceId into Dino GE object instantiations.
  * Also builds the source mapping registry.
  */
-export const instrumentCode = (code: string, trackEditorSource = true): InstrumentationResult => {
+export const instrumentCode = (code: string, trackEditorSource = true, scriptId?: string): InstrumentationResult => {
   if (trackEditorSource) resetSourceMapping();
   const occurrenceCounts: Record<string, number> = {};
   
@@ -136,8 +168,15 @@ export const instrumentCode = (code: string, trackEditorSource = true): Instrume
     return { code, error: err.message || 'Syntax Error' };
   }
 
-  let offset = 0;
-  let instrumentedCode = code;
+  const imports = dinoImports(ast);
+  const injections: Edit[] = [];
+  if (scriptId) {
+    for (const scene of sceneDeclarations(ast, imports)) {
+      const start = scene.body.start + 1;
+      const metadata = { scriptId, className: scene.id!.name };
+      injections.push({ start, end: start, newText: `static ${sceneSourceKey} = ${JSON.stringify(metadata)};` });
+    }
+  }
 
   const isGameObject = (node: any, args: any[]) => {
     if (node.callee.type !== 'Identifier' || args.length === 0 || args[0].type !== 'ObjectExpression') return false;
@@ -161,7 +200,7 @@ export const instrumentCode = (code: string, trackEditorSource = true): Instrume
         const props = args[0].properties;
         
         // Deterministic ID based on type, tag, and occurrence
-        const tagProp = props.find((p: any) => p.key.name === 'tag');
+        const tagProp = props.find((p: any) => p.key?.name === 'tag');
         const tagValue = (tagProp && tagProp.value.type === 'Literal') ? String(tagProp.value.value) : 'no-tag';
         const type = node.callee.name;
         const idKey = `${type}-${tagValue}`;
@@ -172,19 +211,18 @@ export const instrumentCode = (code: string, trackEditorSource = true): Instrume
         // Record property locations (using original offsets)
         if (trackEditorSource) sourceMappingRegistry[sourceId] = {
           sourceId,
-          type: node.callee.name,
+          type: imports.get(node.callee.name) ?? node.callee.name,
           start: node.start,
           end: node.end,
           contentStart: args[0].start + 1, // After {
           contentEnd: args[0].end - 1,    // Before }
-          properties: mapProperties(args[0]),
+          properties: mapProperties(args[0], imports),
         };
 
         // Inject __sourceId into the object literal in the instrumented version
         const injection = `__sourceId: ${JSON.stringify(sourceId)}, `;
-        const insertPos = args[0].start + 1 + offset;
-        instrumentedCode = instrumentedCode.slice(0, insertPos) + injection + instrumentedCode.slice(insertPos);
-        offset += injection.length;
+        const start = args[0].start + 1;
+        injections.push({ start, end: start, newText: injection });
       }
     }
 
@@ -200,6 +238,10 @@ export const instrumentCode = (code: string, trackEditorSource = true): Instrume
   };
 
   walk(ast);
+  let instrumentedCode = code;
+  for (const { start, newText } of injections.sort((a, b) => b.start - a.start)) {
+    instrumentedCode = instrumentedCode.slice(0, start) + newText + instrumentedCode.slice(start);
+  }
   return { code: instrumentedCode };
 };
 
@@ -207,6 +249,91 @@ export interface Edit {
   start: number;
   end: number;
   newText: string;
+}
+
+/** Adds a constructor to the active scene or engine startup callback. */
+export function getSceneObjectCreation(source: string, placement: SceneObjectPlacement) {
+  let ast: acorn.Program;
+  try {
+    ast = acorn.parse(source, { ecmaVersion: 'latest', sourceType: 'module' });
+  } catch {
+    return null;
+  }
+  const imports = dinoImports(ast);
+  const configurations: acorn.ObjectExpression[] = [];
+  const visit = (node: any) => {
+    if (node.type === 'NewExpression' && imports.get(node.callee.name) === 'Engine' &&
+      node.arguments[0]?.type === 'ObjectExpression') {
+      configurations.push(node.arguments[0]);
+    }
+    for (const value of Object.values(node)) {
+      for (const child of Array.isArray(value) ? value : [value]) {
+        if (child && typeof child === 'object' && 'type' in child) visit(child);
+      }
+    }
+  };
+  const isOnLoad = (key: acorn.Node) =>
+    (key.type === 'Identifier' && (key as acorn.Identifier).name === 'onLoad') ||
+    (key.type === 'Literal' && (key as acorn.Literal).value === 'onLoad');
+  let callback: acorn.Node | undefined;
+  let insertion: number;
+  if (placement.scene) {
+    const scene = sceneDeclarations(ast, imports).find(item => item.id?.name === placement.scene?.className);
+    if (!scene || scene.body.body.some(member => 'computed' in member && member.computed)) return null;
+    const hooks = scene.body.body.filter(member => 'key' in member && !member.static && isOnLoad(member.key));
+    if (hooks.length > 1) return null;
+    const [hook] = hooks;
+    if (hook && (hook.type !== 'MethodDefinition' || hook.kind !== 'method')) return null;
+    callback = hook?.value;
+    insertion = scene.body.start + 1;
+  } else {
+    visit(ast);
+    if (configurations.length !== 1) return null;
+    const config = configurations[0];
+    if (config.properties.some(prop => prop.type !== 'Property' || prop.computed)) return null;
+    const hooks = config.properties.filter((prop): prop is acorn.Property => prop.type === 'Property' && isOnLoad(prop.key));
+    if (hooks.length > 1 || (hooks[0] && hooks[0].kind !== 'init')) return null;
+    callback = hooks[0]?.value;
+    insertion = config.start + 1;
+  }
+  if (callback && callback.type !== 'ArrowFunctionExpression' && callback.type !== 'FunctionExpression') return null;
+  const body = (callback as acorn.FunctionExpression | acorn.ArrowFunctionExpression | undefined)?.body;
+  if (body && body.type !== 'BlockStatement') return null;
+
+  const addedImports: string[] = [];
+  const binding = (name: string) => {
+    const existing = Array.from(imports).find(([local, exported]) => exported === name && local.startsWith('DinoPlace'));
+    if (existing) return existing[0];
+    const base = `DinoPlace${name}`;
+    let local = base;
+    for (let i = 2; source.includes(local); i++) local = `${base}${i}`;
+    addedImports.push(`${name} as ${local}`);
+    return local;
+  };
+  const constructor = binding(placement.kind);
+  const vector = binding('Vector2');
+  let tag = placement.tag;
+  for (let i = 2; source.includes(tag); i++) tag = `${placement.tag} ${i}`;
+  const options = placement.kind === 'Sprite'
+    ? `img: Object.assign(new Image(), { src: ${placement.asset.source} }), rows: 1, cols: 1, scale: new ${vector}(${placement.asset.scale}, ${placement.asset.scale})`
+    : Object.entries(sceneObjectDefaults[placement.kind])
+      .map(([key, value]) => `${key}: ${JSON.stringify(value)}`).join(', ');
+  const registration = placement.kind === 'Sprite' ? '.play()' : '';
+  const statement = `new ${constructor}({ tag: ${JSON.stringify(tag)}, position: new ${vector}(${placement.x}, ${placement.y}), ${options} })${registration};`;
+  const edits: Edit[] = [];
+  if (body?.type === 'BlockStatement') {
+    const directive = body.body.filter(item => 'directive' in item).at(-1);
+    const start = directive?.end ?? body.start + 1;
+    edits.push({ start, end: start, newText: `\n    ${statement}\n` });
+  } else {
+    const separator = placement.scene ? '' : ',';
+    edits.push({ start: insertion, end: insertion, newText: `\n  onLoad() {\n    ${statement}\n  }${separator}\n` });
+  }
+  if (addedImports.length) {
+    const start = ast.body.find(node => node.type === 'ImportDeclaration')?.start ?? 0;
+    edits.push({ start, end: start, newText: `import { ${addedImports.join(', ')} } from 'dino-ge';\n` });
+  }
+  return { edits, tag, sourceId: `${constructor}-${tag}-0` };
 }
 
 /**

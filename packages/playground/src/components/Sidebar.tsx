@@ -86,20 +86,20 @@ const Sidebar: React.FC = () => {
   return (
     <div className="sidebar">
       <div className="sidebar-tabs">
-        <div 
+        <button type="button" aria-pressed={activeTab === 'snippets'}
           className={`sidebar-tab ${activeTab === 'snippets' ? 'active' : ''}`} 
           onClick={() => setActiveTab('snippets')}
         >
           <i className="fa-solid fa-code" />
           <span>Snippets</span>
-        </div>
-        <div 
+        </button>
+        <button type="button" aria-pressed={activeTab === 'assets'}
           className={`sidebar-tab ${activeTab === 'assets' ? 'active' : ''}`} 
           onClick={() => setActiveTab('assets')}
         >
           <i className="fa-solid fa-images" />
           <span>Assets</span>
-        </div>
+        </button>
       </div>
       
       <div className="sidebar-content">

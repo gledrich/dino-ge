@@ -1,4 +1,7 @@
 import React, { useEffect, useState } from 'react';
+import { Loader } from 'dino-ge';
+import { usePlayground } from '../context/PlaygroundContext';
+import { sceneAssetDragType } from '../utils/scene-objects';
 import '../styles/asset-panel.css';
 
 interface AssetEntry {
@@ -8,21 +11,11 @@ interface AssetEntry {
 
 const AssetPanel: React.FC = () => {
   const [assets, setAssets] = useState<AssetEntry[]>([]);
+  const { isPaused, isDebug } = usePlayground();
+  const isEditing = isPaused && isDebug;
 
   useEffect(() => {
-    const updateAssets = () => {
-      // Directly access global state to ensure we see assets even if multiple Dino instances exist
-      const global = globalThis as any;
-      const loaderState = global.__DINO_LOADER_STATE__;
-      
-      if (loaderState && loaderState.assets) {
-        const assetsMap = loaderState.assets as Map<string, HTMLImageElement>;
-        setAssets(Array.from(assetsMap.entries()).map(([tag, image]) => ({
-          tag,
-          image
-        })));
-      }
-    };
+    const updateAssets = () => setAssets(Loader.getLoadedAssets());
 
     updateAssets();
     // Poll for new assets
@@ -32,14 +25,22 @@ const AssetPanel: React.FC = () => {
 
   return (
     <div className="asset-panel">
+      <p className="asset-help">{isEditing ? 'Drag an image onto the scene or click to add a sprite.' : 'Enter Edit scene to place images as sprites.'}</p>
       <div className="asset-list">
         {assets.length === 0 ? (
           <div className="no-assets">No assets loaded.</div>
         ) : (
           assets.map((asset) => (
-            <div key={asset.tag} className="asset-item" title={asset.image.src}>
+            <button key={asset.tag} type="button" className="asset-item" title={asset.image.src}
+              aria-label={`Add ${asset.tag} as sprite`} disabled={!isEditing} draggable={isEditing}
+              onClick={() => window.dispatchEvent(new CustomEvent('playground-place-asset', { detail: asset.tag }))}
+              onDragStart={event => {
+                event.dataTransfer.setData(sceneAssetDragType, asset.tag);
+                event.dataTransfer.effectAllowed = 'copy';
+              }}
+            >
               <div className="asset-preview">
-                <img src={asset.image.src} alt={asset.tag} />
+                <img src={asset.image.src} alt="" draggable={false} />
               </div>
               <div className="asset-info">
                 <span className="asset-tag">{asset.tag}</span>
@@ -47,7 +48,7 @@ const AssetPanel: React.FC = () => {
                   {asset.image.width}x{asset.image.height}px
                 </span>
               </div>
-            </div>
+            </button>
           ))
         )}
       </div>

@@ -24,6 +24,15 @@
   gap: 12px;
   border: 1px solid transparent;
   transition: all 0.2s;
+  text-align: left;
+}
+
+.asset-item:not(:disabled) { cursor: grab; }
+
+.asset-help {
+  margin: 8px 10px 0;
+  color: var(--text-secondary);
+  font-size: 11px;
 }
 
 .asset-item:hover {

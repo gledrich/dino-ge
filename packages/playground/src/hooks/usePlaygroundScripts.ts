@@ -20,10 +20,11 @@ export const usePlaygroundScripts = () => {
     const run = ++runId.current;
     const scriptText = await getScript(currentScriptId);
     if (run !== runId.current) return;
-    const result = instrumentCode(scriptText, false);
+    const result = instrumentCode(scriptText, false, currentScriptId);
     window.dispatchEvent(new CustomEvent('playground-syntax-error', { detail: result.error ?? null }));
     if (result.error) return;
 
+    window.dispatchEvent(new Event('playground-before-run'));
     Engine.terminateCurrent();
     Engine.destroyAll();
     Engine.currentScene = null;

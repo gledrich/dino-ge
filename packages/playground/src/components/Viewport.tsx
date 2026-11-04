@@ -1,15 +1,21 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
+import { Engine, Loader } from 'dino-ge';
 import { usePlayground } from '../context/PlaygroundContext';
 import Toolbar from './Toolbar';
 import Logo from './Logo';
+import { getAssetSource, getSceneSource, sceneAssetDragType, sceneObjectDragType, sceneObjectKinds, type SceneObjectKind, type SceneObjectPlacement } from '../utils/scene-objects';
 
 const Viewport: React.FC = () => {
   const { 
+    currentScriptId,
     isViewportReady, 
     setIsViewportReady, 
     isInspectorVisible, 
+    setIsInspectorVisible,
     isPaused, 
+    setIsPaused,
     isDebug, 
+    setIsDebug,
     togglePause, 
     toggleDebug, 
     arePanelsMinimized, 
@@ -17,6 +23,80 @@ const Viewport: React.FC = () => {
   } = usePlayground();
 
   const viewportContainerRef = useRef<HTMLDivElement>(null);
+  const isEditingScene = isPaused && isDebug;
+  const [placementStatus, setPlacementStatus] = useState('');
+  const [dropGuide, setDropGuide] = useState<{ x: number; y: number }>();
+
+  const addObject = useCallback((kind: SceneObjectKind | 'Sprite', clientX?: number, clientY?: number, assetTag?: string) => {
+    const canvas = viewportContainerRef.current?.querySelector<HTMLCanvasElement>('canvas#canvas');
+    const bounds = canvas?.getBoundingClientRect();
+    if (!canvas || !bounds?.width || !bounds.height) {
+      setPlacementStatus('Run the Dino GE script before adding objects.');
+      return;
+    }
+    const runningScript = document.querySelector<HTMLElement>('[data-playground-script]')?.dataset.playgroundScript;
+    if (runningScript !== currentScriptId) {
+      setPlacementStatus('Wait for the open script to start before adding objects.');
+      return;
+    }
+    const scene = Engine.currentScene ? getSceneSource(Engine.currentScene) : undefined;
+    if (Engine.currentScene && !scene) {
+      setPlacementStatus('Add objects in a named scene class declared in the open script.');
+      return;
+    }
+    const { zoom, position } = Engine.camera;
+    const x = clientX === undefined ? canvas.width / 2 : (clientX - bounds.left) * canvas.width / bounds.width;
+    const y = clientY === undefined ? canvas.height / 2 : (clientY - bounds.top) * canvas.height / bounds.height;
+    const options = {
+      tag: `New ${kind.toLowerCase()}`, scene,
+      x: Math.round(x / zoom + position.x), y: Math.round(y / zoom + position.y),
+    };
+    let placement: SceneObjectPlacement;
+    if (kind === 'Sprite') {
+      const image = Loader.getLoadedAssets().find(asset => asset.tag === assetTag)?.image;
+      const source = image && getAssetSource(image.src, currentScriptId);
+      if (!image || !source) {
+        setPlacementStatus('This image needs a reusable URL before it can be added to the script.');
+        return;
+      }
+      const scale = Math.min(1, 128 / Math.max(image.naturalWidth, image.naturalHeight));
+      placement = { ...options, kind, tag: `${assetTag} sprite`, asset: { image, source, scale } };
+    } else {
+      placement = { ...options, kind };
+    }
+    window.dispatchEvent(new CustomEvent('playground-add-scene-object', { detail: placement }));
+    if (!placement.sourceId) {
+      setPlacementStatus(placement.error ?? 'Open the game script in the editor before adding objects.');
+      return;
+    }
+    setPlacementStatus(`Added ${placement.tag}${scene ? ` to ${scene.className}` : ''}. Save the script to keep it.`);
+  }, [currentScriptId]);
+
+  useEffect(() => {
+    const reportHistory = (event: Event) => setPlacementStatus((event as CustomEvent<string>).detail);
+    window.addEventListener('playground-scene-history', reportHistory);
+    return () => window.removeEventListener('playground-scene-history', reportHistory);
+  }, []);
+
+  useEffect(() => {
+    if (!isEditingScene) return;
+    const placeAsset = (event: Event) => addObject('Sprite', undefined, undefined, (event as CustomEvent<string>).detail);
+    window.addEventListener('playground-place-asset', placeAsset);
+    return () => window.removeEventListener('playground-place-asset', placeAsset);
+  }, [addObject, isEditingScene]);
+
+  const toggleSceneEditing = () => {
+    const editing = !isEditingScene;
+    setIsPaused(editing);
+    setIsDebug(editing);
+    if (editing) setIsInspectorVisible(true);
+  };
+
+  const suppressGameActivation = (event: React.MouseEvent | React.KeyboardEvent) => {
+    if (!isEditingScene || !(event.target instanceof HTMLCanvasElement)) return;
+    event.preventDefault();
+    event.stopPropagation();
+  };
 
   useEffect(() => {
     if (!viewportContainerRef.current) return;
@@ -59,14 +139,72 @@ const Viewport: React.FC = () => {
           </span>
         </div>
       )}
-      <div id="playground-canvas-container" ref={viewportContainerRef}></div>
+      <div id="playground-canvas-container" ref={viewportContainerRef}
+        onDragOver={event => {
+          if (!isEditingScene || !event.dataTransfer.types.some(type => type === sceneObjectDragType || type === sceneAssetDragType) ||
+              !(event.target instanceof HTMLCanvasElement)) return;
+          event.preventDefault();
+          event.dataTransfer.dropEffect = 'copy';
+          const rect = event.currentTarget.getBoundingClientRect();
+          setDropGuide({ x: event.clientX - rect.left, y: event.clientY - rect.top });
+        }}
+        onDragLeave={() => setDropGuide(undefined)}
+        onDrop={event => {
+          setDropGuide(undefined);
+          if (!isEditingScene || !(event.target instanceof HTMLCanvasElement)) return;
+          if (event.dataTransfer.types.includes(sceneAssetDragType)) {
+            event.preventDefault();
+            addObject('Sprite', event.clientX, event.clientY, event.dataTransfer.getData(sceneAssetDragType));
+            return;
+          }
+          const kind = sceneObjectKinds.find(item => item === event.dataTransfer.getData(sceneObjectDragType));
+          if (!kind) return;
+          event.preventDefault();
+          addObject(kind, event.clientX, event.clientY);
+        }}
+        onClickCapture={suppressGameActivation}
+        onKeyDownCapture={event => {
+          if (event.key === 'Enter' || event.key === ' ') suppressGameActivation(event);
+        }}
+      />
+      {isEditingScene && (
+        <>
+          <div className="scene-object-palette" role="group" aria-label="Add game objects">
+            <span>Drag onto the scene or click to add</span>
+            <div className="scene-object-options">
+              {sceneObjectKinds.map(kind => (
+                <button key={kind} type="button" draggable aria-label={`Add ${kind.toLowerCase()}`}
+                  onClick={() => addObject(kind)}
+                  onDragStart={event => {
+                    event.dataTransfer.setData(sceneObjectDragType, kind);
+                    event.dataTransfer.effectAllowed = 'copy';
+                  }}
+                  onDragEnd={() => setDropGuide(undefined)}
+                >{kind}</button>
+              ))}
+            </div>
+            <div className="scene-object-options scene-history-actions" role="group" aria-label="Edit history">
+              {(['undo', 'redo'] as const).map(action => (
+                <button key={action} type="button" aria-label={`${action === 'undo' ? 'Undo' : 'Redo'} code edit`}
+                  onClick={() => window.dispatchEvent(new CustomEvent('playground-code-history', { detail: action }))}
+                >{action === 'undo' ? 'Undo' : 'Redo'}</button>
+              ))}
+            </div>
+            {placementStatus && <span role="status">{placementStatus}</span>}
+          </div>
+          {dropGuide && <div className="scene-drop-guide" aria-hidden="true"
+            style={{ left: dropGuide.x, top: dropGuide.y }} />}
+        </>
+      )}
       <Logo visible={!isInspectorVisible && isViewportReady} />
       <Toolbar 
         isPaused={isPaused}
         isDebug={isDebug}
+        isEditingScene={isEditingScene}
         arePanelsMinimized={arePanelsMinimized}
-        onTogglePause={togglePause}
+        onTogglePause={isEditingScene ? toggleSceneEditing : togglePause}
         onToggleDebug={toggleDebug}
+        onToggleSceneEditing={toggleSceneEditing}
         onTogglePanels={togglePanels}
         onRefresh={() => window.dispatchEvent(new CustomEvent('playground-refresh'))}
       />

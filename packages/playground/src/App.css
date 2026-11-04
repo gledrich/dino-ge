@@ -46,6 +46,55 @@
   object-fit: contain;
 }
 
+.scene-object-palette {
+  position: absolute;
+  top: 12px;
+  left: 12px;
+  z-index: 10;
+  display: grid;
+  gap: 6px;
+  max-width: calc(100% - 24px);
+  padding: 8px;
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  background: var(--bg-secondary);
+  color: var(--text-primary);
+  font-size: 12px;
+}
+
+.scene-object-options {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.scene-object-options button {
+  padding: 4px 8px;
+  border: 1px solid var(--border-color);
+  border-radius: 4px;
+  background: var(--bg-primary);
+  color: inherit;
+  cursor: grab;
+}
+
+.scene-object-options button:hover {
+  border-color: var(--accent-primary);
+}
+
+.scene-history-actions button { cursor: pointer; }
+
+.scene-drop-guide {
+  position: absolute;
+  z-index: 9;
+  width: 18px;
+  height: 18px;
+  border: 2px solid var(--accent-secondary);
+  border-radius: 50%;
+  box-shadow: 0 0 0 2px #0008;
+  transform: translate(-50%, -50%);
+  pointer-events: none;
+}
+
 /* Resize Handles */
 .resize-handle-horizontal {
   width: 4px;
@@ -198,6 +247,17 @@
 
 .toolbar button[aria-pressed='true'] {
   color: var(--accent-secondary);
+}
+
+.toolbar .scene-edit-button {
+  width: auto;
+  padding-inline: 8px;
+  font: inherit;
+  font-size: 12px;
+}
+
+.toolbar .scene-edit-button[aria-pressed='true'] {
+  background: var(--bg-primary);
 }
 
 .toolbar button:hover {

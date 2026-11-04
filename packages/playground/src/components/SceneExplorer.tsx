@@ -116,6 +116,7 @@ const SceneExplorer: React.FC = () => {
 
     const onSelectedObjectChanged = (e: any) => {
       setSelectedObject(e.detail as Dino.GameObject | null);
+      updateHierarchy();
     };
 
     const onDebugChanged = () => {
@@ -124,6 +125,7 @@ const SceneExplorer: React.FC = () => {
 
     Engine.on('selectedObjectChanged', onSelectedObjectChanged);
     Engine.on('debug', onDebugChanged);
+    window.addEventListener('playground-scene-history', updateHierarchy);
 
     // Initial update
     updateHierarchy();
@@ -134,6 +136,7 @@ const SceneExplorer: React.FC = () => {
     return () => {
       Engine.off('selectedObjectChanged', onSelectedObjectChanged);
       Engine.off('debug', onDebugChanged);
+      window.removeEventListener('playground-scene-history', updateHierarchy);
       clearInterval(intervalId);
     };
   }, []);

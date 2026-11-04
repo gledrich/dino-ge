@@ -20,6 +20,8 @@
   justify-content: center;
   gap: 6px;
   padding: 8px;
+  border: 0;
+  background: transparent;
   cursor: pointer;
   font-size: 10px;
   color: var(--text-secondary);

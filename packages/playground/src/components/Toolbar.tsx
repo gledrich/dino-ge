@@ -3,9 +3,11 @@ import React from 'react';
 interface ToolbarProps {
   isPaused: boolean;
   isDebug: boolean;
+  isEditingScene: boolean;
   arePanelsMinimized: boolean;
   onTogglePause: () => void;
   onToggleDebug: () => void;
+  onToggleSceneEditing: () => void;
   onTogglePanels: () => void;
   onRefresh: () => void;
 }
@@ -13,9 +15,11 @@ interface ToolbarProps {
 const Toolbar: React.FC<ToolbarProps> = ({
   isPaused,
   isDebug,
+  isEditingScene,
   arePanelsMinimized,
   onTogglePause,
   onToggleDebug,
+  onToggleSceneEditing,
   onTogglePanels,
   onRefresh
 }) => {
@@ -29,6 +33,15 @@ const Toolbar: React.FC<ToolbarProps> = ({
         <svg viewBox="0 0 24 24" aria-hidden="true">
           {isPaused ? <path d="m8 5 11 7-11 7z" /> : <path d="M9 5v14m6-14v14" />}
         </svg>
+      </button>
+      <button type="button"
+        className="scene-edit-button"
+        onClick={onToggleSceneEditing}
+        aria-label="Edit scene"
+        aria-pressed={isEditingScene}
+        title={isEditingScene ? 'Finish editing and resume the game' : 'Pause the game to drag and resize objects'}
+      >
+        Edit
       </button>
       <button type="button"
         onClick={onRefresh}
