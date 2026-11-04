@@ -3,8 +3,8 @@ import Editor from '@monaco-editor/react';
 import { typescript, type editor } from 'monaco-editor';
 import * as Dino from 'dino-ge';
 import { createScript, getScript, getFilesList, setCurrentScriptId, readGameFolder, importGameFolder, type GameFolder } from '../utils/helpers';
-import { Edit, instrumentCode, getSourceMapping, getSceneObjectCreation, getSceneObjectDeletion } from '../utils/ast-utils';
-import { createSceneObject, restoreSceneTransform, type SceneObjectPlacement, type SceneTransformState } from '../utils/scene-objects';
+import { Edit, instrumentCode, getSourceMapping, getSceneObjectCreation, getSceneObjectDeletion, getSceneObjectDuplication } from '../utils/ast-utils';
+import { createSceneObject, duplicateSceneObject, restoreSceneTransform, type SceneObjectPlacement, type SceneTransformState } from '../utils/scene-objects';
 import { useMonacoEditor } from '../hooks/useMonacoEditor';
 import '../styles/editor.css';
 
@@ -247,7 +247,7 @@ const CodeEditor: React.FC<EditorProps> = ({ currentScriptId, onRefresh }) => {
       }
     };
 
-    const removeSceneObject = (event: Event) => {
+    const editPaletteObject = (event: Event) => {
       const { detail: object } = event as CustomEvent<Dino.GameObject>;
       const model: editor.ITextModel | null = monacoEditorRef.current?.getModel();
       const run = document.querySelector<HTMLElement>('script[data-playground-script]');
@@ -259,6 +259,31 @@ const CodeEditor: React.FC<EditorProps> = ({ currentScriptId, onRefresh }) => {
       const matching = Array.from(scene?.objects ?? Dino.Engine.objects)
         .filter(item => item.metadata.sourceId === sourceId);
       if (matching.length !== 1 || matching[0] !== object) return;
+      if (event.type === 'playground-duplicate-scene-object') {
+        const position = object.transform.position.clone();
+        position.set(position.x + 24, position.y + 24);
+        const copy = getSceneObjectDuplication(model.getValue(), sourceId, position.x, position.y);
+        if (!copy) return;
+        const before = model.getAlternativeVersionId();
+        let duplicate: Dino.GameObject | undefined;
+        try {
+          duplicate = duplicateSceneObject(object, copy.type, copy.options, copy.tag, copy.sourceId, position);
+        } catch {
+          return;
+        }
+        if (!duplicate) return;
+        if (!applySourceEdits([copy.edit])) {
+          Dino.Engine.destroyObject(duplicate);
+          return;
+        }
+        recordSceneHistory({ model, run, scene, object: duplicate, before, after: model.getAlternativeVersionId() });
+        Dino.Engine.selectedObject = duplicate;
+        window.dispatchEvent(new CustomEvent('playground-scene-history', {
+          detail: `Created ${copy.tag}. Save the script to keep it.`,
+        }));
+        event.preventDefault();
+        return;
+      }
       const deletion = getSceneObjectDeletion(model.getValue(), sourceId);
       if (!deletion) return;
       const before = model.getAlternativeVersionId();
@@ -353,7 +378,8 @@ const CodeEditor: React.FC<EditorProps> = ({ currentScriptId, onRefresh }) => {
     window.addEventListener('playground-sync-source-mapping', syncSourceMapping);
     window.addEventListener('playground-apply-placement', applyPlacement);
     window.addEventListener('playground-add-scene-object', addSceneObject);
-    window.addEventListener('playground-remove-scene-object', removeSceneObject);
+    window.addEventListener('playground-remove-scene-object', editPaletteObject);
+    window.addEventListener('playground-duplicate-scene-object', editPaletteObject);
     const clearSceneHistory = () => { sceneHistory.current = []; };
     window.addEventListener('playground-before-run', clearSceneHistory);
     const changeCodeHistory = (event: Event) => {
@@ -374,7 +400,8 @@ const CodeEditor: React.FC<EditorProps> = ({ currentScriptId, onRefresh }) => {
       window.removeEventListener('playground-sync-source-mapping', syncSourceMapping);
       window.removeEventListener('playground-apply-placement', applyPlacement);
       window.removeEventListener('playground-add-scene-object', addSceneObject);
-      window.removeEventListener('playground-remove-scene-object', removeSceneObject);
+      window.removeEventListener('playground-remove-scene-object', editPaletteObject);
+      window.removeEventListener('playground-duplicate-scene-object', editPaletteObject);
       window.removeEventListener('playground-before-run', clearSceneHistory);
       window.removeEventListener('playground-code-history', changeCodeHistory);
       window.removeEventListener('playground-apply-edit', handleApplyEditEvent);

@@ -1,4 +1,5 @@
 import * as acorn from 'acorn';
+import { Vector2 } from 'dino-ge';
 import { sceneObjectDefaults, sceneSourceKey, type SceneObjectPlacement } from './scene-objects';
 
 export interface PropertyLocation {
@@ -251,8 +252,8 @@ export interface Edit {
   newText: string;
 }
 
-/** Remove a standalone constructor written by the visual editor. */
-export function getSceneObjectDeletion(source: string, sourceId: string): Edit | null {
+/** Find a standalone constructor written by the visual editor. */
+function findPaletteStatement(source: string, sourceId: string) {
   if (!sourceId.startsWith('DinoPlace') || instrumentCode(source).error) return null;
   const mapping = getSourceMapping()[sourceId];
   const group = sourceId.slice(0, sourceId.lastIndexOf('-') + 1);
@@ -261,7 +262,7 @@ export function getSceneObjectDeletion(source: string, sourceId: string): Edit |
 
   const ast = acorn.parse(source, { ecmaVersion: 'latest', sourceType: 'module' });
   const imports = dinoImports(ast);
-  const matches: acorn.ExpressionStatement[] = [];
+  const matches: { statement: acorn.ExpressionStatement; options: acorn.ObjectExpression }[] = [];
   const visit = (node: any) => {
     if (matches.length || node.start > mapping.start || node.end < mapping.end) return;
     if (node.type === 'BlockStatement') {
@@ -275,8 +276,10 @@ export function getSceneObjectDeletion(source: string, sourceId: string): Edit |
         if (constructor.type !== 'NewExpression' || constructor.start !== mapping.start ||
             constructor.end !== mapping.end || !constructor.callee.name?.startsWith('DinoPlace')) continue;
         const type = imports.get(constructor.callee.name);
-        if (isPlay ? type === 'Sprite' : type === 'Rectangle' || type === 'Circle' || type === 'Text') {
-          matches.push(child);
+        const options = constructor.arguments[0];
+        if (options?.type === 'ObjectExpression' &&
+            (isPlay ? type === 'Sprite' : type === 'Rectangle' || type === 'Circle' || type === 'Text')) {
+          matches.push({ statement: child, options });
           return;
         }
       }
@@ -288,8 +291,15 @@ export function getSceneObjectDeletion(source: string, sourceId: string): Edit |
     }
   };
   visit(ast);
-  const [statement] = matches;
-  if (!statement) return null;
+  const [match] = matches;
+  if (!match) return null;
+  return { ...match, mapping, imports };
+}
+
+export function getSceneObjectDeletion(source: string, sourceId: string): Edit | null {
+  const match = findPaletteStatement(source, sourceId);
+  if (!match) return null;
+  const { statement } = match;
   const lineStart = source.lastIndexOf('\n', statement.start - 1) + 1;
   const lineEnd = source.indexOf('\n', statement.end);
   if (lineEnd >= 0 && !source.slice(lineStart, statement.start).trim() &&
@@ -297,6 +307,75 @@ export function getSceneObjectDeletion(source: string, sourceId: string): Edit |
     return { start: lineStart, end: lineEnd + 1, newText: '' };
   }
   return { start: statement.start, end: statement.end, newText: '' };
+}
+
+/** Copy the constructor's static options without evaluating the game script. */
+export function getSceneObjectDuplication(source: string, sourceId: string, x: number, y: number) {
+  const match = findPaletteStatement(source, sourceId);
+  if (!match || !Number.isFinite(x) || !Number.isFinite(y)) return null;
+  const { statement, mapping, imports } = match;
+  const { tag, position } = mapping.properties;
+  if (!tag || position?.args?.length !== 2 || position.args.some(arg => !arg.numeric)) return null;
+
+  const readOptions = (node: any, root = false): Record<string, unknown> => {
+    if (node.type !== 'ObjectExpression') throw new Error('Expected constructor options');
+    const options = new Map<string, unknown>();
+    for (const prop of node.properties) {
+      if (prop.type !== 'Property' || prop.kind !== 'init' || prop.computed || prop.key.type !== 'Identifier' ||
+          options.has(prop.key.name) || prop.key.name === '__proto__') throw new Error('Unsupported option');
+      const key = prop.key.name;
+      if (root && mapping.type === 'Sprite' && key === 'img') {
+        options.set(key, undefined); // The copy uses the original sprite's loaded image.
+      } else {
+        options.set(key, readValue(prop.value));
+      }
+    }
+    return Object.fromEntries(options);
+  };
+  const readValue = (node: any): unknown => {
+    if (node.type === 'Literal' && ['number', 'boolean', 'string'].includes(typeof node.value)) return node.value;
+    if (node.type === 'UnaryExpression' && ['-', '+'].includes(node.operator) &&
+        node.argument.type === 'Literal' && typeof node.argument.value === 'number') {
+      return node.operator === '-' ? -node.argument.value : node.argument.value;
+    }
+    if (node.type === 'ObjectExpression') return readOptions(node);
+    if (node.type === 'NewExpression' && imports.get(node.callee.name) === 'Vector2') {
+      const [x, y] = node.arguments.map(readValue);
+      if (node.arguments.length === 2 && typeof x === 'number' && typeof y === 'number') return new Vector2(x, y);
+    }
+    throw new Error('Unsupported option value');
+  };
+
+  let options: Record<string, unknown>;
+  try {
+    options = readOptions(match.options, true);
+  } catch {
+    return null;
+  }
+  if (typeof options.tag !== 'string') return null;
+  const base = `${options.tag} copy`;
+  let newTag = base;
+  for (let i = 2; source.includes(newTag); i++) newTag = `${base} ${i}`;
+  const [argX, argY] = position.args;
+  const changes = [
+    { start: tag.valueStart, end: tag.valueEnd, newText: JSON.stringify(newTag) },
+    { ...argX, newText: String(x) },
+    { ...argY, newText: String(y) },
+  ];
+  let copy = source.slice(statement.start, statement.end);
+  for (const change of changes.sort((a, b) => b.start - a.start)) {
+    copy = copy.slice(0, change.start - statement.start) + change.newText + copy.slice(change.end - statement.start);
+  }
+  const lineStart = source.lastIndexOf('\n', statement.start - 1) + 1;
+  const indent = source.slice(lineStart, statement.start).match(/^\s*/)?.[0] ?? '';
+  const lineEnd = source.indexOf('\n', statement.end);
+  const suffix = source.slice(statement.end, lineEnd < 0 ? source.length : lineEnd).trim();
+  const insertion = lineEnd >= 0 && (!suffix || suffix.startsWith('//')) ? lineEnd : statement.end;
+  const alias = sourceId.slice(0, sourceId.indexOf('-'));
+  return {
+    edit: { start: insertion, end: insertion, newText: `\n${indent}${copy}` },
+    tag: newTag, sourceId: `${alias}-${newTag}-0`, type: mapping.type, options,
+  };
 }
 
 /** Adds a constructor to the active scene or engine startup callback. */

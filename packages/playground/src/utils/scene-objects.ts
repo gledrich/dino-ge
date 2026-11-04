@@ -134,3 +134,20 @@ export function createSceneObject(placement: SceneObjectPlacement) {
     }
   }
 }
+
+export function duplicateSceneObject(original: Dino.GameObject, type: string, options: Record<string, unknown>,
+  tag: string, sourceId: string, position: Dino.Vector2): Dino.GameObject | undefined {
+  const props = { ...options, tag, __sourceId: sourceId, position };
+  switch (type) {
+    case 'Rectangle': return new Dino.Rectangle(props as ConstructorParameters<typeof Dino.Rectangle>[0]);
+    case 'Circle': return new Dino.Circle(props as ConstructorParameters<typeof Dino.Circle>[0]);
+    case 'Text': return new Dino.Text(props as ConstructorParameters<typeof Dino.Text>[0]);
+    case 'Sprite': {
+      const img = original.getComponent(Dino.SpriteComponent)?.img;
+      if (!img) return;
+      const sprite = new Dino.Sprite({ ...props, img } as ConstructorParameters<typeof Dino.Sprite>[0]);
+      sprite.play();
+      return sprite;
+    }
+  }
+}

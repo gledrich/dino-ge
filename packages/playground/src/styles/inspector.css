@@ -41,19 +41,28 @@
   padding-bottom: 4px;
 }
 
-.inspector-delete {
+.inspector-delete,
+.inspector-duplicate {
   display: flex;
   align-items: center;
   justify-content: center;
   gap: 6px;
   padding: 6px 10px;
-  border: 1px solid #673940;
+  border: 1px solid var(--border-color);
   border-radius: 4px;
-  background: #332329;
-  color: #ffb4b8;
+  background: var(--bg-primary);
+  color: var(--text-primary);
   font: inherit;
   font-size: 12px;
   cursor: pointer;
+}
+
+.inspector-duplicate:hover { border-color: var(--accent-primary); }
+
+.inspector-delete {
+  border-color: #673940;
+  background: #332329;
+  color: #ffb4b8;
 }
 
 .inspector-delete:hover { background: #4a2a33; }

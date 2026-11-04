@@ -239,6 +239,21 @@ new Engine({ onLoad() {}, update() {} }, { containerId: 'playground-canvas-conta
   await redo.click();
   await expect(circle).toHaveCount(0);
 
+  await rectangle.press('Enter');
+  await page.getByRole('spinbutton', { name: 'Width', exact: true }).fill('96');
+  await page.getByRole('button', { name: 'Save Width to code', exact: true }).click();
+  await expect.poll(readCode).toContain('width: 96');
+  await page.getByRole('button', { name: 'Duplicate object' }).click();
+  const copy = page.getByRole('button', { name: 'New rectangle copy', exact: true });
+  await expect(copy).toHaveAttribute('aria-pressed', 'true');
+  await expect(page.getByRole('spinbutton', { name: 'X', exact: true })).toHaveValue('204.00');
+  await expect(page.getByRole('spinbutton', { name: 'Width', exact: true })).toHaveValue('96.00');
+  await undo.click();
+  await expect(copy).toHaveCount(0);
+  await expect.poll(readCode).not.toContain('New rectangle copy');
+  await redo.click();
+  await expect(copy).toHaveAttribute('aria-pressed', 'true');
+
   await editor.locator('.view-lines').click();
   const modifier = await page.evaluate(() => navigator.userAgent.includes('Macintosh') ? 'Meta' : 'Control');
   const saved = page.waitForResponse(response => response.request().method() === 'PUT' &&
@@ -251,6 +266,7 @@ new Engine({ onLoad() {}, update() {} }, { containerId: 'playground-canvas-conta
   await expect(page.getByRole('spinbutton', { name: 'X', exact: true })).toHaveValue('180.00');
   await expect(page.getByRole('spinbutton', { name: 'Y', exact: true })).toHaveValue('150.00');
   await expect(circle).toHaveCount(0);
+  await expect(copy).toBeVisible();
 });
 
 test('saves a palette drop to the active named scene and restores it there', async ({ page }) => {
@@ -353,6 +369,11 @@ new Engine({
   await page.locator('.script-selector').selectOption(id);
   await sprite.press('Enter');
   await expect(page.getByRole('spinbutton', { name: 'Y', exact: true })).toHaveValue('145.00');
+  await expect(page.getByRole('spinbutton', { name: 'Height', exact: true })).toHaveValue('32.00');
+  await page.getByRole('button', { name: 'Edit scene', exact: true }).click();
+  await page.getByRole('button', { name: 'Duplicate object' }).click();
+  await expect(page.getByRole('button', { name: 'gem sprite copy', exact: true })).toHaveAttribute('aria-pressed', 'true');
+  await expect(page.getByRole('spinbutton', { name: 'Y', exact: true })).toHaveValue('169.00');
   await expect(page.getByRole('spinbutton', { name: 'Height', exact: true })).toHaveValue('32.00');
 });
 
