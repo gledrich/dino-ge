@@ -12,21 +12,14 @@ interface SceneNodeProps {
   onSelect: (obj: Dino.GameObject) => void;
   editing: boolean;
   depth: number;
+  members: ReadonlySet<Dino.GameObject>;
 }
 
-const SceneNode: React.FC<SceneNodeProps> = ({ object, selectedId, onSelect, editing, depth }) => {
+const SceneNode: React.FC<SceneNodeProps> = ({ object, selectedId, onSelect, editing, depth, members }) => {
   const [isExpanded, setIsExpanded] = useState(true);
   
-  let children: Dino.GameObject[] = [];
-  try {
-    if (object && object.transform && object.transform.children) {
-      children = Array.from(object.transform.children)
-        .map(t => t.gameObject)
-        .filter((obj): obj is Dino.GameObject => !!obj);
-    }
-  } catch (err) {
-    console.error('Error mapping children in SceneNode:', err);
-  }
+  const children = Array.from(object.transform.children, transform => transform.gameObject)
+    .filter((child): child is Dino.GameObject => !!child && members.has(child));
 
   const hasChildren = children.length > 0;
   const isSelected = selectedId === object;
@@ -76,6 +69,7 @@ const SceneNode: React.FC<SceneNodeProps> = ({ object, selectedId, onSelect, edi
               onSelect={onSelect}
               editing={editing}
               depth={depth + 1}
+              members={members}
             />
           ))}
         </div>
@@ -96,58 +90,35 @@ const getIconForObject = (obj: Dino.GameObject): string => {
 
 const SceneExplorer: React.FC = () => {
   const { isPaused, isDebug } = usePlayground();
-  const [rootObjects, setRootObjects] = useState<Dino.GameObject[]>([]);
+  const [members, setMembers] = useState(() => new Set(Engine.currentScene?.objects ?? Engine.objects));
+  const rootObjects = Array.from(members).filter(object => {
+    const parent = object.transform.parent?.gameObject;
+    return !parent || !members.has(parent);
+  });
   const [selectedObject, setSelectedObject] = useState<Dino.GameObject | null>(Engine.selectedObject);
 
   useEffect(() => {
+    let scheduled = false;
+    let disposed = false;
     const updateHierarchy = () => {
-      let allObjects: Dino.GameObject[] = [];
-      
-      const scene = (Engine as any).currentScene;
-      const sceneObjects = scene?.objects;
-      const globalObjects = Engine.objects;
-
-      if (sceneObjects) {
-        allObjects = Array.from(sceneObjects);
-      } else {
-        allObjects = Array.from(globalObjects);
-      }
-
-      const roots = allObjects.filter(obj => {
-        try {
-          return obj && obj.transform && !obj.transform.parent;
-        } catch (err) {
-          console.error('Error filtering root objects:', err);
-          return false;
-        }
+      if (scheduled) return;
+      scheduled = true;
+      queueMicrotask(() => {
+        scheduled = false;
+        if (!disposed) setMembers(new Set(Engine.currentScene?.objects ?? Engine.objects));
       });
-      setRootObjects(roots);
     };
-
-    const onSelectedObjectChanged = (e: any) => {
-      setSelectedObject(e.detail as Dino.GameObject | null);
-      updateHierarchy();
-    };
-
-    const onDebugChanged = () => {
-      // Re-trigger update on debug change if needed
+    const onSelectedObjectChanged = (event: CustomEvent<Dino.GameObject | null>) => {
+      setSelectedObject(event.detail);
     };
 
     Engine.on('selectedObjectChanged', onSelectedObjectChanged);
-    Engine.on('debug', onDebugChanged);
-    window.addEventListener('playground-scene-history', updateHierarchy);
-
-    // Initial update
+    Engine.on('sceneHierarchyChanged', updateHierarchy);
     updateHierarchy();
-
-    // Scene hierarchy is relatively static, poll at 1Hz instead of 60Hz
-    const intervalId = setInterval(updateHierarchy, 1000);
-
     return () => {
+      disposed = true;
       Engine.off('selectedObjectChanged', onSelectedObjectChanged);
-      Engine.off('debug', onDebugChanged);
-      window.removeEventListener('playground-scene-history', updateHierarchy);
-      clearInterval(intervalId);
+      Engine.off('sceneHierarchyChanged', updateHierarchy);
     };
   }, []);
 
@@ -173,6 +144,7 @@ const SceneExplorer: React.FC = () => {
               onSelect={handleSelect}
               editing={isPaused && isDebug}
               depth={0}
+              members={members}
             />
           ))
         )}

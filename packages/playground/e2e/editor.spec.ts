@@ -144,6 +144,46 @@ new Engine({
   await expect(page.locator('body')).toHaveAttribute('data-game-action', 'pressed');
 });
 
+test('keeps the hierarchy and Inspector in sync when the game changes scene objects', async ({ page }) => {
+  await page.route('**/files', route => route.fulfill({ json: ['script'] }));
+  await page.route('**/api/scripts/script', route => route.fulfill({ json: `
+import { Engine, Rectangle, Scene, Vector2 } from 'dino-ge';
+class Workshop extends Scene {}
+new Engine({
+  onLoad() {
+    const scene = new Workshop();
+    Engine.currentScene = scene;
+    const box = tag => new Rectangle({ tag, position: new Vector2(150, 150), width: 20, height: 20 });
+    const parent = box('parent');
+    const child = box('child');
+    parent.transform.addChild(child.transform);
+    window.addEventListener('remove-child', () => scene.objects.delete(child));
+    window.addEventListener('rename-parent', () => { parent.metadata.tag = 'renamed parent'; });
+    window.addEventListener('change-level', () => {
+      Engine.currentScene = new Workshop();
+      box('next level');
+    });
+  },
+}, { containerId: 'playground-canvas-container' });
+` }));
+  await page.goto('/');
+  const child = page.getByRole('button', { name: 'child', exact: true });
+  await child.press('Enter');
+  await expect(page.getByRole('textbox', { name: 'Tag', exact: true })).toHaveValue('child');
+  const gameEvent = (type: string) => page.evaluate(name => window.dispatchEvent(new Event(name)), type);
+  await gameEvent('remove-child');
+  await expect(child).toHaveCount(0);
+  await expect(page.getByText('Click an object to inspect.')).toBeVisible();
+
+  await gameEvent('rename-parent');
+  await page.getByRole('button', { name: 'renamed parent', exact: true }).press('Enter');
+  await expect(page.getByRole('textbox', { name: 'Tag', exact: true })).toHaveValue('renamed parent');
+  await gameEvent('change-level');
+  await expect(page.getByRole('button', { name: 'renamed parent', exact: true })).toHaveCount(0);
+  await expect(page.getByRole('button', { name: 'next level', exact: true })).toBeVisible();
+  await expect(page.getByText('Click an object to inspect.')).toBeVisible();
+});
+
 test('places a palette object at the drop point and restores it from the saved script', async ({ page }) => {
   let source = `import { Engine } from 'dino-ge';
 new Engine({ onLoad() {}, update() {} }, { containerId: 'playground-canvas-container' });`;
