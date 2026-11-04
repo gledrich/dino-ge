@@ -14,6 +14,42 @@ export interface SceneTransformState {
   size?: ScenePoint;
 }
 
+/** Move the selection in viewport axes while retaining its local transform. */
+export function nudgeSceneSelection(event: Pick<KeyboardEvent, 'key' | 'shiftKey' | 'altKey' | 'ctrlKey' | 'metaKey'>): boolean {
+  const { key, shiftKey, altKey, ctrlKey, metaKey } = event;
+  if (altKey || ctrlKey || metaKey) return false;
+  const step = shiftKey ? 10 : 1;
+  let x = 0;
+  let y = 0;
+  switch (key) {
+    case 'ArrowLeft': x = -step; break;
+    case 'ArrowRight': x = step; break;
+    case 'ArrowUp': y = -step; break;
+    case 'ArrowDown': y = step; break;
+    default: return false;
+  }
+
+  const { Engine } = Dino;
+  const object = Engine.selectedObject;
+  if (!object || !(Engine.currentScene?.objects ?? Engine.objects).has(object)) return true;
+  const { position, parent } = object.transform;
+  const initial = position.clone();
+  if (parent) {
+    const { worldRotation, worldScale } = parent;
+    const cos = Math.cos(worldRotation);
+    const sin = Math.sin(worldRotation);
+    const localX = worldScale.x ? (x * cos + y * sin) / worldScale.x : 0;
+    const localY = worldScale.y ? (-x * sin + y * cos) / worldScale.y : 0;
+    position.set(position.x + localX, position.y + localY);
+  } else {
+    position.set(position.x + x, position.y + y);
+  }
+  if (position.x !== initial.x || position.y !== initial.y) {
+    Engine.emit('objectManipulated', { object, kind: 'drag', initial });
+  }
+  return true;
+}
+
 export function restoreSceneTransform(object: Dino.GameObject, state: SceneTransformState) {
   if (state.position) object.transform.position.set(state.position.x, state.position.y);
   if (state.scale) object.transform.scale.set(state.scale.x, state.scale.y);

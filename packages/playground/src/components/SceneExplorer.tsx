@@ -1,5 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import * as Dino from 'dino-ge';
+import { usePlayground } from '../context/PlaygroundContext';
+import { nudgeSceneSelection } from '../utils/scene-objects';
 import '../styles/scene-explorer.css';
 
 const { Engine } = Dino;
@@ -8,10 +10,11 @@ interface SceneNodeProps {
   object: Dino.GameObject;
   selectedId: Dino.GameObject | null;
   onSelect: (obj: Dino.GameObject) => void;
+  editing: boolean;
   depth: number;
 }
 
-const SceneNode: React.FC<SceneNodeProps> = ({ object, selectedId, onSelect, depth }) => {
+const SceneNode: React.FC<SceneNodeProps> = ({ object, selectedId, onSelect, editing, depth }) => {
   const [isExpanded, setIsExpanded] = useState(true);
   
   let children: Dino.GameObject[] = [];
@@ -38,6 +41,11 @@ const SceneNode: React.FC<SceneNodeProps> = ({ object, selectedId, onSelect, dep
         aria-pressed={isSelected}
         onClick={() => onSelect(object)}
         onKeyDown={event => {
+          if (editing && isSelected && nudgeSceneSelection(event)) {
+            event.preventDefault();
+            event.stopPropagation();
+            return;
+          }
           if (event.key !== 'Enter' && event.key !== ' ') return;
           event.preventDefault();
           event.stopPropagation();
@@ -66,6 +74,7 @@ const SceneNode: React.FC<SceneNodeProps> = ({ object, selectedId, onSelect, dep
               object={child} 
               selectedId={selectedId}
               onSelect={onSelect}
+              editing={editing}
               depth={depth + 1}
             />
           ))}
@@ -86,6 +95,7 @@ const getIconForObject = (obj: Dino.GameObject): string => {
 };
 
 const SceneExplorer: React.FC = () => {
+  const { isPaused, isDebug } = usePlayground();
   const [rootObjects, setRootObjects] = useState<Dino.GameObject[]>([]);
   const [selectedObject, setSelectedObject] = useState<Dino.GameObject | null>(Engine.selectedObject);
 
@@ -161,6 +171,7 @@ const SceneExplorer: React.FC = () => {
               object={obj} 
               selectedId={selectedObject}
               onSelect={handleSelect}
+              editing={isPaused && isDebug}
               depth={0}
             />
           ))

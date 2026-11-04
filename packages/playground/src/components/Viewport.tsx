@@ -3,7 +3,7 @@ import { Engine, Loader } from 'dino-ge';
 import { usePlayground } from '../context/PlaygroundContext';
 import Toolbar from './Toolbar';
 import Logo from './Logo';
-import { getAssetSource, getSceneSource, sceneAssetDragType, sceneObjectDragType, sceneObjectKinds, type SceneObjectKind, type SceneObjectPlacement } from '../utils/scene-objects';
+import { getAssetSource, getSceneSource, nudgeSceneSelection, sceneAssetDragType, sceneObjectDragType, sceneObjectKinds, type SceneObjectKind, type SceneObjectPlacement } from '../utils/scene-objects';
 
 const Viewport: React.FC = () => {
   const { 
@@ -89,7 +89,10 @@ const Viewport: React.FC = () => {
     const editing = !isEditingScene;
     setIsPaused(editing);
     setIsDebug(editing);
-    if (editing) setIsInspectorVisible(true);
+    if (editing) {
+      setIsInspectorVisible(true);
+      viewportContainerRef.current?.focus();
+    }
   };
 
   const suppressGameActivation = (event: React.MouseEvent | React.KeyboardEvent) => {
@@ -140,6 +143,10 @@ const Viewport: React.FC = () => {
         </div>
       )}
       <div id="playground-canvas-container" ref={viewportContainerRef}
+        role={isEditingScene ? 'region' : undefined}
+        aria-label={isEditingScene ? 'Scene viewport' : undefined}
+        aria-describedby={isEditingScene ? 'scene-keyboard-hint' : undefined}
+        tabIndex={isEditingScene ? 0 : -1}
         onDragOver={event => {
           if (!isEditingScene || !event.dataTransfer.types.some(type => type === sceneObjectDragType || type === sceneAssetDragType) ||
               !(event.target instanceof HTMLCanvasElement)) return;
@@ -164,13 +171,19 @@ const Viewport: React.FC = () => {
         }}
         onClickCapture={suppressGameActivation}
         onKeyDownCapture={event => {
+          if (isEditingScene && (event.target === event.currentTarget || event.target instanceof HTMLCanvasElement) &&
+              nudgeSceneSelection(event)) {
+            event.preventDefault();
+            event.stopPropagation();
+            return;
+          }
           if (event.key === 'Enter' || event.key === ' ') suppressGameActivation(event);
         }}
       />
       {isEditingScene && (
         <>
           <div className="scene-object-palette" role="group" aria-label="Add game objects">
-            <span>Drag onto the scene or click to add</span>
+            <span id="scene-keyboard-hint">Drag to add · Arrow keys move 1 unit · Shift moves 10</span>
             <div className="scene-object-options">
               {sceneObjectKinds.map(kind => (
                 <button key={kind} type="button" draggable aria-label={`Add ${kind.toLowerCase()}`}

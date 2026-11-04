@@ -125,6 +125,18 @@ new Engine({
   await expect.poll(async () => Number(await width.inputValue())).toBeCloseTo(30, 0);
   await expect.poll(async () => Number(await height.inputValue())).toBeCloseTo(30, 0);
 
+  const y = page.getByRole('spinbutton', { name: 'Y', exact: true });
+  await page.getByRole('region', { name: 'Scene viewport' }).press('Shift+ArrowRight');
+  await expect(y).toHaveValue('-3.33');
+  await page.getByRole('button', { name: 'drag target' }).press('ArrowDown');
+  await expect(x).toHaveValue('30.50');
+  await page.getByRole('button', { name: 'Apply placement to code' }).click();
+  await expect.poll(readSource).toContain('new Vector2(30.5, -3.333333)');
+  await page.getByRole('button', { name: 'Undo code edit' }).click();
+  await expect.poll(readSource).toBe(updated);
+  await expect(x).toHaveValue('30.00');
+  await expect.poll(async () => Number(await y.inputValue())).toBeCloseTo(0);
+
   await page.getByRole('button', { name: 'Play', exact: true }).click();
   await expect(edit).toHaveAttribute('aria-pressed', 'false');
   await expect(page.getByRole('button', { name: 'Toggle debug mode' })).toHaveAttribute('aria-pressed', 'false');
