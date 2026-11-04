@@ -230,6 +230,15 @@ new Engine({ onLoad() {}, update() {} }, { containerId: 'playground-canvas-conta
   await redo.click();
   await expect(circle).toHaveAttribute('aria-pressed', 'true');
 
+  await page.getByRole('button', { name: 'Delete object' }).click();
+  await expect(circle).toHaveCount(0);
+  await expect.poll(readCode).not.toContain('New circle');
+  await undo.click();
+  await expect(circle).toHaveAttribute('aria-pressed', 'true');
+  await expect.poll(readCode).toContain('New circle');
+  await redo.click();
+  await expect(circle).toHaveCount(0);
+
   await editor.locator('.view-lines').click();
   const modifier = await page.evaluate(() => navigator.userAgent.includes('Macintosh') ? 'Meta' : 'Control');
   const saved = page.waitForResponse(response => response.request().method() === 'PUT' &&
@@ -241,7 +250,7 @@ new Engine({ onLoad() {}, update() {} }, { containerId: 'playground-canvas-conta
   await rectangle.press('Enter');
   await expect(page.getByRole('spinbutton', { name: 'X', exact: true })).toHaveValue('180.00');
   await expect(page.getByRole('spinbutton', { name: 'Y', exact: true })).toHaveValue('150.00');
-  await expect(page.getByRole('button', { name: 'New circle', exact: true })).toBeVisible();
+  await expect(circle).toHaveCount(0);
 });
 
 test('saves a palette drop to the active named scene and restores it there', async ({ page }) => {

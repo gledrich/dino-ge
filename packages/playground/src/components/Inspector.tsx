@@ -56,7 +56,7 @@ const SECTIONS: Record<string, { rows: PropertyRowDef[], component?: any }> = {
 };
 
 const Inspector: React.FC<InspectorProps> = ({ visible }) => {
-  const { isDebug } = usePlayground();
+  const { isDebug, isPaused } = usePlayground();
   const [selectedObject, setSelectedObject] = useState<InspectableObject | null>(Engine.selectedObject as InspectableObject | null);
   const [isApplying, setIsApplying] = useState(false);
   const [syntaxError, setSyntaxError] = useState<string | null>(null);
@@ -64,6 +64,15 @@ const Inspector: React.FC<InspectorProps> = ({ visible }) => {
   const pendingPlacement = useRef(new WeakMap<Dino.GameObject, Map<Manipulation, ScenePoint>>());
   const [placement, setPlacement] = useState<Map<Manipulation, ScenePoint>>();
   const [placementStatus, setPlacementStatus] = useState('');
+  const canDelete = isPaused && !syntaxError && selectedObject?.metadata.sourceId?.startsWith('DinoPlace');
+
+  const deleteObject = () => {
+    if (!selectedObject) return;
+    const accepted = !window.dispatchEvent(new CustomEvent('playground-remove-scene-object', {
+      detail: selectedObject, cancelable: true,
+    }));
+    if (!accepted) setPlacementStatus('Delete is available for standalone palette objects in the open script.');
+  };
 
   useEffect(() => {
     if (!visible) return;
@@ -272,9 +281,12 @@ const Inspector: React.FC<InspectorProps> = ({ visible }) => {
           <div className="no-selection">Toggle Debug Mode to inspect objects.</div>
         ) : (
           <div className="inspector-form" style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-            {(placement || placementStatus) && (
+            {(placement || placementStatus || canDelete) && (
               <div className="inspector-section">
                 {placement && <button type="button" onClick={applyPlacement}>Apply placement to code</button>}
+                {canDelete && <button type="button" className="inspector-delete" onClick={deleteObject}>
+                  <i className="fa-solid fa-trash" aria-hidden="true" /> Delete object
+                </button>}
                 {placementStatus && <span role="status">{placementStatus}</span>}
               </div>
             )}

@@ -41,6 +41,23 @@
   padding-bottom: 4px;
 }
 
+.inspector-delete {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 6px 10px;
+  border: 1px solid #673940;
+  border-radius: 4px;
+  background: #332329;
+  color: #ffb4b8;
+  font: inherit;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.inspector-delete:hover { background: #4a2a33; }
+
 .inspector-row {
   display: flex;
   align-items: center;

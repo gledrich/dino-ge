@@ -3,7 +3,7 @@ import Editor from '@monaco-editor/react';
 import { typescript, type editor } from 'monaco-editor';
 import * as Dino from 'dino-ge';
 import { createScript, getScript, getFilesList, setCurrentScriptId, readGameFolder, importGameFolder, type GameFolder } from '../utils/helpers';
-import { Edit, instrumentCode, getSourceMapping, getSceneObjectCreation } from '../utils/ast-utils';
+import { Edit, instrumentCode, getSourceMapping, getSceneObjectCreation, getSceneObjectDeletion } from '../utils/ast-utils';
 import { createSceneObject, restoreSceneTransform, type SceneObjectPlacement, type SceneTransformState } from '../utils/scene-objects';
 import { useMonacoEditor } from '../hooks/useMonacoEditor';
 import '../styles/editor.css';
@@ -21,6 +21,7 @@ interface SceneHistoryEntry {
   before: number;
   after: number;
   transform?: { before: SceneTransformState; after: SceneTransformState };
+  removed?: boolean;
 }
 
 const CodeEditor: React.FC<EditorProps> = ({ currentScriptId, onRefresh }) => {
@@ -246,6 +247,30 @@ const CodeEditor: React.FC<EditorProps> = ({ currentScriptId, onRefresh }) => {
       }
     };
 
+    const removeSceneObject = (event: Event) => {
+      const { detail: object } = event as CustomEvent<Dino.GameObject>;
+      const model: editor.ITextModel | null = monacoEditorRef.current?.getModel();
+      const run = document.querySelector<HTMLElement>('script[data-playground-script]');
+      const scene = Dino.Engine.currentScene;
+      const sourceId = object.metadata.sourceId;
+      if (!model || loadedScriptId.current !== currentScriptId || run?.dataset.playgroundScript !== currentScriptId ||
+          !Dino.Engine.paused || !Dino.Engine.debug || Dino.Engine.selectedObject !== object ||
+          !sourceId || object.transform.parent || object.transform.children.size) return;
+      const matching = Array.from(scene?.objects ?? Dino.Engine.objects)
+        .filter(item => item.metadata.sourceId === sourceId);
+      if (matching.length !== 1 || matching[0] !== object) return;
+      const deletion = getSceneObjectDeletion(model.getValue(), sourceId);
+      if (!deletion) return;
+      const before = model.getAlternativeVersionId();
+      if (!applySourceEdits([deletion])) return;
+      Dino.Engine.destroyObject(object);
+      recordSceneHistory({ model, run, scene, object, before, after: model.getAlternativeVersionId(), removed: true });
+      window.dispatchEvent(new CustomEvent('playground-scene-history', {
+        detail: `Deleted ${object.metadata.tag}. Save the script to keep this change.`,
+      }));
+      event.preventDefault();
+    };
+
     const handleApplyEditEvent = async (e: Event) => {
       const customEvent = e as CustomEvent<Edit>;
       const { start, end, newText } = customEvent.detail;
@@ -326,6 +351,7 @@ const CodeEditor: React.FC<EditorProps> = ({ currentScriptId, onRefresh }) => {
     window.addEventListener('playground-sync-source-mapping', syncSourceMapping);
     window.addEventListener('playground-apply-placement', applyPlacement);
     window.addEventListener('playground-add-scene-object', addSceneObject);
+    window.addEventListener('playground-remove-scene-object', removeSceneObject);
     const clearSceneHistory = () => { sceneHistory.current = []; };
     window.addEventListener('playground-before-run', clearSceneHistory);
     const changeCodeHistory = (event: Event) => {
@@ -346,6 +372,7 @@ const CodeEditor: React.FC<EditorProps> = ({ currentScriptId, onRefresh }) => {
       window.removeEventListener('playground-sync-source-mapping', syncSourceMapping);
       window.removeEventListener('playground-apply-placement', applyPlacement);
       window.removeEventListener('playground-add-scene-object', addSceneObject);
+      window.removeEventListener('playground-remove-scene-object', removeSceneObject);
       window.removeEventListener('playground-before-run', clearSceneHistory);
       window.removeEventListener('playground-code-history', changeCodeHistory);
       window.removeEventListener('playground-apply-edit', handleApplyEditEvent);
@@ -361,7 +388,7 @@ const CodeEditor: React.FC<EditorProps> = ({ currentScriptId, onRefresh }) => {
       revision === (event.isUndoing ? item.before : item.after));
     if (!entry) return;
 
-    const { object, scene, transform } = entry;
+    const { object, scene, transform, removed } = entry;
     const active = scene === Dino.Engine.currentScene;
     const objects = scene?.objects ?? Dino.Engine.objects;
     if (transform) {
@@ -373,19 +400,20 @@ const CodeEditor: React.FC<EditorProps> = ({ currentScriptId, onRefresh }) => {
       window.dispatchEvent(new CustomEvent('playground-scene-history', { detail }));
       return;
     }
-    if (event.isUndoing && objects.has(object)) {
+    const remove = removed ? event.isRedoing : event.isUndoing;
+    if (remove && objects.has(object)) {
       if (Dino.Engine.selectedObject === object) Dino.Engine.selectedObject = null;
       if (active) Dino.Engine.destroyObject(object);
       else if (scene) scene.remove(object);
       else objects.delete(object);
-    } else if (event.isRedoing && !objects.has(object)) {
+    } else if (!remove && !objects.has(object)) {
       if (active) {
         Dino.Engine.registerObject(object);
         Dino.Engine.selectedObject = object;
       } else if (scene) scene.add(object);
       else objects.add(object);
     }
-    const detail = `${event.isUndoing ? 'Removed' : 'Restored'} ${object.metadata.tag}.`;
+    const detail = `${remove ? 'Removed' : 'Restored'} ${object.metadata.tag}.`;
     window.dispatchEvent(new CustomEvent('playground-scene-history', { detail }));
   };
 

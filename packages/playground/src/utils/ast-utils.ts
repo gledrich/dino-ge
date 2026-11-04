@@ -251,6 +251,54 @@ export interface Edit {
   newText: string;
 }
 
+/** Remove a standalone constructor written by the visual editor. */
+export function getSceneObjectDeletion(source: string, sourceId: string): Edit | null {
+  if (!sourceId.startsWith('DinoPlace') || instrumentCode(source).error) return null;
+  const mapping = getSourceMapping()[sourceId];
+  const group = sourceId.slice(0, sourceId.lastIndexOf('-') + 1);
+  if (!mapping || Object.keys(getSourceMapping()).filter(id => id.startsWith(group) &&
+      /^\d+$/.test(id.slice(group.length))).length !== 1) return null;
+
+  const ast = acorn.parse(source, { ecmaVersion: 'latest', sourceType: 'module' });
+  const imports = dinoImports(ast);
+  const matches: acorn.ExpressionStatement[] = [];
+  const visit = (node: any) => {
+    if (matches.length || node.start > mapping.start || node.end < mapping.end) return;
+    if (node.type === 'BlockStatement') {
+      for (const child of node.body) {
+        if (child.type !== 'ExpressionStatement') continue;
+        const expression = child.expression;
+        const isPlay = expression.type === 'CallExpression' && !expression.arguments.length &&
+          expression.callee.type === 'MemberExpression' && !expression.callee.computed &&
+          expression.callee.property.name === 'play';
+        const constructor = isPlay ? expression.callee.object : expression;
+        if (constructor.type !== 'NewExpression' || constructor.start !== mapping.start ||
+            constructor.end !== mapping.end || !constructor.callee.name?.startsWith('DinoPlace')) continue;
+        const type = imports.get(constructor.callee.name);
+        if (isPlay ? type === 'Sprite' : type === 'Rectangle' || type === 'Circle' || type === 'Text') {
+          matches.push(child);
+          return;
+        }
+      }
+    }
+    for (const value of Object.values(node)) {
+      for (const child of Array.isArray(value) ? value : [value]) {
+        if (child && typeof child === 'object' && 'type' in child) visit(child);
+      }
+    }
+  };
+  visit(ast);
+  const [statement] = matches;
+  if (!statement) return null;
+  const lineStart = source.lastIndexOf('\n', statement.start - 1) + 1;
+  const lineEnd = source.indexOf('\n', statement.end);
+  if (lineEnd >= 0 && !source.slice(lineStart, statement.start).trim() &&
+      !source.slice(statement.end, lineEnd).trim()) {
+    return { start: lineStart, end: lineEnd + 1, newText: '' };
+  }
+  return { start: statement.start, end: statement.end, newText: '' };
+}
+
 /** Adds a constructor to the active scene or engine startup callback. */
 export function getSceneObjectCreation(source: string, placement: SceneObjectPlacement) {
   let ast: acorn.Program;
