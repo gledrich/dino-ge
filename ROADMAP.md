@@ -6,7 +6,7 @@ This document outlines the planned features and milestones for the **Dino Game E
 
 - **Input State Management:**
   *   [x] Implement keyboard state tracking (e.g., `Input.isKeyDown('w')`).
-  - [ ] Add Gamepad API support for controller input.
+  - [x] Add standard gamepad polling and left-stick input with a dead zone.
 - **Entity Component System (ECS):**
   *   [x] Implement foundation: `Component`, `PhysicsComponent`, `TransformComponent`, `TagComponent`, `VisibilityComponent`.
   *   [x] Refactor `GameObject` to act as an Entity (Pure ECS access).
@@ -28,16 +28,16 @@ This document outlines the planned features and milestones for the **Dino Game E
 ## Phase 2: Medium-Term (Core Game Systems)
 
 - **Audio Manager:**
-  - [ ] Implement a `Sound` class using the Web Audio API.
-  - [ ] Support for background music loops and one-off sound effects.
-  - [ ] Master volume and channel-based volume control.
+  - [x] Implement a `Sound` class using the Web Audio API.
+  - [x] Support for background music loops and one-off sound effects.
+  - [x] Master volume and channel-based volume control.
 - **Tilemaps & Maps:**
-  - [ ] Create a `Tilemap` class to render grid-based levels.
-  - [ ] Support for loading Tiled JSON map exports.
+  - [x] Create a `Tilemap` class to render grid-based levels.
+  - [x] Import finite orthogonal Tiled JSON with one embedded tileset and one unencoded tile layer.
 - **UI Framework:**
-  - [ ] Add a `Button` component with hover/click states.
-  - [ ] Implement UI anchoring (top-left, center, etc.) relative to the screen.
-  - [ ] Add a `ProgressBar` component for health/loading bars.
+  - [x] Draw screen-space buttons with pointer and keyboard activation.
+  - [x] Anchor canvas UI to viewport edges or the centre.
+  - [x] Draw screen-space progress bars for health and loading states.
 
 ## Phase 3: Long-Term (Advanced Features)
 

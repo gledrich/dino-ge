@@ -4,7 +4,7 @@ A lightweight, developer-friendly 2D game engine built with TypeScript, designed
 
 See [dino-ge](./packages/dino-ge//README.md) and [dino-ge-playground](./packages/playground/README.md).
 
-⚠️ **This project is in alpha** ⚠️
+**Beta preview.** APIs and workflows may change during the beta.
 
 ## Core Features
 
@@ -30,6 +30,8 @@ The Dino GE playground provides a robust environment to prototype and test game 
 
 ### Installation
 
+Use Node.js 26.13.0 LTS from `.nvmrc` for local development.
+
 ```bash
 git clone https://github.com/gledrich/dino-ge.git
 cd dino-ge
@@ -48,7 +50,15 @@ Once running, access it at [http://localhost:3000](http://localhost:3000).
 
 ### Development
 
-The `Example` directory provides a clean, minimal implementation as a starting point for your own games.
+Run `npm run build -w dino-ge` and then `npm run example` to play **Amber Ruins**
+at [http://localhost:3001](http://localhost:3001). Use WASD, the arrow keys or
+a standard gamepad's left stick to explore three tiled rooms, avoid the spike
+traps and bring three amber relics to the vault gate. The game includes music,
+sound effects and independent volume controls.
+
+The [example workspace](./packages/example/amber-ruins/README.md) describes
+the assets and the engine APIs the game uses. The original Dino Survival demo
+is still available at `/survival.html`.
 
 _Note: The engine handles initialization; create your game instance directly in your entry file._
 

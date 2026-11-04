@@ -2,7 +2,7 @@
 
 A lightweight, performant 2D game engine built from the ground up in TypeScript. `dino-ge` provides a robust, developer-friendly framework for building 2D web games. Friend of [dino-ge-playground](https://www.npmjs.com/package/dino-ge-playground).
 
-⚠️ **This project is in alpha** ⚠️
+**Beta preview.** APIs and workflows may change during the beta.
 
 ## Features
 
@@ -16,8 +16,26 @@ A lightweight, performant 2D game engine built from the ground up in TypeScript.
 ## Installation
 
 ```bash
-npm install dino-ge
+npm install dino-ge@beta
 ```
+
+## Beta game APIs
+
+- `Tilemap.fromTiled(map, { tileset, position })` imports a finite orthogonal Tiled
+  JSON map with one embedded tileset, square tiles and one unencoded tile layer.
+  Pass the loaded tileset image or its loader tag as `tileset`.
+- `Input.getGamepad()` returns the first connected standard gamepad, or `null`.
+  `Input.getGamepadAxes()` returns its left stick as a `Vector2` with a 0.2
+  dead zone on each axis. Both methods accept an optional gamepad index.
+- Call `await Sound.unlock()` from a user gesture. Use `Sound.load(url)` to
+  decode audio, `sound.play()` for effects, and
+  `sound.play({ loop: true, channel: 'music' })` for a music loop.
+  Playback returns a stop function. `Sound.setVolume(channel, level)` controls
+  the `master`, `music` or `effects` channel between zero and one.
+- Pass `drawUI(ui)` to `Engine` to draw a screen-space interface over the world.
+  The game supplies the state and actions. `ScreenUI` provides anchors,
+  labels, panels, images, keyboard- and pointer-activated buttons, and
+  progress bars. The `onDispose` callback can release game resources on reset.
 
 ## Quick Start
 

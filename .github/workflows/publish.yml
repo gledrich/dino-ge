@@ -15,28 +15,50 @@ jobs:
       - uses: actions/checkout@v6
       - uses: actions/setup-node@v6
         with:
-          node-version: '24'
+          node-version-file: '.nvmrc'
           registry-url: 'https://registry.npmjs.org'
           cache: 'npm'
 
+      - name: Validate release tag
+        id: release
+        run: |
+          version=$(node -p "require('./packages/dino-ge/package.json').version")
+          playground=$(node -p "require('./packages/playground/package.json').version")
+          if [[ "$version" != "$playground" || "$GITHUB_REF_NAME" != "v$version" ]]; then
+            echo "The Git tag must match both package versions." >&2
+            exit 1
+          fi
+          if [[ "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+-beta\.[0-9]+$ ]]; then
+            echo 'dist_tag=beta' >> "$GITHUB_OUTPUT"
+          elif [[ "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo 'dist_tag=latest' >> "$GITHUB_OUTPUT"
+          else
+            echo "Unsupported release version: $version" >&2
+            exit 1
+          fi
+
       - name: Install dependencies
-        run: npm install
+        run: npm ci
 
-      - name: Test
-        run: npm test
+      - name: Lint, build and test
+        run: |
+          npm run lint
+          npm run build
+          npm test
 
-      - name: Build engine
-        run: npm run build -w dino-ge
+      - name: Test Playground and Amber Ruins in browsers
+        run: |
+          npm run test:e2e:docker -- --fail-on-flaky-tests
+          docker run --rm -e CI=true --entrypoint npm tsge-e2e run test:example
 
       - name: Publish engine
-        run: npm publish -w dino-ge --access public
+        run: npm publish -w dino-ge --access public --tag "$NPM_DIST_TAG"
         env:
+          NPM_DIST_TAG: ${{ steps.release.outputs.dist_tag }}
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
 
-      - name: Build playground
-        run: npm run build -w dino-ge-playground
-
       - name: Publish playground
-        run: npm publish -w dino-ge-playground --access public
+        run: npm publish -w dino-ge-playground --access public --tag "$NPM_DIST_TAG"
         env:
+          NPM_DIST_TAG: ${{ steps.release.outputs.dist_tag }}
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
