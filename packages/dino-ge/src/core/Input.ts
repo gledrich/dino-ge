@@ -3,6 +3,8 @@ import Engine from './Engine.js';
 import SpriteComponent from '../components/SpriteComponent.js';
 import ShapeComponent from '../components/ShapeComponent.js';
 import TextComponent from '../components/TextComponent.js';
+import type GameObject from './GameObject.js';
+import { getViewportGeometry, projectOntoObjectAxes } from './ViewportGeometry.js';
 
 /**
  * Handles mouse and keyboard input events.
@@ -13,9 +15,27 @@ export default class Input {
   private static keys: Set<string> = new Set();
   private static isinitialised = false;
 
-  private static isDragging = false;
-  private static isResizing = false;
-  private static dragOffset: Vector2 = new Vector2(0, 0);
+  private static gesture: {
+    kind: 'drag' | 'resize'; object: GameObject; offset: Vector2; initial?: Vector2;
+  } | null = null;
+
+  private static getGestureValue(object: GameObject, kind: 'drag' | 'resize'): Vector2 {
+    if (kind === 'drag') {
+      const position = object.transform.position;
+      return new Vector2(position?.x, position?.y);
+    }
+    if (object.getComponent?.(SpriteComponent)) return object.transform.scale.clone();
+    return new Vector2(object.bounds?.width ?? 0, object.bounds?.height ?? 0);
+  }
+
+  private static getHoveredResizeHandle(object: GameObject, x: number, y: number) {
+    if (!object.bounds) return null;
+    const geometry = getViewportGeometry(object);
+    const { cornerX, cornerY, width, height } = geometry;
+    const halfSize = 4 / Engine.camera.zoom;
+    const isInside = Math.abs(x - cornerX) < halfSize && Math.abs(y - cornerY) < halfSize;
+    return width !== 0 && height !== 0 && isInside ? geometry : null;
+  }
 
   /**
    * initialises input event listeners.
@@ -35,28 +55,38 @@ export default class Input {
         this.mousePosition.y = event.clientY;
       }
 
-      if (this.isResizing && Engine.selectedObject && Engine.debug) {
-        const obj = Engine.selectedObject;
-        const { worldPosition } = obj.transform;
-        const scale = obj.transform.scale || new Vector2(1, 1);
-        const worldWidth = Math.max(5, this.mouseX - worldPosition.x);
-        const worldHeight = Math.max(5, this.mouseY - worldPosition.y);
+      if (this.gesture && (!Engine.debug || this.gesture.object !== Engine.selectedObject)) {
+        this.gesture = null;
+      }
+      const gesture = this.gesture;
+
+      if (gesture?.kind === 'resize') {
+        const obj = gesture.object;
+        const geometry = getViewportGeometry(obj);
+        const pointer = projectOntoObjectAxes(geometry,
+          this.mouseX - gesture.offset.x, this.mouseY - gesture.offset.y);
+        const signX = Math.sign(geometry.scaleX);
+        const signY = Math.sign(geometry.scaleY);
+        const width = Math.max(5, pointer.x * signX);
+        const height = Math.max(5, pointer.y * signY);
 
         const sprite = obj.getComponent(SpriteComponent);
         if (sprite && sprite.frameWidth > 0 && sprite.frameHeight > 0) {
-          // Resizing sprites changes their transform scale
-          obj.transform.scale.x = worldWidth / sprite.frameWidth;
-          obj.transform.scale.y = worldHeight / sprite.frameHeight;
-        } else {
-          // Resizing other components changes their local dimensions
-          // We must compensate for current scale so that: localDim * scale = worldWidth
-          const localWidth = worldWidth / scale.x;
-          const localHeight = worldHeight / scale.y;
+          const parentScale = obj.transform.parent?.worldScale;
+          const parentX = parentScale?.x ?? 1;
+          const parentY = parentScale?.y ?? 1;
+          if (signX && parentX) obj.transform.scale.x = width * signX / (sprite.frameWidth * parentX);
+          if (signY && parentY) obj.transform.scale.y = height * signY / (sprite.frameHeight * parentY);
+        } else if (signX && signY) {
+          const localWidth = width / Math.abs(geometry.scaleX);
+          const localHeight = height / Math.abs(geometry.scaleY);
 
           const shape = obj.getComponent(ShapeComponent);
           const text = obj.getComponent(TextComponent);
 
-          if (shape) {
+          if (shape?.type === 'circle') {
+            shape.width = localWidth / 2;
+          } else if (shape) {
             shape.width = localWidth;
             shape.height = localHeight;
           } else if (text) {
@@ -70,44 +100,34 @@ export default class Input {
         return;
       }
 
-      if (Engine.debug && this.isDragging && Engine.selectedObject) {
-        const { parent } = Engine.selectedObject.transform;
+      if (gesture?.kind === 'drag') {
+        const { parent, position } = gesture.object.transform;
+        const worldX = this.mouseX - gesture.offset.x;
+        const worldY = this.mouseY - gesture.offset.y;
         if (parent) {
-          const parentWorldPos = parent.worldPosition;
-          Engine.selectedObject.transform.position.x = (this.mouseX - this.dragOffset.x) - parentWorldPos.x;
-          Engine.selectedObject.transform.position.y = (this.mouseY - this.dragOffset.y) - parentWorldPos.y;
+          const origin = parent.worldPosition;
+          const scale = parent.worldScale;
+          const rotation = parent.worldRotation;
+          const x = worldX - origin.x;
+          const y = worldY - origin.y;
+          const cos = Math.cos(rotation);
+          const sin = Math.sin(rotation);
+          // Undo the parent's translation, rotation and scale in reverse order.
+          // A collapsed axis has no inverse, so retain its local coordinate.
+          position.x = scale.x === 0 ? position.x : (x * cos + y * sin) / scale.x;
+          position.y = scale.y === 0 ? position.y : (-x * sin + y * cos) / scale.y;
         } else {
-          Engine.selectedObject.transform.position.x = this.mouseX - this.dragOffset.x;
-          Engine.selectedObject.transform.position.y = this.mouseY - this.dragOffset.y;
+          position.x = worldX;
+          position.y = worldY;
         }
         return;
       }
 
-      // Cursor feedback for resize handle
-      if (Engine.debug && Engine.selectedObject && !this.isDragging && !this.isResizing) {
-        const obj = Engine.selectedObject;
-        const { worldPosition } = obj.transform;
-        const worldScale = obj.transform.worldScale || new Vector2(1, 1);
-        const width = (obj.bounds?.width ?? 0) * worldScale.x;
-        const height = (obj.bounds?.height ?? 0) * worldScale.y;
-        const handleSize = 8 / Engine.camera.zoom;
-        const worldPos = new Vector2(this.mouseX, this.mouseY);
-
-        if (
-          worldPos.x > worldPosition.x + width - handleSize / 2 &&
-          worldPos.x < worldPosition.x + width + handleSize / 2 &&
-          worldPos.y > worldPosition.y + height - handleSize / 2 &&
-          worldPos.y < worldPosition.y + height + handleSize / 2
-        ) {
-          const canvas = document.getElementById('canvas');
-          if (canvas) canvas.style.cursor = 'se-resize';
-          return;
-        } else {
-          const canvas = document.getElementById('canvas');
-          if (canvas && canvas.style.cursor === 'se-resize') {
-            canvas.style.cursor = 'default';
-          }
-        }
+      const selected = Engine.selectedObject;
+      if (canvas && Engine.debug && selected && this.getHoveredResizeHandle(selected, this.mouseX, this.mouseY)) {
+        canvas.style.cursor = 'se-resize';
+      } else if (canvas?.style?.cursor === 'se-resize') {
+        canvas.style.cursor = 'default';
       }
     });
 
@@ -119,24 +139,17 @@ export default class Input {
 
       // If debug mode is on, try to select/drag/resize an object
       if (Engine.debug && event.button === 0) {
-        // First check if we're clicking the resize handle of the ALREADY selected object
-        if (Engine.selectedObject) {
-          const obj = Engine.selectedObject;
-          const { worldPosition } = obj.transform;
-          const worldScale = obj.transform.worldScale || new Vector2(1, 1);
-          const width = (obj.bounds?.width ?? 0) * worldScale.x;
-          const height = (obj.bounds?.height ?? 0) * worldScale.y;
-          const handleSize = 8 / Engine.camera.zoom;
-
-          if (
-            worldPos.x > worldPosition.x + width - handleSize / 2 &&
-            worldPos.x < worldPosition.x + width + handleSize / 2 &&
-            worldPos.y > worldPosition.y + height - handleSize / 2 &&
-            worldPos.y < worldPosition.y + height + handleSize / 2
-          ) {
-            this.isResizing = true;
-            return;
-          }
+        this.gesture = null;
+        const selected = Engine.selectedObject;
+        const handle = selected && this.getHoveredResizeHandle(selected, worldPos.x, worldPos.y);
+        if (selected && handle) {
+          this.gesture = {
+            kind: 'resize',
+            object: selected,
+            offset: new Vector2(worldPos.x - handle.cornerX, worldPos.y - handle.cornerY),
+            initial: this.getGestureValue(selected, 'resize'),
+          };
+          return;
         }
 
         const objects = Engine.currentScene ? Engine.currentScene.objects : Engine.objects;
@@ -149,20 +162,19 @@ export default class Input {
           const obj = sorted[i];
           if (!obj.bounds) continue;
           
-          const { worldPosition } = obj.transform;
-          const worldScale = obj.transform.worldScale || new Vector2(1, 1);
-          const width = obj.bounds.width * worldScale.x;
-          const height = obj.bounds.height * worldScale.y;
+          const geometry = getViewportGeometry(obj);
+          const point = projectOntoObjectAxes(geometry, worldPos.x, worldPos.y);
           if (
-            worldPos.x > worldPosition.x &&
-            worldPos.x < worldPosition.x + width &&
-            worldPos.y > worldPosition.y &&
-            worldPos.y < worldPosition.y + height
+            point.x > Math.min(0, geometry.width) && point.x < Math.max(0, geometry.width) &&
+            point.y > Math.min(0, geometry.height) && point.y < Math.max(0, geometry.height)
           ) {
             Engine.selectedObject = obj;
-            this.isDragging = true;
-            this.dragOffset.x = worldPos.x - worldPosition.x;
-            this.dragOffset.y = worldPos.y - worldPosition.y;
+            this.gesture = {
+              kind: 'drag',
+              object: obj,
+              offset: new Vector2(worldPos.x - geometry.origin.x, worldPos.y - geometry.origin.y),
+              initial: this.getGestureValue(obj, 'drag'),
+            };
             found = true;
             break;
           }
@@ -180,9 +192,14 @@ export default class Input {
 
     document.addEventListener('mouseup', (event: MouseEvent) => {
       this.keys.delete(`mouse${event.button}`);
-      if (event.button === 0) {
-        this.isDragging = false;
-        this.isResizing = false;
+      if (event.button !== 0) return;
+      const gesture = this.gesture;
+      this.gesture = null;
+      if (Engine.debug && gesture?.initial && gesture.object === Engine.selectedObject) {
+        const value = this.getGestureValue(gesture.object, gesture.kind);
+        if (value.x !== gesture.initial.x || value.y !== gesture.initial.y) {
+          Engine.emit('objectManipulated', { object: gesture.object, kind: gesture.kind, initial: gesture.initial });
+        }
       }
     });
 
@@ -219,6 +236,7 @@ export default class Input {
 
     window.addEventListener('blur', () => {
       this.keys.clear();
+      this.gesture = null;
     });
   }
 

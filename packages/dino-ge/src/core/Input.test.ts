@@ -2,6 +2,7 @@ import Input from './Input.js';
 import Vector2 from '../math/Vector2.js';
 import Engine from './Engine.js';
 import GameObject from './GameObject.js';
+import TransformComponent from '../components/TransformComponent.js';
 
 jest.mock('./Engine', () => ({
   __esModule: true,
@@ -13,11 +14,20 @@ jest.mock('./Engine', () => ({
     },
     paused: false,
     debug: false,
+    emit: jest.fn(),
     objects: new Set(),
     currentScene: null,
     selectedObject: null
   }
 }));
+
+const inputState = Input as unknown as {
+  gesture: { kind: 'drag' | 'resize'; object: GameObject; offset: Vector2 } | null;
+};
+
+function beginResize(object: GameObject) {
+  inputState.gesture = { kind: 'resize', object, offset: new Vector2(0, 0) };
+}
 
 describe('Input', () => {
   let capturedListeners: Record<string, ((event: unknown) => void)> = {};
@@ -28,8 +38,7 @@ describe('Input', () => {
     (Input as unknown as { clickListeners: Set<unknown> }).clickListeners.clear();
     (Input as unknown as { isinitialised: boolean }).isinitialised = false;
     (Input as unknown as { mousePosition: Vector2 }).mousePosition = new Vector2(0, 0);
-    (Input as unknown as { isDragging: boolean }).isDragging = false;
-    (Input as unknown as { isResizing: boolean }).isResizing = false;
+    inputState.gesture = null;
     jest.clearAllMocks();
     
     capturedListeners = {};
@@ -251,7 +260,7 @@ describe('Input', () => {
 
     // Click handle
     capturedListeners['mousedown']({ target: document.createElement('canvas'), button: 0 } as unknown as MouseEvent);
-    expect((Input as unknown as { isResizing: boolean }).isResizing).toBe(true);
+    expect(inputState.gesture?.kind === 'resize').toBe(true);
 
     // Resize to 200x300 (mouse at 210, 310)
     (Input as unknown as { mousePosition: Vector2 }).mousePosition = new Vector2(210, 310);
@@ -261,34 +270,34 @@ describe('Input', () => {
 
     // Mouseup to reset state before next click
     capturedListeners['mouseup']({ button: 0 } as unknown as MouseEvent);
-    expect((Input as unknown as { isResizing: boolean }).isResizing).toBe(false);
+    expect(inputState.gesture?.kind === 'resize').toBe(false);
 
     // Click NEAR handle but not ON it (e.g. at 110, 100)
     // Range is 106-114 for x, 106-114 for y.
     (Input as unknown as { mousePosition: Vector2 }).mousePosition = new Vector2(110, 100);
     capturedListeners['mousedown']({ target: document.createElement('canvas'), button: 0 } as unknown as MouseEvent);
-    expect((Input as unknown as { isResizing: boolean }).isResizing).toBe(false);
-    expect((Input as unknown as { isDragging: boolean }).isDragging).toBe(true);
+    expect(inputState.gesture?.kind === 'resize').toBe(false);
+    expect(inputState.gesture?.kind === 'drag').toBe(true);
 
     // Reset and test other boundaries
     capturedListeners['mouseup']({ button: 0 } as unknown as MouseEvent);
     (Input as unknown as { mousePosition: Vector2 }).mousePosition = new Vector2(100, 110); // x too small
     capturedListeners['mousedown']({ target: document.createElement('canvas'), button: 0 } as unknown as MouseEvent);
-    expect((Input as unknown as { isResizing: boolean }).isResizing).toBe(false);
+    expect(inputState.gesture?.kind === 'resize').toBe(false);
 
     capturedListeners['mouseup']({ button: 0 } as unknown as MouseEvent);
     (Input as unknown as { mousePosition: Vector2 }).mousePosition = new Vector2(120, 110); // x too large
     capturedListeners['mousedown']({ target: document.createElement('canvas'), button: 0 } as unknown as MouseEvent);
-    expect((Input as unknown as { isResizing: boolean }).isResizing).toBe(false);
+    expect(inputState.gesture?.kind === 'resize').toBe(false);
 
     capturedListeners['mouseup']({ button: 0 } as unknown as MouseEvent);
     (Input as unknown as { mousePosition: Vector2 }).mousePosition = new Vector2(110, 120); // y too large
     capturedListeners['mousedown']({ target: document.createElement('canvas'), button: 0 } as unknown as MouseEvent);
-    expect((Input as unknown as { isResizing: boolean }).isResizing).toBe(false);
+    expect(inputState.gesture?.kind === 'resize').toBe(false);
 
     // Mouseup resets
     capturedListeners['mouseup']({ button: 0 } as unknown as MouseEvent);
-    expect((Input as unknown as { isResizing: boolean }).isResizing).toBe(false);
+    expect(inputState.gesture?.kind === 'resize').toBe(false);
 
     // Cursor reset when moving away from handle
     (Input as unknown as { mousePosition: Vector2 }).mousePosition = new Vector2(50, 50);
@@ -312,7 +321,7 @@ describe('Input', () => {
     } as unknown as GameObject;
     
     (Engine as unknown as { selectedObject: unknown }).selectedObject = obj;
-    (Input as unknown as { isResizing: boolean }).isResizing = true;
+    beginResize(Engine.selectedObject!);
     Input.init();
     
     (Input as unknown as { mousePosition: Vector2 }).mousePosition = new Vector2(50, 50);
@@ -328,7 +337,7 @@ describe('Input', () => {
       getComponent: jest.fn(() => null)
     } as unknown as GameObject;
     (Engine as unknown as { selectedObject: unknown }).selectedObject = objNoScale;
-    (Input as unknown as { isResizing: boolean }).isResizing = true;
+    beginResize(Engine.selectedObject!);
     capturedListeners['mousemove']({ clientX: 20, clientY: 20 } as unknown as MouseEvent);
     expect(objNoScale.bounds!.width).toBe(20);
   });
@@ -360,10 +369,10 @@ describe('Input', () => {
 
     // Test mousedown on handle with missing worldScale (line 126 branch)
     capturedListeners['mousedown']({ target: document.createElement('canvas'), button: 0 } as unknown as MouseEvent);
-    expect((Input as unknown as { isResizing: boolean }).isResizing).toBe(true);
+    expect(inputState.gesture?.kind === 'resize').toBe(true);
 
     // Test selection loop with missing worldScale (hit test branch)
-    (Input as unknown as { isResizing: boolean }).isResizing = false;
+    inputState.gesture = null;
     (Engine as unknown as { selectedObject: unknown }).selectedObject = null;
     (Input as unknown as { mousePosition: Vector2 }).mousePosition = new Vector2(5, 5);
     capturedListeners['mousedown']({ target: document.createElement('canvas'), button: 0 } as unknown as MouseEvent);
@@ -383,7 +392,7 @@ describe('Input', () => {
     } as unknown as GameObject;
     
     (Engine as unknown as { selectedObject: unknown }).selectedObject = obj;
-    (Input as unknown as { isResizing: boolean }).isResizing = true;
+    beginResize(Engine.selectedObject!);
     Input.init();
     
     // Shape
@@ -414,12 +423,12 @@ describe('Input', () => {
     Input.init();
     
     // No matching component fallback
-    (Input as unknown as { isResizing: boolean }).isResizing = true;
+    beginResize(Engine.selectedObject!);
     (Input as unknown as { mousePosition: Vector2 }).mousePosition = new Vector2(100, 100);
     expect(() => capturedListeners['mousemove']({ clientX: 100, clientY: 100 } as unknown as MouseEvent)).not.toThrow();
 
     // Hover handle with no canvas
-    (Input as unknown as { isResizing: boolean }).isResizing = false;
+    inputState.gesture = null;
     jest.spyOn(document, 'getElementById').mockReturnValue(null);
     expect(() => capturedListeners['mousemove']({ clientX: 100, clientY: 100 } as unknown as MouseEvent)).not.toThrow();
 
@@ -447,7 +456,7 @@ describe('Input', () => {
       getComponent: jest.fn((cls) => cls.name === 'SpriteComponent' ? mockSprite : null)
     } as unknown as GameObject;
     (Engine as unknown as { selectedObject: unknown }).selectedObject = spriteObj;
-    (Input as unknown as { isResizing: boolean }).isResizing = true;
+    beginResize(Engine.selectedObject!);
     expect(() => {
       capturedListeners['mousemove']({ clientX: 50, clientY: 50 } as unknown as MouseEvent);
     }).not.toThrow();
@@ -506,7 +515,8 @@ describe('Input', () => {
 
   it('handles dragging with parent', () => {
     (Engine as unknown as { debug: boolean }).debug = true;
-    const parentTransform = { worldPosition: new Vector2(100, 100) };
+    const parentTransform = new TransformComponent();
+    parentTransform.position.set(100, 100);
     const obj = {
       transform: { position: { x: 10, y: 10 }, worldPosition: { x: 110, y: 110 }, worldScale: new Vector2(1, 1), parent: parentTransform },
       bounds: { width: 50, height: 50 },
@@ -521,6 +531,66 @@ describe('Input', () => {
     (Input as unknown as { mousePosition: Vector2 }).mousePosition = new Vector2(200, 200);
     capturedListeners['mousemove']({ clientX: 200, clientY: 200 } as unknown as MouseEvent);
     expect(obj.transform.position.x).toBe(75);
+  });
+
+  it('keeps the grab offset when dragging a child of a rotated and scaled parent', () => {
+    Engine.debug = true;
+    const parent = new TransformComponent();
+    parent.position.set(100, 100);
+    parent.rotation = Math.PI / 2;
+    parent.scale.set(2, 3);
+    const transform = new TransformComponent();
+    transform.position.set(10, 10);
+    parent.addChild(transform);
+    const object = {
+      transform, bounds: { width: 20, height: 20 }, metadata: { zIndex: 0 }
+    } as GameObject;
+    Engine.objects.add(object);
+
+    Input.init();
+    capturedListeners.mousemove({ clientX: 75, clientY: 125 });
+    capturedListeners.mousedown({ target: document.createElement('canvas'), button: 0 });
+    expect(Engine.selectedObject).toBeNull();
+    capturedListeners.mouseup({ button: 0 });
+    capturedListeners.mousemove({ clientX: 65, clientY: 125 });
+    capturedListeners.mousedown({ target: document.createElement('canvas'), button: 0 });
+    expect(Engine.selectedObject).toBe(object);
+    capturedListeners.mousemove({ clientX: 95, clientY: 165 });
+
+    expect(transform.worldPosition.x).toBeCloseTo(100);
+    expect(transform.worldPosition.y).toBeCloseTo(160);
+    expect(transform.position.x).toBeCloseTo(30);
+    expect(transform.position.y).toBeCloseTo(0);
+  });
+
+  it('ends a viewport drag when selection changes or the window loses focus', () => {
+    Engine.debug = true;
+    const createObject = (x: number) => {
+      const transform = new TransformComponent();
+      transform.position.set(x, 10);
+      return { transform, bounds: { width: 30, height: 30 }, metadata: { zIndex: 0 } } as GameObject;
+    };
+    const first = createObject(10);
+    const second = createObject(100);
+    Engine.objects.add(first);
+    Engine.objects.add(second);
+    const canvas = document.createElement('canvas');
+    Input.init();
+    const grabFirst = () => {
+      capturedListeners.mousemove({ clientX: 20, clientY: 20 });
+      capturedListeners.mousedown({ target: canvas, button: 0 });
+      expect(Engine.selectedObject).toBe(first);
+    };
+
+    grabFirst();
+    Engine.selectedObject = second;
+    capturedListeners.mousemove({ clientX: 70, clientY: 70 });
+    expect(second.transform.position).toMatchObject({ x: 100, y: 10 });
+
+    grabFirst();
+    window.dispatchEvent(new Event('blur'));
+    capturedListeners.mousemove({ clientX: 70, clientY: 70 });
+    expect(first.transform.position).toMatchObject({ x: 10, y: 10 });
   });
 
   it('does not trigger click listeners when paused', () => {

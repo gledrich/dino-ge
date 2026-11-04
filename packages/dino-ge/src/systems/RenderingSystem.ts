@@ -6,6 +6,7 @@ import Engine from '../core/Engine.js';
 import PhysicsComponent from '../components/PhysicsComponent.js';
 import Vector2 from '../math/Vector2.js';
 import { getEngineState } from '../core/EngineState.js';
+import { getViewportGeometry } from '../core/ViewportGeometry.js';
 
 /**
  * A system that processes entities with RenderComponents.
@@ -95,16 +96,19 @@ export default class RenderingSystem extends System {
     }
 
     state.sortedObjects.forEach((object) => {
-      const { worldPosition, worldScale } = object.transform;
-      const width = (object.bounds?.width ?? 0) * worldScale.x;
-      const height = (object.bounds?.height ?? 0) * worldScale.y;
+      const { origin: worldPosition, width, height, rotation, cos, sin, cornerX, cornerY } =
+        getViewportGeometry(object);
+      const acrossX = width * cos;
+      const acrossY = width * sin;
+      const downX = -height * sin;
+      const downY = height * cos;
 
       // Frustum Culling
       if (
-        worldPosition.x < bounds.x + bounds.width &&
-        worldPosition.x + width > bounds.x &&
-        worldPosition.y < bounds.y + bounds.height &&
-        worldPosition.y + height > bounds.y
+        worldPosition.x + Math.min(0, acrossX) + Math.min(0, downX) < bounds.x + bounds.width &&
+        worldPosition.x + Math.max(0, acrossX) + Math.max(0, downX) > bounds.x &&
+        worldPosition.y + Math.min(0, acrossY) + Math.min(0, downY) < bounds.y + bounds.height &&
+        worldPosition.y + Math.max(0, acrossY) + Math.max(0, downY) > bounds.y
       ) {
         // Find any RenderComponent on the entity
         const renderable = object.getComponent(RenderComponent);
@@ -126,24 +130,32 @@ export default class RenderingSystem extends System {
             this.ctx.setLineDash([5 / Engine.camera.zoom, 5 / Engine.camera.zoom]);
           }
 
-          this.ctx.strokeRect(worldPosition.x, worldPosition.y, width, height);
+          if (object === Engine.selectedObject && rotation !== 0) {
+            this.ctx.save();
+            this.ctx.translate(worldPosition.x, worldPosition.y);
+            this.ctx.rotate(rotation);
+            this.ctx.strokeRect(0, 0, width, height);
+            this.ctx.restore();
+          } else {
+            this.ctx.strokeRect(worldPosition.x, worldPosition.y, width, height);
+          }
           this.ctx.setLineDash([]);
 
           // Draw resize handle if selected
-          if (object === Engine.selectedObject) {
+          if (object === Engine.selectedObject && width !== 0 && height !== 0) {
             const handleSize = 8 / Engine.camera.zoom;
             this.ctx.fillStyle = '#FFD166';
             this.ctx.fillRect(
-              worldPosition.x + width - handleSize / 2,
-              worldPosition.y + height - handleSize / 2,
+              cornerX - handleSize / 2,
+              cornerY - handleSize / 2,
               handleSize,
               handleSize
             );
             this.ctx.strokeStyle = '#000000';
             this.ctx.lineWidth = 1 / Engine.camera.zoom;
             this.ctx.strokeRect(
-              worldPosition.x + width - handleSize / 2,
-              worldPosition.y + height - handleSize / 2,
+              cornerX - handleSize / 2,
+              cornerY - handleSize / 2,
               handleSize,
               handleSize
             );

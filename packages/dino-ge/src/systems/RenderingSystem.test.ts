@@ -33,6 +33,7 @@ describe('RenderingSystem', () => {
       restore: jest.fn(),
       scale: jest.fn(),
       translate: jest.fn(),
+      rotate: jest.fn(),
       fillRect: jest.fn(),
       strokeRect: jest.fn(),
       fillText: jest.fn(),
@@ -104,6 +105,23 @@ describe('RenderingSystem', () => {
     Engine.zOrderDirty = true;
     system.update(new Set([obj]));
     expect(render.draw).not.toHaveBeenCalled();
+  });
+
+  it('draws a rotated selection that extends into view from an offscreen origin', () => {
+    const system = new RenderingSystem(mockCtx);
+    const object = new MockGameObject('rotated', 0, 30, 40);
+    object.transform.position.set(810, 100);
+    object.transform.rotation = Math.PI / 2;
+    const render = new MockRenderComponent();
+    object.addComponent(render);
+    Engine.selectedObject = object;
+
+    system.update(new Set([object]), 0, true);
+
+    expect(render.draw).toHaveBeenCalled();
+    expect(mockCtx.rotate).toHaveBeenCalledWith(Math.PI / 2);
+    expect(mockCtx.strokeRect).toHaveBeenCalledWith(0, 0, 30, 40);
+    expect(mockCtx.fillRect).toHaveBeenCalledWith(766, 126, 8, 8);
   });
 
   it('sets a new rendering context', () => {
