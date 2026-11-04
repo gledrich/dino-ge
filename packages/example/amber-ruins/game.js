@@ -1,14 +1,16 @@
-import { Engine, Input, Loader, Sound, Sprite, Tilemap, Vector2, VisibilityComponent } from 'dino-ge';
+import { Engine, Input, Loader, Sound, Sprite, SpriteComponent, Tilemap, Vector2, VisibilityComponent } from 'dino-ge';
 
 const asset = name => new URL(`./assets/${name}`, import.meta.url).href;
 const cellSize = 48;
 const stepDuration = 145;
+const walkDuration = 125;
 const damageGrace = 850;
 const rooms = ['The Gatehouse', 'The Spike Gallery', 'The Amber Vault'];
 const relicCells = [[5, 3], [12, 4], [20, 3]];
 const startCell = [2, 4];
 const exitCell = [23, 4];
 const controlsHint = 'Move with WASD, arrow keys or the left stick.';
+const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)');
 
 const hud = Object.fromEntries(
   ['room', 'health', 'relics', 'hint', 'overlay', 'overlay-title', 'instructions', 'start', 'mute', 'music', 'effects']
@@ -25,6 +27,8 @@ let column = startCell[0];
 let row = startCell[1];
 let nextMove = 0;
 let vulnerableAt = 0;
+let walk;
+let previousFrame;
 let muted = false;
 let audioLoading;
 const sounds = {};
@@ -40,17 +44,19 @@ function position(sprite, x, y, size) {
   sprite.transform.position.set(x * cellSize + inset, y * cellSize + inset);
 }
 
-function makeSprite(tag, image, x, y, size) {
+function makeSprite(tag, image, x, y, size, framesAcross = 1) {
   const sprite = new Sprite({
     tag,
     img: image,
-    rows: 1,
-    cols: 1,
-    scale: size / image.width,
+    rows: framesAcross,
+    cols: framesAcross,
+    endCol: framesAcross ** 2,
+    scale: size * framesAcross / image.width,
     zIndex: 2,
   });
   position(sprite, x, y, size);
   sprite.play();
+  sprite.getComponent(SpriteComponent).playing = false;
   return sprite;
 }
 
@@ -75,10 +81,14 @@ function start() {
   collected = 0;
   nextMove = 0;
   vulnerableAt = 0;
+  walk = undefined;
+  previousFrame = undefined;
   tilemap.data[exitCell[1]][exitCell[0]] = 3;
   for (const relic of relics) relic.getComponent(VisibilityComponent).visible = true;
   position(player, column, row, 44);
   player.flip = false;
+  player.getComponent(VisibilityComponent).visible = true;
+  player.currentFrame = 0;
   active = true;
   hud.hint.textContent = controlsHint;
   hud.overlay.hidden = true;
@@ -121,10 +131,10 @@ function move(now) {
     return;
   }
 
+  walk = { column, row, start: now };
   column = nextColumn;
   row = nextRow;
   if (horizontal) player.flip = x < 0;
-  position(player, column, row, 44);
 
   const relicIndex = relicCells.findIndex(([relicX, relicY]) => relicX === column && relicY === row);
   const visibility = relics[relicIndex]?.getComponent(VisibilityComponent);
@@ -132,6 +142,7 @@ function move(now) {
     visibility.visible = false;
     collected++;
     sounds.pickup?.play();
+    pulse(hud.relics, '#fff1c3');
     if (collected === relicCells.length) {
       tilemap.data[exitCell[1]][exitCell[0]] = 0;
       hud.hint.textContent = 'The gate is open. Head to the far side of the Amber Vault.';
@@ -145,26 +156,58 @@ function move(now) {
   if (column === exitCell[0] && row === exitCell[1]) finish(true);
 }
 
+function pulse(element, colour) {
+  if (reducedMotion.matches) return;
+  element.animate([{ color: colour, scale: 1.16 }, { scale: 1 }], {
+    duration: 260,
+    easing: 'ease-out',
+  });
+}
+
+function animate(now) {
+  const elapsed = walk ? now - walk.start : walkDuration;
+  if (elapsed >= walkDuration || reducedMotion.matches) walk = undefined;
+  const progress = walk ? elapsed / walkDuration : 1;
+  const eased = progress * progress * (3 - 2 * progress);
+  const x = walk ? walk.column + (column - walk.column) * eased : column;
+  const y = walk ? walk.row + (row - walk.row) * eased : row;
+  const lift = walk ? Math.sin(progress * Math.PI) * 2 / cellSize : 0;
+  position(player, x, y - lift, 44);
+  player.currentFrame = walk ? Math.min(3, Math.floor(progress * 4)) : 0;
+  player.getComponent(VisibilityComponent).visible =
+    !active || now >= vulnerableAt || reducedMotion.matches || Math.floor(now / 90) % 2 === 0;
+
+  for (const [index, relic] of relics.entries()) {
+    const [relicX, relicY] = relicCells[index];
+    const bob = reducedMotion.matches ? 0 : Math.sin(now / 285 + index) * 3 / cellSize;
+    position(relic, relicX, relicY - bob, 62);
+  }
+}
+
 function update() {
-  if (!tilemap) return;
+  if (!player) return;
+  const now = performance.now();
+  if (active) move(now);
+  animate(now);
+
   const camera = Engine.camera;
   const roomIndex = Math.min(rooms.length - 1, Math.floor(column / 8));
   camera.zoom = Math.min(game.width / (9 * cellSize), game.height / (9 * cellSize), 1.55);
   const viewWidth = game.width / camera.zoom;
   const mapWidth = tilemap.data[0].length * cellSize;
   const roomLeft = (4.5 + roomIndex * 8) * cellSize - viewWidth / 2;
-  camera.position.set(
-    Math.max(0, Math.min(mapWidth - viewWidth, roomLeft)),
-    4.5 * cellSize - game.height / (2 * camera.zoom),
-  );
+  const targetX = Math.max(0, Math.min(mapWidth - viewWidth, roomLeft));
+  const blend = previousFrame === undefined || reducedMotion.matches
+    ? 1 : 1 - Math.exp(-(now - previousFrame) / 95);
+  camera.position.set(camera.position.x + (targetX - camera.position.x) * blend,
+    4.5 * cellSize - game.height / (2 * camera.zoom));
+  previousFrame = now;
 
-  if (!active) return;
-  const now = performance.now();
-  move(now);
   if (active && tilemap.data[row][column] === 2 && now >= vulnerableAt) {
     vulnerableAt = now + damageGrace;
     health--;
     sounds.damage?.play();
+    pulse(hud.health, '#ff9474');
     hud.hint.textContent = 'Watch out for the obsidian spikes!';
     showStatus();
     if (health === 0) finish(false);
@@ -176,7 +219,7 @@ async function loadLevel() {
   if (!response.ok) throw new Error(`Could not load rooms (HTTP ${response.status})`);
   const map = await response.json();
 
-  for (const [name, file] of [['tiles', 'ruins-atlas.png'], ['explorer', 'explorer.png'], ['amber', 'amber.png']]) {
+  for (const [name, file] of [['tiles', 'ruins-atlas.png'], ['explorer', 'explorer-walk.png'], ['amber', 'amber.png']]) {
     Loader.queueImage(name, asset(file));
   }
   await Loader.loadAll();
@@ -190,7 +233,7 @@ async function loadLevel() {
   tilemap.transform.scale.set(scale, scale);
   const amber = Loader.getImage('amber');
   relics = relicCells.map(([x, y], index) => makeSprite(`relic-${index + 1}`, amber, x, y, 62));
-  player = makeSprite('explorer', Loader.getImage('explorer'), column, row, 44);
+  player = makeSprite('explorer', Loader.getImage('explorer'), column, row, 44, 2);
   hud.start.disabled = false;
 }
 
