@@ -31,14 +31,14 @@ export default class Registry {
 
     state.zOrderDirty = true;
     state.sortedObjects = [];
-    if (state.selectedObject === object) {
-      state.selectedObject = null;
-    }
-    
     if (state.currentScene) {
       state.currentScene.remove(object);
     } else {
       state.objects.delete(object);
+    }
+    if (state.selectedObject === object) {
+      state.selectedObject = null;
+      state.events.dispatchEvent(new CustomEvent('selectedObjectChanged', { detail: null }));
     }
   }
 }

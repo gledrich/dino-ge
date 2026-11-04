@@ -1,5 +1,6 @@
 import Component from '../core/Component.js';
 import Vector2 from '../math/Vector2.js';
+import { notifySceneObjectChanged } from '../core/EngineState.js';
 
 /**
  * Component that holds the position, rotation, and scale of an entity.
@@ -83,6 +84,7 @@ export default class TransformComponent extends Component {
     child.parent = this;
     this.children.add(child);
     child.setDirty();
+    notifySceneObjectChanged(child.gameObject);
   }
 
   /**
@@ -94,6 +96,7 @@ export default class TransformComponent extends Component {
       child.parent = undefined;
       this.children.delete(child);
       child.setDirty();
+      notifySceneObjectChanged(child.gameObject);
     }
   }
 

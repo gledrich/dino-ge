@@ -8,7 +8,7 @@ import System from './System.js';
 import PhysicsSystem from '../systems/PhysicsSystem.js';
 import RenderingSystem from '../systems/RenderingSystem.js';
 import type { CollisionManifold } from '../physics/Physics.js';
-import { type EngineState } from './EngineState.js';
+import { notifySceneObjectsChanged, type EngineState } from './EngineState.js';
 import Registry from './Registry.js';
 import PhysicsComponent from '../components/PhysicsComponent.js';
 import { ObjectSet } from './ObjectSet.js';
@@ -238,7 +238,7 @@ export default class Engine {
    */
   public static set currentScene(scene: Scene | null) {
     this._state.currentScene = scene;
-    this.zOrderDirty = true;
+    notifySceneObjectsChanged();
     if (scene) {
       this.camera.reset();
       scene.onLoad();

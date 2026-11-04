@@ -1,12 +1,18 @@
 import Component from '../core/Component.js';
-import { getEngineState } from '../core/EngineState.js';
+import { getEngineState, notifySceneObjectChanged } from '../core/EngineState.js';
 
 /**
  * Component that holds metadata like tags and rendering order.
  */
 export default class TagComponent extends Component {
   /** A unique identifier for the object type. */
-  tag: string;
+  get tag(): string { return this._tag; }
+  set tag(value: string) {
+    if (this._tag === value) return;
+    this._tag = value;
+    notifySceneObjectChanged(this.gameObject);
+  }
+  private _tag: string;
   /** Hidden identifier linking runtime object to its source code location. */
   sourceId?: string;
   private _zIndex: number;
@@ -25,7 +31,7 @@ export default class TagComponent extends Component {
 
   constructor(tag: string = 'obj', zIndex: number = 0, sourceId?: string) {
     super();
-    this.tag = tag;
+    this._tag = tag;
     this._zIndex = zIndex;
     this.sourceId = sourceId;
   }

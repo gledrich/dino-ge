@@ -689,6 +689,38 @@ describe('Engine', () => {
     expect(scene.objects.size).toBe(0);
   });
 
+  it('reports active scene changes and clears a selection removed by the game', () => {
+    const scene = new MockScene();
+    const otherScene = new MockScene();
+    const parent = new MockGameObject('parent', 0);
+    const child = new MockGameObject('child', 0);
+    Engine.currentScene = scene;
+    const hierarchy = jest.fn();
+    const selection = jest.fn();
+    Engine.on('sceneHierarchyChanged', hierarchy);
+    Engine.on('selectedObjectChanged', selection);
+
+    otherScene.add(child);
+    expect(hierarchy).not.toHaveBeenCalled();
+    scene.add(parent);
+    scene.objects.add(child);
+    scene.objects.add(child);
+    parent.transform.addChild(child.transform);
+    child.metadata.tag = 'renamed';
+    expect(hierarchy).toHaveBeenCalledTimes(4);
+
+    Engine.selectedObject = child;
+    scene.remove(child);
+    expect(selection).toHaveBeenLastCalledWith(expect.objectContaining({ detail: null }));
+    expect(Engine.selectedObject).toBeNull();
+    expect(hierarchy).toHaveBeenCalledTimes(5);
+
+    Engine.selectedObject = parent;
+    Engine.currentScene = otherScene;
+    expect(Engine.selectedObject).toBeNull();
+    expect(hierarchy).toHaveBeenCalledTimes(6);
+  });
+
   it('manages debug visualization toggles', () => {
     Engine.showPhysicsVectors = false;
     expect(Engine.showPhysicsVectors).toBe(false);

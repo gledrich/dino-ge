@@ -1,4 +1,5 @@
-import GameObject from './GameObject.js';
+import type GameObject from './GameObject.js';
+import { ObjectSet } from './ObjectSet.js';
 
 /**
  * Represents a separate world or level in the game.
@@ -6,7 +7,7 @@ import GameObject from './GameObject.js';
  */
 export default abstract class Scene {
   /** The set of game objects currently in the scene. */
-  public objects: Set<GameObject> = new Set();
+  public objects: Set<GameObject> = new ObjectSet();
 
   /**
    * Called once when the scene becomes active.
