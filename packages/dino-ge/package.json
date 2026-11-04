@@ -12,7 +12,7 @@
     "build": "tsc -p tsconfig.build.json",
     "test": "jest",
     "test:coverage": "jest --coverage",
-    "docs": "typedoc --tsconfig tsconfig.build.json --exclude '**/*.test.ts' --out ../../docs/api src/ --entryPointStrategy expand"
+    "docs": "typedoc --plugin ./typedoc-class-names.mjs --tsconfig tsconfig.build.json --exclude '**/*.test.ts' --out ../../docs/api src/ --entryPointStrategy expand"
   },
   "author": "Rich <richgled25@gmail.com>",
   "license": "MIT",
