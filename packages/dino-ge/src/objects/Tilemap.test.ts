@@ -29,6 +29,38 @@ describe('Tilemap', () => {
     jest.clearAllMocks();
   });
 
+  describe('fromTiled', () => {
+    const layer = { type: 'tilelayer', width: 2, height: 2, data: [0, 1, 2, 0] };
+    const tileset = { firstgid: 1, tilewidth: 16, tileheight: 16, columns: 2, tilecount: 4 };
+    const map = {
+      orientation: 'orthogonal', infinite: false, width: 2, height: 2,
+      tilewidth: 16, tileheight: 16, layers: [layer], tilesets: [tileset],
+    };
+    const options = { tileset: mockImg, position: new Vector2(10, 20) };
+
+    it('converts global tile IDs to local indices and preserves empty tiles', () => {
+      const tilemap = Tilemap.fromTiled(map, options);
+      expect(tilemap.data).toEqual([[-1, 0], [1, -1]]);
+      expect(tilemap.tilesetCols).toBe(2);
+      expect(tilemap.tileSize).toBe(16);
+    });
+
+    it.each([
+      { ...map, width: 0 },
+      { ...map, infinite: true },
+      { ...map, layers: [{ ...layer, data: [1, 2] }] },
+      { ...map, layers: [{ ...layer, data: 'AAAA', encoding: 'base64' }] },
+      { ...map, layers: [{ ...layer, data: [0, 1, 2, 5] }] },
+      { ...map, layers: [{ ...layer, data: [0, 1, 2, 0x80000001] }] },
+      { ...map, tilesets: [{ ...tileset, source: 'external.tsj' }] },
+      { ...map, tilesets: [tileset, tileset] },
+    ])('rejects unsupported or malformed data without registering a tilemap', invalid => {
+      const register = jest.spyOn(Registry, 'registerObject');
+      expect(() => Tilemap.fromTiled(invalid, options)).toThrow(/Tiled/);
+      expect(register).not.toHaveBeenCalled();
+    });
+  });
+
   it('initialises with an Image element', () => {
     const spy = jest.spyOn(Registry, 'registerObject');
     const tilemap = new Tilemap(mockProps);
