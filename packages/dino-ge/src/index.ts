@@ -31,3 +31,4 @@ export { type CollisionManifold } from './physics/Physics.js';
 export { default as Rectangle } from './objects/Rectangle.js';
 export { default as Text } from './objects/Text.js';
 export { default as Tilemap } from './objects/Tilemap.js';
+export { default as Sound, type SoundChannel, type SoundPlaybackOptions, type SoundVolumeChannel } from './core/Sound.js';
