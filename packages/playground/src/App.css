@@ -446,8 +446,11 @@
   color: var(--accent-secondary);
 }
 
+.toolbar .scene-edit-button[aria-pressed='false'] {
+  color: var(--text-primary);
+}
+
 .toolbar .scene-edit-button[aria-pressed='true'] {
-  background: var(--bg-primary);
   color: var(--accent-primary);
 }
 
