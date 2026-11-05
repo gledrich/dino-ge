@@ -208,7 +208,7 @@ new Engine({ onLoad() {}, update() {} }, { containerId: 'playground-canvas-conta
   await expect(canvas).toBeVisible();
   const editor = page.locator('.monaco-editor');
   await expect(editor).toContainText('new Engine');
-  await expect(page.getByRole('button', { name: 'Object Library', exact: true })).toHaveAttribute('aria-pressed', 'true');
+  await expect(page.getByRole('button', { name: 'Library', exact: true })).toHaveAttribute('aria-pressed', 'true');
   const box = (await canvas.boundingBox())!;
   const transfer = await page.evaluateHandle(() => {
     const data = new DataTransfer();

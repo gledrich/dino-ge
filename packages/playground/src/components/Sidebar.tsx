@@ -92,14 +92,14 @@ const Sidebar: React.FC = () => {
           className={`sidebar-tab ${activeTab === 'library' ? 'active' : ''}`}
           onClick={() => setActiveTab('library')}
         >
-          <i className="fa-solid fa-cubes" />
-          <span>Object Library</span>
+          <i className="fa-solid fa-cubes" aria-hidden="true" />
+          <span>Library</span>
         </button>
         <button type="button" aria-pressed={activeTab === 'assets'}
           className={`sidebar-tab ${activeTab === 'assets' ? 'active' : ''}`} 
           onClick={() => setActiveTab('assets')}
         >
-          <i className="fa-solid fa-images" />
+          <i className="fa-solid fa-images" aria-hidden="true" />
           <span>Assets</span>
         </button>
       </div>
@@ -109,7 +109,7 @@ const Sidebar: React.FC = () => {
           <div className="object-library">
             <section className="library-section" aria-labelledby="library-objects">
               <h3 id="library-objects">Scene objects</h3>
-              <p className="library-hint">Drag to place precisely, or click to add at the centre.</p>
+              <p className="library-hint">Drag onto the scene or click to add at the centre.</p>
               {snippets.filter(item => item.kind || item.label === 'Sprite').map(({ label, icon, code, kind }) => (
                 <div className="library-row" key={label}>
                   <button type="button" className="scene-control snippet-btn" draggable={!!kind}
@@ -132,7 +132,7 @@ const Sidebar: React.FC = () => {
                   </button>
                   <button type="button" className="scene-control library-code" aria-label={`Insert ${label.toLowerCase()} code`}
                     title={`Insert ${label.toLowerCase()} code`} onClick={() => insertSnippet(code)}>
-                    <i className="fa-solid fa-code" aria-hidden="true" />
+                    <span aria-hidden="true">Code</span>
                   </button>
                 </div>
               ))}

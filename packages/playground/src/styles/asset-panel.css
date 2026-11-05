@@ -1,18 +1,13 @@
 .asset-panel {
   display: flex;
   flex-direction: column;
-  height: 100%;
-  color: white;
-  overflow: hidden;
+  gap: 6px;
 }
 
 .asset-list {
-  flex: 1;
-  overflow-y: auto;
-  padding: 10px;
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 6px;
 }
 
 .asset-item {
@@ -25,17 +20,12 @@
 .asset-item:not(:disabled) { cursor: grab; }
 .asset-item:disabled { opacity: 0.7; cursor: default; }
 
-.asset-help {
-  margin: 8px 10px 0;
-  color: var(--text-secondary);
-  font-size: 11px;
-}
-
 .asset-preview {
+  flex-shrink: 0;
   width: 48px;
   height: 48px;
-  background: #1a1a1a;
-  border-radius: 4px;
+  background: var(--bg-secondary);
+  border-radius: var(--scene-control-radius);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -56,22 +46,22 @@
 }
 
 .asset-tag {
-  font-weight: bold;
-  font-size: 0.9rem;
-  color: #43aa8b;
+  font-weight: 600;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
 .asset-details {
-  font-size: 0.75rem;
-  color: #aaa;
+  font-size: 11px;
+  color: var(--text-secondary);
 }
 
 .no-assets {
-  padding: 20px;
-  text-align: center;
-  color: #666;
-  font-style: italic;
+  padding: 10px;
+  border: 1px dashed var(--border-color);
+  border-radius: var(--scene-control-radius);
+  color: var(--text-secondary);
+  font-size: 12px;
+  line-height: 1.4;
 }

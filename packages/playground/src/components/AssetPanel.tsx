@@ -25,10 +25,14 @@ const AssetPanel: React.FC = () => {
 
   return (
     <div className="asset-panel">
-      <p className="asset-help">{isEditing ? 'Drag an image onto the scene or click to add a sprite.' : 'Enter Edit scene to place images as sprites.'}</p>
+      {assets.length > 0 && (
+        <p className="asset-help">
+          {isEditing ? 'Drag an image onto the scene or click to add a sprite.' : 'Enter Edit scene to place images as sprites.'}
+        </p>
+      )}
       <div className="asset-list">
         {assets.length === 0 ? (
-          <div className="no-assets">No assets loaded.</div>
+          <div className="no-assets">Images appear here when the game loads them.</div>
         ) : (
           assets.map((asset) => (
             <button key={asset.tag} type="button" className="scene-control asset-item" title={asset.image.src}
