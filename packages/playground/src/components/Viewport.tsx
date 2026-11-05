@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { Engine, SpriteComponent, snapToGrid, type ObjectManipulationPreview } from 'dino-ge';
+import { Engine, Input, SpriteComponent, snapToGrid, type ObjectManipulationPreview } from 'dino-ge';
 import { usePlayground } from '../context/PlaygroundContext';
 import Toolbar from './Toolbar';
 import Logo from './Logo';
@@ -100,6 +100,9 @@ const Viewport: React.FC = () => {
   const draggedAsset = useRef<SceneImageAsset | null>(null);
   const [manipulationReadout, setManipulationReadout] = useState('');
   const [keyboardPlacement, setKeyboardPlacement] = useState<KeyboardPlacement>();
+  const historyBlockedReason = keyboardPlacement || manipulationReadout
+    ? 'Finish or cancel the current edit before using code history.'
+    : pendingCanvasPlacements.size > 0 ? 'Apply or discard canvas changes before using code history.' : '';
   const [dropGuide, setDropGuide] = useState<{
     x: number; y: number; left: number; top: number; kind?: SceneObjectKind;
     width?: number; height?: number;
@@ -500,6 +503,11 @@ const Viewport: React.FC = () => {
     event.stopPropagation();
   };
 
+  const changeCodeHistory = (action: 'undo' | 'redo') => {
+    if (historyBlockedReason || Input.isManipulatingObject) return;
+    window.dispatchEvent(new CustomEvent('playground-code-history', { detail: action }));
+  };
+
   useEffect(() => {
     if (!viewportContainerRef.current) return;
 
@@ -621,11 +629,16 @@ const Viewport: React.FC = () => {
             event.stopPropagation();
             return;
           }
-          if (isEditingScene && (event.target === event.currentTarget || event.target instanceof HTMLCanvasElement) &&
-              nudgeSceneSelection(event)) {
-            event.preventDefault();
-            event.stopPropagation();
-            return;
+          if (isEditingScene && (event.target === event.currentTarget || event.target instanceof HTMLCanvasElement)) {
+            const key = event.key.toLowerCase();
+            const isHistoryShortcut = !event.altKey && (event.ctrlKey || event.metaKey) &&
+              (key === 'z' || (key === 'y' && event.ctrlKey && !event.metaKey && !event.shiftKey));
+            if (isHistoryShortcut || nudgeSceneSelection(event)) {
+              event.preventDefault();
+              event.stopPropagation();
+              if (isHistoryShortcut && !event.repeat) changeCodeHistory(event.shiftKey || key === 'y' ? 'redo' : 'undo');
+              return;
+            }
           }
           if (event.key === 'Enter' || event.key === ' ') suppressGameActivation(event);
         }}
@@ -638,7 +651,9 @@ const Viewport: React.FC = () => {
               <div className="scene-object-options" role="group" aria-label="Edit history">
                 {(['undo', 'redo'] as const).map(action => (
                   <button key={action} type="button" className="scene-control" aria-label={`${action === 'undo' ? 'Undo' : 'Redo'} code edit`}
-                    onClick={() => window.dispatchEvent(new CustomEvent('playground-code-history', { detail: action }))}
+                    disabled={!!historyBlockedReason}
+                    title={historyBlockedReason || (action === 'undo' ? 'Undo code edit (Ctrl/⌘+Z)' : 'Redo code edit (Ctrl/⌘+Shift+Z)')}
+                    onClick={() => changeCodeHistory(action)}
                   ><i className={`fa-solid ${action === 'undo' ? 'fa-rotate-left' : 'fa-rotate-right'}`} aria-hidden="true" />
                     {action === 'undo' ? 'Undo' : 'Redo'}</button>
                 ))}
@@ -666,7 +681,8 @@ const Viewport: React.FC = () => {
             {!keyboardPlacement && <span id="scene-keyboard-hint" className="scene-edit-hint">
               Middle drag pans · {isGridSnapping ? 'Arrows move 1 cell · Shift moves 10 cells' : 'Arrows move 1 px · Shift moves 10 px'}<br />
               Round handle rotates · Square handle resizes<br />
-              Shift enables either option while dragging · Esc cancels
+              Shift enables either option while dragging · Esc cancels<br />
+              {historyBlockedReason || 'Ctrl/⌘+Z undoes · Add Shift to redo'}
             </span>}
             {!isInspectorVisible && selectedObject && pendingCanvasPlacements.has(selectedObject) && (
               <button type="button" className="scene-control scene-review-changes" onClick={() => {

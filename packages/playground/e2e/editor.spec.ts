@@ -52,6 +52,58 @@ new Engine({
   })).toContain(`tag: "beta's box"`);
 });
 
+test('uses code history from the canvas keyboard without losing unfinished canvas edits', async ({ page }) => {
+  await page.route('**/files', route => route.fulfill({ json: ['script'] }));
+  await page.route('**/api/scripts/script', route => route.fulfill({ json: `
+import { Engine, Rectangle, Vector2 } from 'dino-ge';
+new Engine({ onLoad() {
+  new Rectangle({ tag: 'Platform', position: new Vector2(350, 220), width: 64, height: 48 });
+}, update() {} }, { containerId: 'playground-canvas-container' });` }));
+  await page.goto('/');
+  const platform = page.getByRole('button', { name: 'Platform', exact: true });
+  await expect(platform).toBeVisible();
+  await page.getByRole('button', { name: 'Edit scene', exact: true }).click();
+  await platform.click();
+  const scene = page.getByRole('region', { name: 'Scene viewport' });
+  const x = page.getByRole('spinbutton', { name: 'X', exact: true });
+  const readSource = () => page.evaluate(() => {
+    const { monaco } = window as typeof window & { monaco: Monaco };
+    return monaco.editor.getEditors()[0].getValue();
+  });
+  await scene.press('Shift+ArrowRight');
+  await page.getByRole('button', { name: 'Apply placement to code' }).click();
+  await expect.poll(readSource).toContain('new Vector2(360, 220)');
+  await scene.press('Control+z');
+  await expect(x).toHaveValue('350.00');
+  await expect.poll(readSource).toContain('new Vector2(350, 220)');
+  await scene.press('Meta+Shift+Z');
+  await expect(x).toHaveValue('360.00');
+
+  const canvas = page.locator('#canvas');
+  const box = (await canvas.boundingBox())!;
+  await page.mouse.move(box.x + 380, box.y + 245);
+  await page.mouse.down();
+  await page.mouse.move(box.x + 400, box.y + 245, { steps: 4 });
+  const readout = page.getByRole('group', { name: 'Current scene gesture' });
+  await expect(readout).toContainText('Move');
+  await scene.press('Control+z');
+  await expect(readout).toContainText('Move');
+  expect(await readSource()).toContain('new Vector2(360, 220)');
+  await page.mouse.up();
+  await expect(platform).toHaveAccessibleDescription('Pending canvas changes');
+  await expect(page.getByRole('button', { name: 'Undo code edit', exact: true })).toBeDisabled();
+  await scene.press('Control+z');
+  await expect(platform).toHaveAccessibleDescription('Pending canvas changes');
+  expect(await readSource()).toContain('new Vector2(360, 220)');
+
+  await page.getByRole('button', { name: 'Discard canvas changes', exact: true }).click();
+  await scene.press('Meta+z');
+  await expect(x).toHaveValue('350.00');
+  await scene.press('Control+y');
+  await expect(x).toHaveValue('360.00');
+  await expect.poll(readSource).toContain('new Vector2(360, 220)');
+});
+
 test('keeps live Inspector values and save controls readable in a narrow panel', async ({ page }) => {
   await page.setViewportSize({ width: 768, height: 800 });
   await page.route('**/files', route => route.fulfill({ json: ['script'] }));

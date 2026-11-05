@@ -42,6 +42,11 @@ export default class Input {
 
   private static gesture: ObjectGesture | null = null;
 
+  /** Whether a pointer is currently manipulating a scene object. */
+  static get isManipulatingObject(): boolean {
+    return this.gesture !== null;
+  }
+
   private static isGestureActive(gesture: ObjectGesture) {
     return Engine.debug && gesture.object === Engine.selectedObject && (!gesture.startedPaused || Engine.paused);
   }
