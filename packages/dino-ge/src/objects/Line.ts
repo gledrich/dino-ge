@@ -85,6 +85,17 @@ export default class Line extends GameObject {
     this.updateBounds();
   }
 
+  /** Move the line's local origin while keeping both endpoints relative to it. */
+  setOrigin(x: number, y: number) {
+    const { position } = this.transform;
+    if (position.x === x && position.y === y) return;
+    if (position === this.lineComponent.p1 || position === this.lineComponent.p2) {
+      this.transform.position = new Vector2(x, y);
+    } else {
+      position.set(x, y);
+    }
+  }
+
   /** Move one local endpoint without moving the line's origin or its other endpoint. */
   setEndpoint(endpoint: 'p1' | 'p2', x: number, y: number) {
     const line = this.lineComponent;

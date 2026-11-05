@@ -205,25 +205,29 @@ export default class Input {
       }
 
       if (gesture?.kind === 'drag') {
-        const { parent, position } = gesture.object.transform;
+        const { object } = gesture;
+        const { parent, position } = object.transform;
         const step = Engine.debugPositionGridSize;
-        const worldX = snapToGrid(this.mouseX - gesture.offset.x, step);
-        const worldY = snapToGrid(this.mouseY - gesture.offset.y, step);
+        let x = snapToGrid(this.mouseX - gesture.offset.x, step);
+        let y = snapToGrid(this.mouseY - gesture.offset.y, step);
         if (parent) {
           const origin = parent.worldPosition;
           const scale = parent.worldScale;
           const rotation = parent.worldRotation;
-          const x = worldX - origin.x;
-          const y = worldY - origin.y;
+          const dx = x - origin.x;
+          const dy = y - origin.y;
           const cos = Math.cos(rotation);
           const sin = Math.sin(rotation);
           // Undo the parent's translation, rotation and scale in reverse order.
           // A collapsed axis has no inverse, so retain its local coordinate.
-          position.x = scale.x === 0 ? position.x : (x * cos + y * sin) / scale.x;
-          position.y = scale.y === 0 ? position.y : (-x * sin + y * cos) / scale.y;
+          x = scale.x === 0 ? position.x : (dx * cos + dy * sin) / scale.x;
+          y = scale.y === 0 ? position.y : (-dx * sin + dy * cos) / scale.y;
+        }
+        if (object instanceof Line) {
+          object.setOrigin(x, y);
         } else {
-          position.x = worldX;
-          position.y = worldY;
+          position.x = x;
+          position.y = y;
         }
         this.publishPreview(gesture);
         return;
