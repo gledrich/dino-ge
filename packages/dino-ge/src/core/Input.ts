@@ -3,8 +3,9 @@ import Engine from './Engine.js';
 import SpriteComponent from '../components/SpriteComponent.js';
 import ShapeComponent from '../components/ShapeComponent.js';
 import TextComponent from '../components/TextComponent.js';
+import VisibilityComponent from '../components/VisibilityComponent.js';
 import type GameObject from './GameObject.js';
-import { getViewportGeometry, projectOntoObjectAxes } from './ViewportGeometry.js';
+import { containsViewportPoint, getViewportDrawOrder, getViewportGeometry, projectOntoObjectAxes } from './ViewportGeometry.js';
 
 /**
  * Handles mouse and keyboard input events.
@@ -155,19 +156,14 @@ export default class Input {
         const objects = Engine.currentScene ? Engine.currentScene.objects : Engine.objects;
         let found = false;
 
-        // Check objects from top to bottom (zIndex)
-        const sorted = Array.from(objects).sort((a, b) => b.metadata.zIndex - a.metadata.zIndex);
+        const sorted = getViewportDrawOrder(objects);
 
-        for (let i = 0; i < sorted.length; i++) {
+        for (let i = sorted.length - 1; i >= 0; i--) {
           const obj = sorted[i];
-          if (!obj.bounds) continue;
+          if (!obj.bounds || obj.getComponent?.(VisibilityComponent)?.visible === false) continue;
           
           const geometry = getViewportGeometry(obj);
-          const point = projectOntoObjectAxes(geometry, worldPos.x, worldPos.y);
-          if (
-            point.x > Math.min(0, geometry.width) && point.x < Math.max(0, geometry.width) &&
-            point.y > Math.min(0, geometry.height) && point.y < Math.max(0, geometry.height)
-          ) {
+          if (containsViewportPoint(obj, geometry, worldPos.x, worldPos.y)) {
             Engine.selectedObject = obj;
             this.gesture = {
               kind: 'drag',

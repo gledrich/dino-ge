@@ -287,6 +287,27 @@ new Engine({ onLoad() {}, update() {} }, { containerId: 'playground-canvas-conta
   await expect(copy).toBeVisible();
 });
 
+test('picks the visible shape at an overlapping point', async ({ page }) => {
+  await page.route('**/files', route => route.fulfill({ json: ['script'] }));
+  await page.route('**/api/scripts/script', route => route.fulfill({ json: `
+import { Circle, Engine, Rectangle, Vector2 } from 'dino-ge';
+new Engine({ onLoad() {
+  new Circle({ tag: 'top circle', position: new Vector2(160, 140), radius: 25 });
+  new Rectangle({ tag: 'backing', position: new Vector2(160, 140), width: 50, height: 50 });
+  new Rectangle({ tag: 'hidden cover', position: new Vector2(160, 140), width: 50, height: 50, visible: false, zIndex: 20 });
+} }, { containerId: 'playground-canvas-container' });` }));
+  await page.goto('/');
+  const circle = page.getByRole('button', { name: 'top circle', exact: true });
+  await expect(circle).toBeVisible();
+  await page.getByRole('button', { name: 'Edit scene' }).click();
+  const canvas = page.locator('#canvas');
+  await canvas.click({ position: { x: 185, y: 165 } });
+  await expect(circle).toHaveAttribute('aria-pressed', 'true');
+  await canvas.click({ position: { x: 162, y: 142 } });
+  await expect(page.getByRole('button', { name: 'backing', exact: true })).toHaveAttribute('aria-pressed', 'true');
+  await expect(page.getByRole('button', { name: 'hidden cover', exact: true })).toBeVisible();
+});
+
 test('navigates the editing camera, places in world coordinates and restores the gameplay view', async ({ page }) => {
   await page.route('**/files', route => route.fulfill({ json: ['script'] }));
   await page.route('**/api/scripts/script', route => route.fulfill({ json: `

@@ -6,7 +6,7 @@ import Engine from '../core/Engine.js';
 import PhysicsComponent from '../components/PhysicsComponent.js';
 import Vector2 from '../math/Vector2.js';
 import { getEngineState } from '../core/EngineState.js';
-import { getViewportGeometry } from '../core/ViewportGeometry.js';
+import { getViewportDrawOrder, getViewportGeometry } from '../core/ViewportGeometry.js';
 
 /**
  * A system that processes entities with RenderComponents.
@@ -51,7 +51,7 @@ export default class RenderingSystem extends System {
 
     // Update sorted cache if dirty
     if (state.zOrderDirty || !state.sortedObjects) {
-      state.sortedObjects = Array.from(entities).sort((a, b) => (a.metadata.zIndex > b.metadata.zIndex ? 1 : -1));
+      state.sortedObjects = getViewportDrawOrder(entities);
       state.zOrderDirty = false;
     }
 
