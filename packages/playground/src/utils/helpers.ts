@@ -1,6 +1,25 @@
 let currentScriptId = 'script';
 const scriptEndpoint = (id: string) => `/api/scripts/${encodeURIComponent(id)}`;
 
+async function projectModuleRequest<T>(id: string, path?: string, options?: RequestInit): Promise<T> {
+  const query = path ? `?${new URLSearchParams({ path })}` : '';
+  const response = await fetch(`${scriptEndpoint(id)}/modules${query}`, options);
+  const result = await response.json().catch(() => null);
+  if (!response.ok) throw new Error(result?.error || 'Could not access the project files.');
+  return result;
+}
+
+export const listProjectModules = (id: string, signal: AbortSignal) =>
+  projectModuleRequest<string[]>(id, undefined, { signal });
+
+export const readProjectModule = (id: string, path: string, signal: AbortSignal) =>
+  projectModuleRequest<string>(id, path, { signal });
+
+export const saveProjectModule = (id: string, path: string, data: string) =>
+  projectModuleRequest(id, path, {
+    method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ data }),
+  });
+
 export const setCurrentScriptId = (id: string) => {
   currentScriptId = id;
 };

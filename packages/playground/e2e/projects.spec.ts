@@ -1,5 +1,6 @@
 import { clickCanvasText, expectCanvasText, observeCanvasUI } from '../../example/e2e/canvas-ui';
 import { expect, test } from '@playwright/test';
+import type { Monaco } from '@monaco-editor/react';
 import { spawn } from 'node:child_process';
 import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
@@ -162,6 +163,37 @@ export const run = window.gameRuns;`);
     await page.getByRole('tab', { name: 'Console' }).click();
     await page.getByRole('button', { name: 'Reset game' }).click();
     await expect(page.getByText('Imported game 2: Nested level')).toBeVisible();
+
+    await page.getByRole('tab', { name: 'Editor' }).click();
+    await page.getByRole('button', { name: 'Project files', exact: true }).click({ timeout: 3000 });
+    const modules = page.getByRole('dialog', { name: 'Project files', exact: true });
+    await modules.getByLabel('JavaScript module').selectOption('src/logic.js');
+    const moduleEditor = modules.locator('.monaco-editor');
+    await expect(moduleEditor).toContainText('Imported game');
+    const updatedModule = "import { run } from './counter.js';\nexport const heading = 'Module edit ' + run;";
+    await moduleEditor.evaluate((element, text) => {
+      const { monaco } = window as typeof window & { monaco: Monaco };
+      const editor = monaco.editor.getEditors().find(item => item.getDomNode() === element)!;
+      editor.setValue(text);
+    }, updatedModule);
+    await expect(modules.getByRole('button', { name: 'Close', exact: true })).toBeDisabled();
+    const moduleSave = page.waitForResponse(response => response.request().method() === 'PUT' &&
+      new URL(response.url()).pathname.endsWith('/modules'));
+    await modules.getByRole('button', { name: 'Save module', exact: true }).click();
+    const savedModule = await moduleSave;
+    expect(savedModule.ok()).toBe(true);
+    expect(savedModule.request().postDataJSON().data.replace(/\r\n/g, '\n')).toBe(updatedModule);
+    await expect(modules.getByRole('status')).toContainText('Saved');
+    await modules.getByRole('button', { name: 'Close', exact: true }).click();
+    await expect(page.getByRole('button', { name: 'Project files', exact: true })).toBeFocused();
+    await expect(page.locator('.script-selector')).toHaveValue(id);
+    await expect(page.getByText('Imported game 2: Nested level')).toBeVisible();
+    await page.getByRole('button', { name: 'Reset game' }).click();
+    await expect(page.getByText('Module edit 3: Nested level')).toBeVisible();
+    const traversal = await request.get(`/api/scripts/${encodeURIComponent(id)}/modules`, {
+      params: { path: '../outside.js' },
+    });
+    expect(traversal.status()).toBe(400);
 
     const update = await request.put(`/api/scripts/${encodeURIComponent(id)}`, {
       data: { data: script.replace('heading +', '"Edited game" +') },

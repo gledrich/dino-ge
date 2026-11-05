@@ -61,6 +61,38 @@
 
 .import-game-error { margin: 4px 10px; color: #ff988f; }
 
+.project-files-dialog {
+  width: min(760px, calc(100% - 32px));
+  max-height: calc(100% - 32px);
+  box-sizing: border-box;
+  padding: 16px;
+  border: 1px solid var(--border-color);
+  border-radius: 10px;
+  background: var(--bg-secondary);
+  color: var(--text-primary);
+}
+
+.project-files-dialog[open] { display: grid; gap: 12px; }
+.project-files-dialog::backdrop { background: rgb(0 0 0 / 55%); }
+.editor .project-files-dialog h2 { display: block; margin: 0; font-size: 17px; }
+.project-files-dialog p { margin: 0; font-size: 12px; }
+
+.project-module-label {
+  display: grid;
+  gap: 4px;
+  font-size: 12px;
+}
+
+.project-module-editor {
+  height: min(50vh, 420px);
+  min-height: 140px;
+  border: 1px solid var(--border-color);
+  overflow: hidden;
+}
+
+.project-module-actions { display: flex; justify-content: end; flex-wrap: wrap; gap: 6px; }
+.project-module-actions button:disabled { opacity: 0.5; cursor: default; }
+
 .icons-container i {
   cursor: pointer;
   transition: all 0.2s;

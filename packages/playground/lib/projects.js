@@ -75,6 +75,65 @@ export class ProjectStore {
     return path.join(directory, name.endsWith('.js') ? name : `${name}.js`);
   }
 
+  async projectDirectory(id) {
+    const [name] = relativePath(id);
+    if (!projectName.test(name)) throw new ProjectError('Invalid project name.');
+    const directory = path.join(this.root, name);
+    const metadataPath = path.join(directory, manifest);
+    if (!(await fs.lstat(directory)).isDirectory() || !(await fs.lstat(metadataPath)).isFile()) {
+      throw new ProjectError('Project could not be found.', 404);
+    }
+    const { entry } = JSON.parse(await fs.readFile(metadataPath, 'utf8'));
+    relativePath(entry);
+    if (!entry.endsWith('.js') || id !== `${name}/${entry.slice(0, -3)}`) {
+      throw new ProjectError('Project entry could not be found.', 404);
+    }
+    return { directory, entry };
+  }
+
+  async listModules(id) {
+    const { directory, entry } = await this.projectDirectory(id);
+    const files = await fs.readdir(directory, { recursive: true, withFileTypes: true });
+    return files.flatMap(file => {
+      if (!file.isFile() || !/\.m?js$/.test(file.name)) return [];
+      const relative = path.relative(directory, path.join(file.parentPath, file.name)).split(path.sep).join('/');
+      try {
+        const parts = relativePath(relative);
+        return relative !== entry && !parts.includes('node_modules') ? [relative] : [];
+      } catch (error) {
+        if (error instanceof ProjectError) return [];
+        throw error;
+      }
+    }).sort();
+  }
+
+  async modulePath(id, relative) {
+    const parts = relativePath(relative);
+    const { directory, entry } = await this.projectDirectory(id);
+    if (relative === entry || !/\.m?js$/.test(relative) || parts.includes('node_modules')) {
+      throw new ProjectError('Choose a JavaScript module in this project.');
+    }
+    const filename = path.join(directory, ...parts);
+    const parent = path.dirname(filename);
+    if (await fs.realpath(parent) !== parent || !(await fs.lstat(filename)).isFile()) {
+      throw new ProjectError('Module could not be found.', 404);
+    }
+    return filename;
+  }
+
+  async saveModule(id, relative, data) {
+    if (Buffer.byteLength(data) > maxBytes) throw new ProjectError('A module can contain up to 16 MiB.', 413);
+    const filename = await this.modulePath(id, relative);
+    const { mode } = await fs.stat(filename);
+    const temporary = path.join(path.dirname(filename), `.dino-module-${randomUUID()}.tmp`);
+    try {
+      await fs.writeFile(temporary, data, { flag: 'wx', mode: mode & 0o777 });
+      await fs.rename(temporary, filename);
+    } finally {
+      await fs.rm(temporary, { force: true });
+    }
+  }
+
   async spriteDirectory(id) {
     const script = await this.scriptPath(id);
     if (!(await fs.lstat(script)).isFile()) throw new ProjectError('The open script could not be found.', 404);

@@ -47,6 +47,16 @@ app.post('/api/projects', express.json({ limit: '24mb' }), async (req, res) => {
     res.status(err instanceof ProjectError ? err.status : 500).json({ error: err.message });
   }
 });
+app.put('/api/scripts/:id/modules', express.json({ limit: '24mb' }), async (req, res) => {
+  try {
+    const { data } = req.body ?? {};
+    if (typeof data !== 'string') return res.status(400).json({ error: 'Module contents must be text.' });
+    await projects.saveModule(req.params.id, req.query.path, data);
+    res.json({ success: true });
+  } catch (err) {
+    res.status(scriptErrorStatus(err)).json({ error: err.message });
+  }
+});
 app.use(express.json());
 
 const serveWorkspace = [async (req, res, next) => {
@@ -125,6 +135,16 @@ app.post('/api/scripts/:id/assets', express.raw({ type: spriteImageTypes, limit:
     const type = req.get('content-type')?.split(';')[0].trim().toLowerCase();
     const url = await projects.importSprite(req.params.id, req.query.name, type, req.body);
     res.status(201).json({ url });
+  } catch (err) {
+    res.status(scriptErrorStatus(err)).json({ error: err.message });
+  }
+});
+
+app.get('/api/scripts/:id/modules', async (req, res) => {
+  try {
+    if (req.query.path === undefined) return res.json(await projects.listModules(req.params.id));
+    const filePath = await projects.modulePath(req.params.id, req.query.path);
+    res.json(await fs.readFile(filePath, { encoding: 'utf8', flag: constants.O_RDONLY | noFollow }));
   } catch (err) {
     res.status(scriptErrorStatus(err)).json({ error: err.message });
   }

@@ -3,6 +3,7 @@ import Editor from '@monaco-editor/react';
 import { typescript, type editor } from 'monaco-editor';
 import * as Dino from 'dino-ge';
 import { usePlayground } from '../context/PlaygroundContext';
+import ProjectFilesDialog from './ProjectFilesDialog';
 import { createScript, getScript, getFilesList, readGameFolder, importGameFolder, type GameFolder } from '../utils/helpers';
 import { Edit, instrumentCode, getSourceMapping, getSceneObjectCreation, getSceneObjectDeletion, getSceneObjectDuplication, getSpriteImageReplacement, type CanvasPlacementTransaction } from '../utils/ast-utils';
 import { createSceneObject, duplicateSceneObject, getSceneSource, isReplaceableSprite, restoreSceneTransform, sceneObjectCodeEvent, type CanvasTransformChange, type SceneObjectPlacement } from '../utils/scene-objects';
@@ -36,6 +37,8 @@ const CodeEditor: React.FC<EditorProps> = ({ currentScriptId, onSave, onSelectSc
   const [entryFile, setEntryFile] = useState('');
   const [importing, setImporting] = useState(false);
   const [importError, setImportError] = useState('');
+  const [projectFilesOpen, setProjectFilesOpen] = useState(false);
+  const projectFilesButton = useRef<HTMLButtonElement>(null);
   const folderPicker = useRef<HTMLInputElement>(null);
   const loadedScriptId = useRef('');
   const sceneHistory = useRef<SceneHistoryEntry[]>([]);
@@ -638,6 +641,8 @@ const CodeEditor: React.FC<EditorProps> = ({ currentScriptId, onSave, onSelectSc
               <option key={s} value={s}>{s}</option>
             ))}
           </select>
+          {currentScriptId.includes('/') && <button type="button" className="import-game-button" ref={projectFilesButton}
+            disabled={importing} onClick={() => setProjectFilesOpen(true)}>Project files</button>}
           <button type="button" className="import-game-button" disabled={importing}
             onClick={() => folderPicker.current?.click()}>Import game folder</button>
           <input ref={folderPicker} type="file" multiple hidden {...{ webkitdirectory: '' }}
@@ -670,6 +675,11 @@ const CodeEditor: React.FC<EditorProps> = ({ currentScriptId, onSave, onSelectSc
         </div>
       )}
       {importError && <p className="import-game-error" role="alert">{importError}</p>}
+      {projectFilesOpen && <ProjectFilesDialog key={currentScriptId} scriptId={currentScriptId}
+        onClose={() => {
+          setProjectFilesOpen(false);
+          projectFilesButton.current?.focus();
+        }} />}
       <div className="editor-textbox">
         <Editor
           height="100%"
