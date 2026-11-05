@@ -46,7 +46,7 @@
   object-fit: contain;
 }
 
-.scene-object-palette {
+.scene-edit-controls {
   position: absolute;
   top: 12px;
   left: 12px;
@@ -60,35 +60,27 @@
   background: var(--bg-secondary);
   color: var(--text-primary);
   font-size: 12px;
+  pointer-events: none;
 }
 
 .scene-object-options {
   display: flex;
+  align-items: center;
   flex-wrap: wrap;
   gap: 6px;
 }
 
-.scene-object-options button {
-  padding: 4px 8px;
-  border: 1px solid var(--border-color);
-  border-radius: 4px;
-  background: var(--bg-primary);
-  color: inherit;
-  cursor: grab;
-}
-
-.scene-object-options button:hover {
-  border-color: var(--accent-primary);
-}
-
-.scene-history-actions button { cursor: pointer; }
+.scene-history-actions button { pointer-events: auto; }
+.scene-edit-label { margin-inline-end: 4px; font-weight: 600; }
+.scene-edit-hint { color: var(--text-secondary); font-size: 11px; }
+.scene-edit-status { border-top: 1px solid var(--border-color); padding-top: 6px; }
 
 .scene-drop-guide {
   position: absolute;
   z-index: 9;
   width: 18px;
   height: 18px;
-  border: 2px solid var(--accent-secondary);
+  border: 2px solid var(--accent-primary);
   border-radius: 50%;
   box-shadow: 0 0 0 2px #0008;
   transform: translate(-50%, -50%);
@@ -258,6 +250,7 @@
 
 .toolbar .scene-edit-button[aria-pressed='true'] {
   background: var(--bg-primary);
+  color: var(--accent-primary);
 }
 
 .toolbar button:hover {

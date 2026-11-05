@@ -198,19 +198,19 @@ const Viewport: React.FC = () => {
         }}
       />
       {isEditingScene && (
-        <>
-          <div className="scene-object-palette" role="group" aria-label="Scene editing">
-            <span id="scene-keyboard-hint">Arrow keys move 1 unit · Shift moves 10</span>
+          <div className="scene-edit-controls" role="group" aria-label="Scene editing">
             <div className="scene-object-options scene-history-actions" role="group" aria-label="Edit history">
+              <span className="scene-edit-label">Scene editing</span>
               {(['undo', 'redo'] as const).map(action => (
-                <button key={action} type="button" aria-label={`${action === 'undo' ? 'Undo' : 'Redo'} code edit`}
+                <button key={action} type="button" className="scene-control" aria-label={`${action === 'undo' ? 'Undo' : 'Redo'} code edit`}
                   onClick={() => window.dispatchEvent(new CustomEvent('playground-code-history', { detail: action }))}
-                >{action === 'undo' ? 'Undo' : 'Redo'}</button>
+                ><i className={`fa-solid ${action === 'undo' ? 'fa-rotate-left' : 'fa-rotate-right'}`} aria-hidden="true" />
+                  {action === 'undo' ? 'Undo' : 'Redo'}</button>
               ))}
             </div>
-            {placementStatus && <span role="status">{placementStatus}</span>}
+            <span id="scene-keyboard-hint" className="scene-edit-hint">Arrows move 1 unit · Shift + arrows move 10</span>
+            {placementStatus && <span className="scene-edit-status" role="status">{placementStatus}</span>}
           </div>
-        </>
       )}
       {dropGuide && <div className="scene-drop-guide" aria-hidden="true"
         style={{ left: dropGuide.x, top: dropGuide.y }} />}

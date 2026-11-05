@@ -31,7 +31,7 @@ const AssetPanel: React.FC = () => {
           <div className="no-assets">No assets loaded.</div>
         ) : (
           assets.map((asset) => (
-            <button key={asset.tag} type="button" className="asset-item" title={asset.image.src}
+            <button key={asset.tag} type="button" className="scene-control asset-item" title={asset.image.src}
               aria-label={`Add ${asset.tag} as sprite`} disabled={!isEditing} draggable={isEditing}
               onClick={() => window.dispatchEvent(new CustomEvent('playground-place-asset', { detail: asset.tag }))}
               onDragStart={event => {

@@ -106,35 +106,47 @@ const Sidebar: React.FC = () => {
       
       <div className="sidebar-content">
         {activeTab === 'library' ? (
-          <div className="snippets-grid">
-            <p className="library-hint">Drag an object onto the scene. Use the code button to insert a snippet.</p>
-            {snippets.map(({ label, icon, code, kind }) => (
-              <div className="library-row" key={label}>
-                <button type="button" className="snippet-btn" draggable={!!kind}
-                  aria-label={kind ? `Add ${label.toLowerCase()}` : label === 'Sprite' ? 'Choose sprite image' : undefined}
-                  title={kind ? `Drag ${label.toLowerCase()} onto the scene` : label}
-                  onDragStart={event => {
-                    if (!kind) return;
-                    event.dataTransfer.setData(sceneObjectDragType, kind);
-                    event.dataTransfer.effectAllowed = 'copy';
-                  }}
-                  onClick={() => {
-                    if (label === 'Sprite') setActiveTab('assets');
-                    else if (kind) window.dispatchEvent(new CustomEvent('playground-place-object', { detail: kind }));
-                    else insertSnippet(code);
-                  }}
-                >
-                  <i className={`fa-solid ${icon}`} aria-hidden="true" />
-                  <span>{label}</span>
-                </button>
-                {(kind || label === 'Sprite') && (
-                  <button type="button" className="snippet-btn library-code" aria-label={`Insert ${label.toLowerCase()} code`}
+          <div className="object-library">
+            <section className="library-section" aria-labelledby="library-objects">
+              <h3 id="library-objects">Scene objects</h3>
+              <p className="library-hint">Drag to place precisely, or click to add at the centre.</p>
+              {snippets.filter(item => item.kind || item.label === 'Sprite').map(({ label, icon, code, kind }) => (
+                <div className="library-row" key={label}>
+                  <button type="button" className="scene-control snippet-btn" draggable={!!kind}
+                    aria-label={kind ? `Add ${label.toLowerCase()}` : 'Choose sprite image'}
+                    title={kind ? `Drag ${label.toLowerCase()} onto the scene` : 'Choose an image in Assets'}
+                    onDragStart={event => {
+                      if (!kind) return;
+                      event.dataTransfer.setData(sceneObjectDragType, kind);
+                      event.dataTransfer.effectAllowed = 'copy';
+                    }}
+                    onClick={() => {
+                      if (kind) window.dispatchEvent(new CustomEvent('playground-place-object', { detail: kind }));
+                      else setActiveTab('assets');
+                    }}
+                  >
+                    <i className={`fa-solid ${icon}`} aria-hidden="true" />
+                    <span>{label}</span>
+                    <i className={`fa-solid ${kind ? 'fa-grip-vertical' : 'fa-chevron-right'} library-affordance`} aria-hidden="true" />
+                  </button>
+                  <button type="button" className="scene-control library-code" aria-label={`Insert ${label.toLowerCase()} code`}
                     title={`Insert ${label.toLowerCase()} code`} onClick={() => insertSnippet(code)}>
                     <i className="fa-solid fa-code" aria-hidden="true" />
                   </button>
-                )}
-              </div>
-            ))}
+                </div>
+              ))}
+            </section>
+            <section className="library-section" aria-labelledby="library-code-snippets">
+              <h3 id="library-code-snippets">Code snippets</h3>
+              {snippets.filter(item => !item.kind && item.label !== 'Sprite').map(({ label, icon, code }) => (
+                <button type="button" className="scene-control snippet-btn" key={label}
+                  title={`Insert ${label} code`} onClick={() => insertSnippet(code)}>
+                  <i className={`fa-solid ${icon}`} aria-hidden="true" />
+                  <span>{label}</span>
+                  <i className="fa-solid fa-code library-affordance" aria-hidden="true" />
+                </button>
+              ))}
+            </section>
           </div>
         ) : (activeTab === 'assets' && (
           <AssetPanel />

@@ -291,14 +291,17 @@ const Inspector: React.FC<InspectorProps> = ({ visible }) => {
           <div className="inspector-form" style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
             {(placement || placementStatus || canEditPaletteObject) && (
               <div className="inspector-section">
-                {placement && <button type="button" onClick={applyPlacement}>Apply placement to code</button>}
-                {canEditPaletteObject && <button type="button" className="inspector-duplicate" onClick={duplicateObject}>
+                <h3>Object actions</h3>
+                {placement && <button type="button" className="scene-control inspector-apply" onClick={applyPlacement}>
+                  <i className="fa-solid fa-code" aria-hidden="true" /> Apply placement to code
+                </button>}
+                {canEditPaletteObject && <button type="button" className="scene-control" onClick={duplicateObject}>
                   <i className="fa-solid fa-copy" aria-hidden="true" /> Duplicate object
                 </button>}
-                {canEditPaletteObject && <button type="button" className="inspector-delete" onClick={deleteObject}>
+                {canEditPaletteObject && <button type="button" className="scene-control inspector-delete" onClick={deleteObject}>
                   <i className="fa-solid fa-trash" aria-hidden="true" /> Delete object
                 </button>}
-                {placementStatus && <span role="status">{placementStatus}</span>}
+                {placementStatus && <span className="inspector-action-status" role="status">{placementStatus}</span>}
               </div>
             )}
             <div className="inspector-section">

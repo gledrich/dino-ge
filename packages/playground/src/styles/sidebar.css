@@ -19,7 +19,7 @@
   align-items: center;
   justify-content: center;
   gap: 6px;
-  padding: 8px;
+  padding: 8px 6px;
   border: 0;
   background: transparent;
   cursor: pointer;
@@ -29,6 +29,15 @@
   letter-spacing: 0.5px;
   transition: all 0.2s;
   border-bottom: 2px solid transparent;
+}
+
+.sidebar-tab:first-child { flex: 1.25; }
+
+.sidebar-tab span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .sidebar-tab:hover {
@@ -52,10 +61,26 @@
   padding: 10px;
 }
 
-.snippets-grid {
+.object-library,
+.library-section {
   display: flex;
   flex-direction: column;
   gap: 6px;
+}
+
+.object-library { gap: 14px; }
+
+.library-section + .library-section {
+  padding-top: 12px;
+  border-top: 1px solid var(--border-color);
+}
+
+.library-section h3 {
+  margin: 0;
+  color: var(--text-primary);
+  font-size: 11px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
 }
 
 .library-hint {
@@ -72,19 +97,10 @@
 }
 
 .library-row .snippet-btn[draggable='true'] { cursor: grab; }
-.library-row .library-code { padding-inline: 9px; }
+.library-row .library-code { color: var(--text-secondary); }
 
 .snippet-btn {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  background: var(--bg-primary);
-  border: 1px solid var(--border-color);
-  color: var(--text-primary);
-  padding: 8px 12px;
-  border-radius: 4px;
-  cursor: pointer;
-  transition: all 0.2s;
+  justify-content: flex-start;
   text-align: left;
 }
 
@@ -99,7 +115,7 @@
   font-size: 12px;
 }
 
-.snippet-btn:hover {
-  background: rgba(67, 170, 139, 0.1);
-  border-color: var(--accent-primary);
+.snippet-btn .library-affordance {
+  margin-inline-start: auto;
+  color: var(--text-secondary);
 }

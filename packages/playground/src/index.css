@@ -9,6 +9,37 @@
   --border-color: #333;
   --handle-color: #444;
   --handle-active-color: var(--accent-primary);
+  --scene-control-height: 32px;
+  --scene-control-radius: 6px;
+}
+
+.scene-control {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  min-height: var(--scene-control-height);
+  box-sizing: border-box;
+  padding: 5px 9px;
+  border: 1px solid var(--border-color);
+  border-radius: var(--scene-control-radius);
+  background: var(--bg-primary);
+  color: var(--text-primary);
+  font: inherit;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.scene-control:hover {
+  background: var(--bg-tertiary);
+  border-color: var(--accent-primary);
+}
+
+.scene-control:focus-visible,
+.sidebar-tab:focus-visible,
+.toolbar button:focus-visible {
+  outline: 2px solid var(--accent-primary);
+  outline-offset: 1px;
 }
 
 html,

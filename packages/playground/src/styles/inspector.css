@@ -41,31 +41,23 @@
   padding-bottom: 4px;
 }
 
-.inspector-delete,
-.inspector-duplicate {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 6px;
-  padding: 6px 10px;
-  border: 1px solid var(--border-color);
-  border-radius: 4px;
-  background: var(--bg-primary);
-  color: var(--text-primary);
-  font: inherit;
-  font-size: 12px;
-  cursor: pointer;
+.scene-control.inspector-apply {
+  border-color: var(--accent-primary);
 }
 
-.inspector-duplicate:hover { border-color: var(--accent-primary); }
+.inspector-action-status {
+  color: var(--text-secondary);
+  font-size: 11px;
+  line-height: 1.5;
+}
 
-.inspector-delete {
+.scene-control.inspector-delete {
   border-color: #673940;
   background: #332329;
   color: #ffb4b8;
 }
 
-.inspector-delete:hover { background: #4a2a33; }
+.scene-control.inspector-delete:hover { background: #4a2a33; border-color: #a95965; }
 
 .inspector-row {
   display: flex;
