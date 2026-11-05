@@ -6,6 +6,7 @@ export const sceneObjectDragType = 'application/x-dino-scene-object';
 export const scenePointerDragEvent = 'playground-pointer-drag-scene-item';
 export const sceneKeyboardPlacementEvent = 'playground-position-scene-item';
 export const sceneObjectCodeEvent = 'playground-insert-scene-object-code';
+export const openEntryObjectSourceEvent = 'playground-open-entry-object-source';
 export const sceneAssetDragType = 'application/x-dino-scene-asset';
 export const sceneAssetDragEvent = 'playground-drag-scene-asset';
 export const sceneSourceKey = '__dinoPlaygroundSceneSource';

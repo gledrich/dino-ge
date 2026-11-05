@@ -301,10 +301,43 @@ export const makeExternal = () => new Rectangle({ tag: 'External platform', posi
   await page.getByRole('combobox', { name: 'Current script' }).selectOption(id);
   await expect(page.locator('#canvas')).toBeVisible({ timeout: 3000 });
   await page.getByRole('button', { name: 'Edit scene', exact: true }).click();
+  const entryEditor = page.locator('#playground-panel-editor .monaco-editor');
+  await expect.poll(() => entryEditor.evaluate(element => {
+    const { monaco } = window as typeof window & { monaco: Monaco };
+    return monaco.editor.getEditors().find(item => item.getDomNode() === element)?.getValue();
+  })).toContain('Entry platform');
+  await entryEditor.evaluate(element => {
+    const { monaco } = window as typeof window & { monaco: Monaco };
+    const editor = monaco.editor.getEditors().find(item => item.getDomNode() === element)!;
+    editor.setValue('// Unsaved draft\n' + '\n'.repeat(35) + editor.getValue());
+  });
   await page.getByRole('tab', { name: 'Console', exact: true }).click();
   await page.getByRole('button', { name: 'Entry platform', exact: true }).click({ timeout: 3000 });
   const source = page.getByRole('button', { name: 'View source', exact: true });
-  await expect(source).toHaveCount(0);
+  await page.getByRole('button', { name: 'Collapse editor', exact: true }).click();
+  await source.press('Enter', { timeout: 3000 });
+  await expect(page.getByRole('tab', { name: 'Editor', exact: true })).toHaveAttribute('aria-selected', 'true');
+  await expect(entryEditor).toBeVisible();
+  await expect.poll(() => entryEditor.evaluate(element => {
+    const { monaco } = window as typeof window & { monaco: Monaco };
+    const editor = monaco.editor.getEditors().find(item => item.getDomNode() === element);
+    const model = editor?.getModel();
+    const position = editor?.getPosition();
+    if (!model || !position || !editor.hasTextFocus()) return '';
+    const visible = editor.getScrolledVisiblePosition(position);
+    if (!visible || visible.top < 0 || visible.top >= editor.getLayoutInfo().height) return '';
+    const offset = model.getOffsetAt(position);
+    return model.getValue().slice(offset, offset + 90);
+  })).toMatch(/^new Rectangle\(\{\s*tag: ['"]Entry platform/);
+  await entryEditor.evaluate(element => {
+    const { monaco } = window as typeof window & { monaco: Monaco };
+    const editor = monaco.editor.getEditors().find(item => item.getDomNode() === element)!;
+    editor.setValue(editor.getValue() + "\nfunction unused() { new Rectangle({ tag: 'Entry platform' }); }");
+  });
+  await page.getByRole('tab', { name: 'Console', exact: true }).click();
+  await source.click();
+  await expect(page.getByRole('status').filter({ hasText: 'Could not locate a unique constructor in the open script.' })).toBeVisible();
+  await expect(page.getByRole('tab', { name: 'Console', exact: true })).toHaveAttribute('aria-selected', 'true');
   await page.getByRole('button', { name: 'Entry callback', exact: true }).click();
   await expect(source).toHaveCount(0);
   await page.getByRole('button', { name: 'External platform', exact: true }).click();

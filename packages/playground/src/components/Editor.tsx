@@ -7,7 +7,7 @@ import ProjectFilesDialog from './ProjectFilesDialog';
 import { openProjectObjectSourceEvent, type ProjectObjectSourceRequest } from '../utils/project-object-source';
 import { createScript, getCurrentScriptId, getScript, getFilesList, getSpriteImageFileError, readGameFolder, importGameFolder, importSpriteImage, type GameFolder } from '../utils/helpers';
 import { applyEditsToSource, Edit, instrumentCode, getSourceMapping, getSceneObjectCreation, getSceneObjectDeletion, getSceneObjectDuplication, getSpriteImageReplacement, type CanvasPlacementTransaction } from '../utils/ast-utils';
-import { createSceneObject, duplicateSceneObject, getSceneSource, insertSceneObjectCode, isReplaceableSprite, restoreSceneTransform, sceneAssetDragEvent, sceneAssetDragType, sceneObjectCodeEvent, sceneObjectDragType, sceneObjectKinds, scenePointerDragEvent, type CanvasTransformChange, type SceneImageAsset, type SceneObjectPlacement, type ScenePointerDrag, type ScenePointerDragItem } from '../utils/scene-objects';
+import { createSceneObject, duplicateSceneObject, getSceneSource, insertSceneObjectCode, isReplaceableSprite, openEntryObjectSourceEvent, restoreSceneTransform, sceneAssetDragEvent, sceneAssetDragType, sceneObjectCodeEvent, sceneObjectDragType, sceneObjectKinds, scenePointerDragEvent, type CanvasTransformChange, type SceneImageAsset, type SceneObjectPlacement, type ScenePointerDrag, type ScenePointerDragItem } from '../utils/scene-objects';
 import { useMonacoEditor } from '../hooks/useMonacoEditor';
 import '../styles/editor.css';
 
@@ -197,35 +197,58 @@ const CodeEditor: React.FC<EditorProps> = ({ currentScriptId, onSave, onSelectSc
   }, [currentScriptId, formatCode]);
 
   useEffect(() => {
-    const onSelectedObjectChanged = (e: any) => {
-      const obj = e.detail as Dino.GameObject | null;
-      if (obj && obj.metadata.sourceId) {
-        const mapping = getSourceMapping()[obj.metadata.sourceId];
-        if (mapping) {
-          const editor = monacoEditorRef.current;
-          if (editor) {
-            const model = editor.getModel();
-            if (model) {
-              const startPos = model.getPositionAt(mapping.start);
-              editor.revealPositionInCenter(startPos);
-              editor.setPosition(startPos);
-            }
-          }
-        }
-      }
+    let frame = 0;
+    const currentRun = (object: Dino.GameObject) => {
+      if (loadedScriptId.current !== currentScriptId || !(Dino.Engine.currentScene?.objects ?? Dino.Engine.objects).has(object)) return;
+      const run = document.querySelector<HTMLElement>('script[data-playground-script]');
+      if (run?.dataset.playgroundScript === currentScriptId) return run;
     };
-
+    const reveal = (object: Dino.GameObject | null) => {
+      const sourceId = object?.metadata.sourceId;
+      if (!sourceId || !object || !currentRun(object)) return;
+      const mapping = getSourceMapping()[sourceId];
+      const codeEditor: editor.IStandaloneCodeEditor | undefined = monacoEditorRef.current;
+      const position = mapping && codeEditor?.getModel()?.getPositionAt(mapping.start);
+      if (!position) return;
+      codeEditor?.setPosition(position);
+      codeEditor?.revealPositionInCenter(position);
+    };
+    const onSelectedObjectChanged = ({ detail }: CustomEvent<Dino.GameObject | null>) => reveal(detail);
+    const openEntrySource = (event: Event) => {
+      const { detail: object } = event as CustomEvent<Dino.GameObject>;
+      const sourceId = object.metadata.sourceId;
+      const run = currentRun(object);
+      const codeEditor: editor.IStandaloneCodeEditor | undefined = monacoEditorRef.current;
+      const model = codeEditor?.getModel();
+      if (!sourceId || !run || !codeEditor || !model || instrumentCode(model.getValue()).error) return;
+      const mappings = getSourceMapping();
+      const mapping = mappings[sourceId];
+      const group = sourceId.slice(0, sourceId.lastIndexOf('-') + 1);
+      if (!mapping || Object.keys(mappings).some(id => id !== sourceId && id.startsWith(group) && /^\d+$/.test(id.slice(group.length)))) return;
+      const revision = model.getVersionId();
+      setActiveTab('editor');
+      setIsEditorVisible(true);
+      cancelAnimationFrame(frame);
+      frame = requestAnimationFrame(() => {
+        if (Dino.Engine.selectedObject !== object || currentRun(object) !== run ||
+            codeEditor.getModel() !== model || model.getVersionId() !== revision) return;
+        codeEditor.layout();
+        const position = model.getPositionAt(mapping.start);
+        codeEditor.setPosition(position);
+        codeEditor.revealPositionInCenterIfOutsideViewport(position);
+        codeEditor.focus();
+      });
+      event.preventDefault();
+    };
     Dino.Engine.on('selectedObjectChanged', onSelectedObjectChanged);
-    
-    // If an object is already selected when the editor mounts, scroll to it
-    if (Dino.Engine.selectedObject) {
-      onSelectedObjectChanged({ detail: Dino.Engine.selectedObject });
-    }
-
+    window.addEventListener(openEntryObjectSourceEvent, openEntrySource);
+    reveal(Dino.Engine.selectedObject);
     return () => {
+      cancelAnimationFrame(frame);
       Dino.Engine.off('selectedObjectChanged', onSelectedObjectChanged);
+      window.removeEventListener(openEntryObjectSourceEvent, openEntrySource);
     };
-  }, [monacoEditorRef]);
+  }, [currentScriptId, monacoEditorRef, setActiveTab, setIsEditorVisible]);
 
 
   useEffect(() => {

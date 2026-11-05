@@ -4,7 +4,7 @@ import InspectorRow, { InspectableObject, PropertyRowDef, resolveComponentPath }
 import { applyEditsToSource, findObjectConstructor, getLineOriginEdit, getStandaloneSceneObject, getSurgicalEdit, getSourceMapping, readObjectSourceMappings, type CanvasPlacementTransaction, type Edit } from '../utils/ast-utils';
 import { usePlayground } from '../context/PlaygroundContext';
 import { getProjectObjectLocation, getProjectObjectSource, openProjectObjectSourceEvent, type ProjectObjectSourceRequest } from '../utils/project-object-source';
-import { getCanvasPlacementBaseline, isCanvasTransformProperty, restoreSceneTransform, type CanvasPlacement, type SceneTransformState } from '../utils/scene-objects';
+import { getCanvasPlacementBaseline, isCanvasTransformProperty, openEntryObjectSourceEvent, restoreSceneTransform, type CanvasPlacement, type SceneTransformState } from '../utils/scene-objects';
 import '../styles/inspector.css';
 
 const { Engine } = Dino;
@@ -463,14 +463,21 @@ const Inspector: React.FC<InspectorProps> = ({ visible }) => {
               </section>
             )}
             {placementStatus && <span className="inspector-action-status" role="status">{placementStatus}</span>}
-            {(objectActions || canOpenModule) && (
+            {(objectActions || canOpenModule || sourceId) && (
               <div className="inspector-section">
                 <h3>Object actions</h3>
-                {canOpenModule && <button type="button" className="scene-control"
-                  title={moduleSource.path} onClick={event => {
-                    window.dispatchEvent(new CustomEvent<ProjectObjectSourceRequest>(openProjectObjectSourceEvent, {
-                      detail: { source: moduleSource, trigger: event.currentTarget },
-                    }));
+                {(canOpenModule || sourceId) && <button type="button" className="scene-control"
+                  title={canOpenModule ? moduleSource.path : 'Open the constructor in the script editor'} onClick={event => {
+                    if (canOpenModule) {
+                      window.dispatchEvent(new CustomEvent<ProjectObjectSourceRequest>(openProjectObjectSourceEvent, {
+                        detail: { source: moduleSource, trigger: event.currentTarget },
+                      }));
+                    } else {
+                      const accepted = !window.dispatchEvent(new CustomEvent(openEntryObjectSourceEvent, {
+                        detail: selectedObject, cancelable: true,
+                      }));
+                      setPlacementStatus(accepted ? '' : 'Could not locate a unique constructor in the open script.');
+                    }
                   }}>
                   <i className="fa-solid fa-code" aria-hidden="true" /> View source
                 </button>}
