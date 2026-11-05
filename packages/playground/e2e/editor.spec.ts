@@ -1239,6 +1239,33 @@ new Engine({ onLoad() {
   await expect(front).toHaveAttribute('aria-pressed', 'true');
 });
 
+test('keeps the selected object handles visible above foreground objects during scene editing', async ({ page }) => {
+  await page.route('**/files', route => route.fulfill({ json: ['script'] }));
+  await page.route('**/api/scripts/script', route => route.fulfill({ json: `
+import { Engine, Rectangle, Vector2 } from 'dino-ge';
+new Engine({ onLoad() {
+  new Rectangle({ tag: 'Back plate', position: new Vector2(350, 235), width: 40, height: 30, colour: '#43aa8b' });
+  new Rectangle({ tag: 'Front plate', position: new Vector2(320, 205), width: 100, height: 90, colour: '#3c537d', zIndex: 1 });
+}, update() {} }, { containerId: 'playground-canvas-container' });` }));
+  await page.goto('/');
+  await page.getByRole('button', { name: 'Edit scene', exact: true }).click();
+  const canvas = page.locator('#canvas');
+  const pixel = (x: number, y: number) => canvas.evaluate((element: HTMLCanvasElement, [x, y]) =>
+    Array.from(element.getContext('2d')!.getImageData(x, y, 1, 1).data), [x, y]);
+  const foreground = [60, 83, 125, 255];
+  await expect.poll(() => pixel(390, 265)).toEqual(foreground);
+  const position = { x: 370, y: 245 };
+  await canvas.click({ position });
+  await canvas.click({ position, modifiers: ['Alt'] });
+  await expect(page.getByRole('button', { name: 'Back plate', exact: true })).toHaveAttribute('aria-pressed', 'true');
+  await expect.poll(() => pixel(390, 265)).toEqual([255, 209, 102, 255]);
+  await expect.poll(() => pixel(370, 215)).toEqual([101, 217, 178, 255]);
+  await expect.poll(() => pixel(370, 245)).toEqual(foreground);
+
+  await page.getByRole('button', { name: 'Play', exact: true }).click();
+  await expect.poll(() => pixel(390, 265)).toEqual(foreground);
+});
+
 test('navigates the editing camera, places in world coordinates and restores the gameplay view', async ({ page }) => {
   await page.route('**/files', route => route.fulfill({ json: ['script'] }));
   await page.route('**/api/scripts/script', route => route.fulfill({ json: `
