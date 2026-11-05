@@ -841,7 +841,9 @@ const CodeEditor: React.FC<EditorProps> = ({ currentScriptId, onSave, onSelectSc
         initialSource={projectFiles.request?.source} prepareDraft={projectFiles.request?.prepareDraft}
         onClose={() => {
           setProjectFiles(undefined);
-          projectFiles.trigger.focus();
+          const { trigger } = projectFiles;
+          trigger.focus();
+          if (document.activeElement !== trigger) document.getElementById('playground-tab-editor')?.focus();
         }} />}
       {dropFeedback?.scriptId === currentScriptId && <p className={`editor-drop-feedback${dropFeedback.error ? ' editor-drop-error' : ''}`}
         role={dropFeedback.error ? 'alert' : 'status'}>{dropFeedback.message}</p>}

@@ -375,6 +375,39 @@ export const makeExternal = () => new Rectangle({ tag: 'External platform', posi
   await expect(dialog.getByRole('status')).toHaveText('Reset the game to refresh the source location.');
 });
 
+test('returns focus to the mobile Editor when the project-file trigger is hidden', async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  const id = 'mobile-source/index';
+  const modulePath = 'platform.js';
+  const module = `import { Rectangle, Vector2 } from 'dino-ge';
+export const makePlatform = () => new Rectangle({ tag: 'Platform', position: new Vector2(90, 60), width: 64, height: 20 });`;
+  await page.route('**/files', route => route.fulfill({ json: ['script', id] }));
+  await page.route('**/api/scripts/script', route => route.fulfill({ json: '' }));
+  await page.route(`**/api/scripts/${encodeURIComponent(id)}`, route => route.fulfill({ json: `
+import { Engine } from 'dino-ge';
+import { makePlatform } from './platform.js';
+new Engine({ onLoad() { makePlatform(); } }, { containerId: 'playground-canvas-container' });` }));
+  await page.route(`**/api/scripts/${encodeURIComponent(id)}/modules`, route => route.fulfill({ json: [modulePath] }));
+  await page.route(`**/api/scripts/${encodeURIComponent(id)}/modules?*`, route => route.fulfill({ headers: moduleHeaders(module), json: module }));
+  await page.route(`**/project-runs/*/mobile-source/${modulePath}`, route => route.fulfill({ contentType: 'text/javascript', body: module }));
+
+  await page.goto('/');
+  await page.getByRole('combobox', { name: 'Current script' }).selectOption(id);
+  const dock = page.getByRole('tablist', { name: 'Workspace tools' });
+  await dock.getByRole('tab', { name: 'Explorer' }).click();
+  await page.getByRole('button', { name: 'Platform', exact: true }).press('Enter');
+  const inspector = dock.getByRole('tab', { name: 'Inspector' });
+  await inspector.click();
+  await page.getByRole('button', { name: 'View source', exact: true }).press('Enter');
+  const dialog = page.getByRole('dialog', { name: 'Project files', exact: true });
+  await expect(dialog.getByLabel('JavaScript module')).toHaveValue(modulePath);
+  await page.keyboard.press('Escape');
+  await expect(dialog).toBeHidden();
+  await expect(dock.getByRole('tab', { name: 'Editor' })).toBeFocused();
+  await page.keyboard.press('ArrowRight');
+  await expect(inspector).toBeFocused();
+});
+
 test('reviews and saves canvas moves in the module that created the objects', async ({ page }) => {
   await page.setViewportSize({ width: 768, height: 800 });
   const id = 'module-placement/index';
