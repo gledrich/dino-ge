@@ -413,15 +413,16 @@ new Engine({ onLoad() {
 test('explains a rejected palette drop without pausing the game or changing the script', async ({ page }) => {
   const source = `import { Engine } from 'dino-ge';
 function setup() {}
+const callbacks = { onLoad: setup };
 let frames = 0;
 new Engine({
-  onLoad: setup,
+  ...callbacks,
   update() { document.body.dataset.previewFrames = String(++frames); },
 }, { containerId: 'playground-canvas-container' });`;
   await page.route('**/files', route => route.fulfill({ json: ['script'] }));
   await page.route('**/api/scripts/script', route => route.fulfill({ json: source }));
   await page.goto('/');
-  await expect(page.locator('.monaco-editor')).toContainText('onLoad: setup');
+  await expect(page.locator('.monaco-editor')).toContainText('...callbacks');
   const canvas = page.locator('#canvas');
   await expect(canvas).toBeVisible();
   const readSource = () => page.evaluate(() => {
@@ -433,7 +434,7 @@ new Engine({
     targetPosition: { x: 180, y: 150 },
   });
 
-  const error = page.getByRole('alert').filter({ hasText: 'inline onLoad block' });
+  const error = page.getByRole('alert').filter({ hasText: 'inline configuration' });
   await expect(error).toBeVisible();
   await expect(page.getByRole('button', { name: 'Pause', exact: true })).toBeVisible();
   await expect(page.getByRole('button', { name: 'Edit scene', exact: true })).toHaveAttribute('aria-pressed', 'false');
@@ -443,6 +444,48 @@ new Engine({
   await expect.poll(frames).toBeGreaterThan(await frames());
   await page.getByRole('button', { name: 'Dismiss placement error' }).click();
   await expect(error).toHaveCount(0);
+});
+
+test('saves successive palette drops with a named setup callback and preserves the captured callback', async ({ page }) => {
+  let source = `import { Engine, Rectangle, Vector2 } from 'dino-ge';
+function onLoad() {
+  if (this.update) new Rectangle({ tag: 'setup marker', position: new Vector2(30, 30), width: 30, height: 30 });
+}
+new Engine({ onLoad, update() {} }, { containerId: 'playground-canvas-container' });
+onLoad = () => { throw new Error('The callback was already captured'); };`;
+  await page.route('**/files', route => route.fulfill({ json: ['script'] }));
+  await page.route('**/api/scripts/script', route => {
+    if (route.request().method() === 'PUT') {
+      source = route.request().postDataJSON().data;
+      return route.fulfill({ json: { success: true } });
+    }
+    return route.fulfill({ json: source });
+  });
+  await page.goto('/');
+  const canvas = page.locator('#canvas');
+  const marker = page.getByRole('button', { name: 'setup marker', exact: true });
+  await expect(marker).toBeVisible();
+  await expect.poll(() => page.evaluate(() => {
+    const { monaco } = window as typeof window & { monaco?: Monaco };
+    return monaco?.editor.getEditors()[0]?.getValue();
+  })).toContain('onLoad,');
+  for (const [kind, x] of [['rectangle', 175], ['circle', 275]] as const) {
+    await page.getByRole('button', { name: `Add ${kind}` }).dragTo(canvas, { targetPosition: { x, y: 150 } });
+    await expect(page.getByRole('button', { name: `New ${kind}`, exact: true })).toHaveAttribute('aria-pressed', 'true');
+  }
+  await expect(marker).toHaveCount(1);
+
+  const saved = page.waitForResponse(response => response.request().method() === 'PUT' &&
+    response.url().endsWith('/api/scripts/script'));
+  await page.getByRole('button', { name: 'Save script', exact: true }).click();
+  await saved;
+  expect(source.match(/function DinoPlaceLoad/g)).toHaveLength(1);
+  await page.reload();
+  await expect(marker).toHaveCount(1);
+  for (const [kind, x] of [['rectangle', 175], ['circle', 275]] as const) {
+    await page.getByRole('button', { name: `New ${kind}`, exact: true }).click();
+    await expect(page.getByRole('spinbutton', { name: 'X', exact: true })).toHaveValue(`${x}.00`);
+  }
 });
 
 test('saves a palette drop to the active named scene and restores it there', async ({ page }) => {

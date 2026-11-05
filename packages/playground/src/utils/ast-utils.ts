@@ -378,6 +378,20 @@ export function getSceneObjectDuplication(source: string, sourceId: string, x: n
   };
 }
 
+/** Find the end of the placement block generated around a referenced callback. */
+function getPlacedObjectInsertion(callback: acorn.Expression | undefined): number | undefined {
+  if (callback?.type !== 'CallExpression' || callback.arguments.length !== 1) return;
+  const factory = callback.callee;
+  if (factory.type !== 'ArrowFunctionExpression' || factory.params.length !== 1 ||
+      factory.params[0].type !== 'Identifier' || factory.params[0].name !== 'DinoPlaceSetup' ||
+      factory.body.type !== 'FunctionExpression' || factory.body.id?.name !== 'DinoPlaceLoad') return;
+  const finalStatement = factory.body.body.body.at(-1);
+  if (finalStatement?.type === 'ReturnStatement' &&
+      finalStatement.argument?.type === 'Identifier' && finalStatement.argument.name === 'DinoPlaceResult') {
+    return finalStatement.start;
+  }
+}
+
 /** Adds a constructor to the active scene or engine startup callback. */
 export function getSceneObjectCreation(source: string, placement: SceneObjectPlacement) {
   let ast: acorn.Program;
@@ -402,7 +416,8 @@ export function getSceneObjectCreation(source: string, placement: SceneObjectPla
   const isOnLoad = (key: acorn.Node) =>
     (key.type === 'Identifier' && (key as acorn.Identifier).name === 'onLoad') ||
     (key.type === 'Literal' && (key as acorn.Literal).value === 'onLoad');
-  let callback: acorn.Node | undefined;
+  let callback: acorn.Expression | undefined;
+  let engineHook: acorn.Property | undefined;
   let insertion: number;
   if (placement.scene) {
     const scene = sceneDeclarations(ast, imports).find(item => item.id?.name === placement.scene?.className);
@@ -420,12 +435,15 @@ export function getSceneObjectCreation(source: string, placement: SceneObjectPla
     if (config.properties.some(prop => prop.type !== 'Property' || prop.computed)) return null;
     const hooks = config.properties.filter((prop): prop is acorn.Property => prop.type === 'Property' && isOnLoad(prop.key));
     if (hooks.length > 1 || (hooks[0] && hooks[0].kind !== 'init')) return null;
-    callback = hooks[0]?.value;
+    engineHook = hooks[0];
+    callback = engineHook?.value;
     insertion = config.start + 1;
   }
-  if (callback && callback.type !== 'ArrowFunctionExpression' && callback.type !== 'FunctionExpression') return null;
-  const body = (callback as acorn.FunctionExpression | acorn.ArrowFunctionExpression | undefined)?.body;
+  const wrappedInsertion = getPlacedObjectInsertion(callback);
+  const referencedCallback = callback?.type === 'Identifier' || callback?.type === 'MemberExpression' ? callback : undefined;
+  const body = callback?.type === 'ArrowFunctionExpression' || callback?.type === 'FunctionExpression' ? callback.body : undefined;
   if (body && body.type !== 'BlockStatement') return null;
+  if (callback && !body && !referencedCallback && wrappedInsertion === undefined) return null;
 
   const addedImports: string[] = [];
   const binding = (name: string) => {
@@ -448,7 +466,24 @@ export function getSceneObjectCreation(source: string, placement: SceneObjectPla
   const registration = placement.kind === 'Sprite' ? '.play()' : '';
   const statement = `new ${constructor}({ tag: ${JSON.stringify(tag)}, position: new ${vector}(${placement.x}, ${placement.y}), ${options} })${registration};`;
   const edits: Edit[] = [];
-  if (body?.type === 'BlockStatement') {
+  if (wrappedInsertion !== undefined) {
+    const lineStart = source.lastIndexOf('\n', wrappedInsertion - 1) + 1;
+    const indent = source.slice(lineStart, wrappedInsertion).match(/^[ \t]*/)?.[0] ?? '';
+    edits.push({ start: wrappedInsertion, end: wrappedInsertion, newText: `${statement}\n${indent}` });
+  } else if (referencedCallback && engineHook) {
+    // Evaluate the original callback at configuration time and forward the Engine's receiver.
+    const original = source.slice(referencedCallback.start, referencedCallback.end);
+    const key = engineHook.shorthand ? 'onLoad: ' : '';
+    edits.push({
+      start: referencedCallback.start,
+      end: referencedCallback.end,
+      newText: `${key}(DinoPlaceSetup => function DinoPlaceLoad() {
+    const DinoPlaceResult = DinoPlaceSetup == null ? undefined : Reflect.apply(DinoPlaceSetup, this, []);
+    ${statement}
+    return DinoPlaceResult;
+  })(${original})`,
+    });
+  } else if (body?.type === 'BlockStatement') {
     const directive = body.body.filter(item => 'directive' in item).at(-1);
     const start = directive?.end ?? body.start + 1;
     edits.push({ start, end: start, newText: `\n    ${statement}\n` });
