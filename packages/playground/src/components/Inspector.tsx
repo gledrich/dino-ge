@@ -36,7 +36,7 @@ const SECTIONS: Record<string, { rows: PropertyRowDef[], component: any, descrip
     rows: [
       { label: 'Content', type: 'text', propertyPath: 'text' },
       { label: 'Text colour', type: 'colour', propertyPath: 'colour' },
-      { label: 'Background', type: 'colour', propertyPath: 'backgroundColour' },
+      { label: 'Background', type: 'colour', propertyPath: 'backgroundColour', emptyColourLabel: 'None' },
     ]
   },
   Appearance: {
@@ -65,6 +65,7 @@ const SECTIONS: Record<string, { rows: PropertyRowDef[], component: any, descrip
       { label: 'End X', type: 'number', propertyPath: 'p2.x' },
       { label: 'End Y', type: 'number', propertyPath: 'p2.y' },
       { label: 'Stroke width', type: 'number', propertyPath: 'width', min: 0.01 },
+      { label: 'Stroke colour', type: 'colour', propertyPath: 'colour', emptyColourLabel: 'Inherit' },
     ]
   },
   Physics: {

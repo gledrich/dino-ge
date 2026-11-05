@@ -139,9 +139,19 @@ export default class RenderingSystem extends System {
     }
 
     if (line) {
+      const dx = line.x2 - line.x1;
+      const dy = line.y2 - line.y1;
+      const length = Math.hypot(dx, dy) || 1;
+      this.ctx.lineWidth = 1 / Engine.camera.zoom;
+      // Draw outside the stroke so the debug overlay leaves its colour visible.
+      const offset = (line.radius + this.ctx.lineWidth) / length;
+      const normalX = -dy * offset;
+      const normalY = dx * offset;
       this.ctx.beginPath();
-      this.ctx.moveTo(line.x1, line.y1);
-      this.ctx.lineTo(line.x2, line.y2);
+      this.ctx.moveTo(line.x1 + normalX, line.y1 + normalY);
+      this.ctx.lineTo(line.x2 + normalX, line.y2 + normalY);
+      this.ctx.moveTo(line.x1 - normalX, line.y1 - normalY);
+      this.ctx.lineTo(line.x2 - normalX, line.y2 - normalY);
       this.ctx.stroke();
     } else if (rotation !== 0) {
       this.ctx.save();

@@ -2329,14 +2329,22 @@ new Engine({ onLoad() {}, update() {} }, { containerId: 'playground-canvas-conta
 
   const endX = page.getByRole('spinbutton', { name: 'End X', exact: true });
   const stroke = page.getByRole('spinbutton', { name: 'Stroke width', exact: true });
-  const readExtendedStrokePixel = () => canvas.evaluate((element: HTMLCanvasElement, [originX, originY]) =>
-    element.getContext('2d')!.getImageData(Number(originX) + 125, Number(originY) + 4, 1, 1).data[0], [movedX, movedY]);
+  const readExtendedStrokePixel = (offset = 4) => canvas.evaluate((element: HTMLCanvasElement, [originX, originY, offset]) =>
+    element.getContext('2d')!.getImageData(Number(originX) + 125, Number(originY) + Number(offset), 1, 1).data[0],
+  [movedX, movedY, offset]);
   await expect.poll(readExtendedStrokePixel).toBe(255);
   await endX.fill('145');
   await stroke.fill('12');
   await expect.poll(readExtendedStrokePixel).toBe(0);
   await page.getByRole('button', { name: 'Save End X to code' }).click();
   await page.getByRole('button', { name: 'Save Stroke width to code' }).click();
+  const colour = page.getByRole('textbox', { name: 'Stroke colour', exact: true });
+  await expect(colour).toHaveValue('', { timeout: 3000 });
+  await page.getByLabel('Choose stroke colour', { exact: true }).fill('#9e3a88');
+  await expect(colour).toHaveValue('#9e3a88');
+  await expect.poll(readExtendedStrokePixel).toBe(158);
+  await expect.poll(() => readExtendedStrokePixel(0)).toBe(158);
+  await page.getByRole('button', { name: 'Save Stroke colour to code' }).click();
 
   const saved = page.waitForResponse(response => response.request().method() === 'PUT' &&
     response.url().endsWith('/api/scripts/script'));
@@ -2348,6 +2356,15 @@ new Engine({ onLoad() {}, update() {} }, { containerId: 'playground-canvas-conta
   await expect(y).toHaveValue(movedY);
   await expect(endX).toHaveValue('145.00');
   await expect(stroke).toHaveValue('12.00');
+  await expect(colour).toHaveValue('#9e3a88');
+  await expect.poll(readExtendedStrokePixel).toBe(158);
+  await colour.clear();
+  await expect.poll(readExtendedStrokePixel).toBe(0);
+  await page.getByRole('button', { name: 'Save Stroke colour to code' }).click();
+  await expect.poll(() => page.evaluate(() => {
+    const { monaco } = window as typeof window & { monaco: Monaco };
+    return monaco.editor.getEditors()[0].getValue();
+  })).toMatch(/colour:\s*(?:""|'')/);
 });
 
 test('drags a rotated line’s endpoints independently and saves them with undo', async ({ page }) => {

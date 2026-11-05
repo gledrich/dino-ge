@@ -8,15 +8,18 @@ export interface PropertyRowDef {
   type: string;
   propertyPath: string;
   min?: number;
+  emptyColourLabel?: string;
 }
 
 const lineProperties = new Map([
   ['p1.x', 'x1'], ['p1.y', 'y1'], ['p2.x', 'x2'], ['p2.y', 'y2'], ['width', 'strokeWidth'],
+  ['colour', 'colour'],
 ]);
 
 let colourContext: CanvasRenderingContext2D | null | undefined;
 
 function getCanvasColourHex(value: string) {
+  if (!value.trim()) return;
   if (colourContext === undefined) {
     const canvas = document.createElement('canvas');
     canvas.width = canvas.height = 1;
@@ -158,14 +161,17 @@ const InspectorRow: React.FC<{
   // Sync runtime value to the input box and check for modifications
   useEffect(() => {
     let rafId: number;
-    let previousColour: unknown;
+    let previousColour: string | undefined;
     const loop = () => {
       const resolved = resolveComponentPath(selectedObject, def.propertyPath);
       if (resolved && resolved.target) {
         const val = resolved.target[resolved.prop];
-        if (colourRef.current && typeof val === 'string' && val !== previousColour) {
-          previousColour = val;
-          colourRef.current.value = getCanvasColourHex(val) ?? '#000000';
+        if (colourRef.current) {
+          const colour = typeof val === 'string' ? val : '';
+          if (colour !== previousColour) {
+            previousColour = colour;
+            colourRef.current.value = getCanvasColourHex(colour) ?? '#000000';
+          }
         }
         
         // Update input if not focused
@@ -199,8 +205,8 @@ const InspectorRow: React.FC<{
 
   const parseValue = (element: HTMLInputElement) => {
     if (def.type === 'checkbox') return element.checked;
-    const clearsBackground = def.propertyPath === 'backgroundColour' && element.value === '';
-    if (isColour && !clearsBackground && !getCanvasColourHex(element.value)) return;
+    const emptyColour = def.emptyColourLabel && element.value === '';
+    if (isColour && !emptyColour && !getCanvasColourHex(element.value)) return;
     if (def.type !== 'number') return element.value;
     const value = element.valueAsNumber;
     if (Number.isFinite(value) && !element.validity.rangeUnderflow) {
@@ -277,6 +283,7 @@ const InspectorRow: React.FC<{
           min={def.min}
           step="any"
           ref={inputRef}
+          placeholder={def.emptyColourLabel}
           aria-invalid={isColour && !isValid ? true : undefined}
           aria-describedby={isColour && !isValid ? `${inputId}-error` : undefined}
           title={isColour ? 'CSS colour, such as #54d6ad, rebeccapurple or rgba(0, 0, 0, 0.5)' : undefined}
