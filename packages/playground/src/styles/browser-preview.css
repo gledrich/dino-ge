@@ -4,4 +4,13 @@
     padding: 2px 8px;
     gap: 8px;
   }
+
+  .mobile-workspace:has(.browser-game-preview) {
+    container-type: size;
+  }
+
+  .mobile-workspace .viewport-panel:has(.browser-game-preview) .toolbar {
+    /* Count the drawer's height towards the clearance for the game arrows. */
+    bottom: max(12px, calc(102px - (100cqh - 100%)));
+  }
 }
