@@ -282,7 +282,7 @@ const CodeEditor: React.FC<EditorProps> = ({ currentScriptId, onSave, onSelectSc
       event.preventDefault();
     };
 
-    const editPaletteObject = (event: Event) => {
+    const editSceneObject = (event: Event) => {
       const { detail: object } = event as CustomEvent<Dino.GameObject>;
       const model: editor.ITextModel | null = monacoEditorRef.current?.getModel();
       const run = document.querySelector<HTMLElement>('script[data-playground-script]');
@@ -294,11 +294,12 @@ const CodeEditor: React.FC<EditorProps> = ({ currentScriptId, onSave, onSelectSc
       const matching = Array.from(scene?.objects ?? Dino.Engine.objects)
         .filter(item => item.metadata.sourceId === sourceId);
       if (matching.length !== 1 || matching[0] !== object) return;
+      const matchesConstructor = (type?: string) => type && Dino[type as keyof typeof Dino] === object.constructor;
       if (event.type === 'playground-duplicate-scene-object') {
         const position = object.transform.position.clone();
         position.set(position.x + 24, position.y + 24);
         const copy = getSceneObjectDuplication(model.getValue(), sourceId, position.x, position.y);
-        if (!copy) return;
+        if (!copy || !matchesConstructor(copy.type)) return;
         const before = model.getAlternativeVersionId();
         let duplicate: Dino.GameObject | undefined;
         try {
@@ -320,7 +321,7 @@ const CodeEditor: React.FC<EditorProps> = ({ currentScriptId, onSave, onSelectSc
         return;
       }
       const deletion = getSceneObjectDeletion(model.getValue(), sourceId);
-      if (!deletion) return;
+      if (!deletion || !matchesConstructor(getSourceMapping()[sourceId]?.type)) return;
       const before = model.getAlternativeVersionId();
       if (!applySourceEdits([deletion])) return;
       Dino.Engine.destroyObject(object);
@@ -414,8 +415,8 @@ const CodeEditor: React.FC<EditorProps> = ({ currentScriptId, onSave, onSelectSc
     window.addEventListener('playground-apply-placement', applyPlacement);
     window.addEventListener('playground-update-sprite-image', replaceSpriteImage);
     window.addEventListener('playground-add-scene-object', addSceneObject);
-    window.addEventListener('playground-remove-scene-object', editPaletteObject);
-    window.addEventListener('playground-duplicate-scene-object', editPaletteObject);
+    window.addEventListener('playground-remove-scene-object', editSceneObject);
+    window.addEventListener('playground-duplicate-scene-object', editSceneObject);
     const clearSceneHistory = () => { sceneHistory.current = []; };
     window.addEventListener('playground-before-run', clearSceneHistory);
     const changeCodeHistory = (event: Event) => {
@@ -437,8 +438,8 @@ const CodeEditor: React.FC<EditorProps> = ({ currentScriptId, onSave, onSelectSc
       window.removeEventListener('playground-apply-placement', applyPlacement);
       window.removeEventListener('playground-update-sprite-image', replaceSpriteImage);
       window.removeEventListener('playground-add-scene-object', addSceneObject);
-      window.removeEventListener('playground-remove-scene-object', editPaletteObject);
-      window.removeEventListener('playground-duplicate-scene-object', editPaletteObject);
+      window.removeEventListener('playground-remove-scene-object', editSceneObject);
+      window.removeEventListener('playground-duplicate-scene-object', editSceneObject);
       window.removeEventListener('playground-before-run', clearSceneHistory);
       window.removeEventListener('playground-code-history', changeCodeHistory);
       window.removeEventListener('playground-apply-edit', handleApplyEditEvent);

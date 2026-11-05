@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import * as Dino from 'dino-ge';
 import InspectorRow, { InspectableObject, PropertyRowDef, resolveComponentPath } from './InspectorRow';
-import { getLineOriginEdit, getSurgicalEdit, getSourceMapping, type CanvasPlacementTransaction, type Edit } from '../utils/ast-utils';
+import { getLineOriginEdit, getStandaloneSceneObject, getSurgicalEdit, getSourceMapping, type CanvasPlacementTransaction, type Edit } from '../utils/ast-utils';
 import { usePlayground } from '../context/PlaygroundContext';
 import { getCanvasPlacementBaseline, isCanvasTransformProperty, restoreSceneTransform, type CanvasPlacement, type SceneTransformState } from '../utils/scene-objects';
 import '../styles/inspector.css';
@@ -178,14 +178,19 @@ const Inspector: React.FC<InspectorProps> = ({ visible }) => {
   const pendingCount = Array.from(pendingCanvasPlacements.keys()).filter(object => activeObjects.has(object)).length;
   const hasPendingCanvasChanges = pendingCanvasPlacements.size > 0;
   const baseline = selectedObject && placement ? getCanvasPlacementBaseline(selectedObject, placement) : undefined;
-  const canEditPaletteObject = isPaused && !syntaxError && selectedObject?.metadata.sourceId?.startsWith('DinoPlace');
+  const sourceId = selectedObject?.metadata.sourceId;
+  const standalone = isPaused && !syntaxError && sourceId && selectedObject &&
+    !selectedObject.transform.parent && !selectedObject.transform.children.size ? getStandaloneSceneObject(sourceId) : null;
+  const objectActions = standalone && Dino[standalone.mapping.type as keyof typeof Dino] === selectedObject?.constructor &&
+    Array.from(activeObjects).filter(object => object.metadata.sourceId === sourceId).length === 1 ? standalone : null;
+  const watchSceneChanges = hasPendingCanvasChanges || !!standalone;
 
   const deleteObject = () => {
     if (!selectedObject) return;
     const accepted = !window.dispatchEvent(new CustomEvent('playground-remove-scene-object', {
       detail: selectedObject, cancelable: true,
     }));
-    if (!accepted) setPlacementStatus('Delete is available for standalone palette objects in the open script.');
+    if (!accepted) setPlacementStatus('Delete is available for standalone objects in the open script.');
   };
 
   const duplicateObject = () => {
@@ -193,7 +198,7 @@ const Inspector: React.FC<InspectorProps> = ({ visible }) => {
     const accepted = !window.dispatchEvent(new CustomEvent('playground-duplicate-scene-object', {
       detail: selectedObject, cancelable: true,
     }));
-    if (!accepted) setPlacementStatus('Duplicate is available for standalone palette objects with literal options in the open script.');
+    if (!accepted) setPlacementStatus('Duplicate is available for standalone objects with literal options in the open script.');
   };
 
   useEffect(() => {
@@ -206,6 +211,7 @@ const Inspector: React.FC<InspectorProps> = ({ visible }) => {
     const onSyntaxError = (e: Event) => {
       const customEvent = e as CustomEvent<string | null>;
       setSyntaxError(customEvent.detail);
+      setTick(tick => tick + 1);
     };
 
     const onEngineUpdate = () => {
@@ -232,11 +238,11 @@ const Inspector: React.FC<InspectorProps> = ({ visible }) => {
   }, []);
 
   useEffect(() => {
-    if (!hasPendingCanvasChanges) return;
+    if (!watchSceneChanges) return;
     const updateScene = () => setTick(tick => tick + 1);
     Engine.on('sceneHierarchyChanged', updateScene);
     return () => { Engine.off('sceneHierarchyChanged', updateScene); };
-  }, [hasPendingCanvasChanges]);
+  }, [watchSceneChanges]);
 
   const discardPlacement = () => {
     if (!selectedObject || !baseline || Engine.selectedObject !== selectedObject) return;
@@ -368,12 +374,12 @@ const Inspector: React.FC<InspectorProps> = ({ visible }) => {
               </section>
             )}
             {placementStatus && <span className="inspector-action-status" role="status">{placementStatus}</span>}
-            {canEditPaletteObject && (
+            {objectActions && (
               <div className="inspector-section">
                 <h3>Object actions</h3>
-                <button type="button" className="scene-control" onClick={duplicateObject}>
+                {objectActions.statement.canDuplicate && <button type="button" className="scene-control" onClick={duplicateObject}>
                   <i className="fa-solid fa-copy" aria-hidden="true" /> Duplicate object
-                </button>
+                </button>}
                 <button type="button" className="scene-control inspector-delete" onClick={deleteObject}>
                   <i className="fa-solid fa-trash" aria-hidden="true" /> Delete object
                 </button>

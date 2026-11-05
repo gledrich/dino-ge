@@ -165,6 +165,68 @@ new Engine({ onLoad() {
   await expect(page.getByRole('spinbutton', { name: 'X', exact: true })).toHaveValue('521.00');
 });
 
+test('duplicates and deletes standalone hand-written objects with source and scene history', async ({ page }) => {
+  let source = `import { Engine, Rectangle as Platform, Vector2 as Vec } from 'dino-ge';
+new Engine({ onLoad() {
+  new Platform({ tag: 'Handmade platform', position: new Vec(350, 220), width: 64, height: 48 });
+  const bound = new Platform({ tag: 'Bound platform', position: new Vec(520, 220), width: 64, height: 48 });
+  void bound;
+  const width = 64;
+  new Platform({ tag: 'Computed platform', position: new Vec(600, 300), width, height: 48 });
+  for (let i = 0; i < 2; i++) {
+    new Platform({ tag: 'Repeated platform', position: new Vec(600, 380), width: 64, height: 48 });
+  }
+}, update() {} }, { containerId: 'playground-canvas-container' });`;
+  await page.route('**/files', route => route.fulfill({ json: ['script'] }));
+  await page.route('**/api/scripts/script', route => {
+    if (route.request().method() === 'PUT') {
+      source = route.request().postDataJSON().data;
+      return route.fulfill({ json: { success: true } });
+    }
+    return route.fulfill({ json: source });
+  });
+  await page.goto('/');
+  await page.getByRole('button', { name: 'Edit scene', exact: true }).click();
+  const duplicate = page.getByRole('button', { name: 'Duplicate object', exact: true });
+  const remove = page.getByRole('button', { name: 'Delete object', exact: true });
+  await page.getByRole('button', { name: 'Bound platform', exact: true }).click();
+  await expect(duplicate).toHaveCount(0);
+  await expect(remove).toHaveCount(0);
+  await page.getByRole('button', { name: 'Computed platform', exact: true }).click();
+  await expect(duplicate).toHaveCount(0);
+  await expect(remove).toHaveCount(0);
+  const repeated = page.getByRole('button', { name: 'Repeated platform', exact: true });
+  await expect(repeated).toHaveCount(2);
+  await repeated.first().click();
+  await expect(duplicate).toHaveCount(0);
+  await expect(remove).toHaveCount(0);
+  const original = page.getByRole('button', { name: 'Handmade platform', exact: true });
+  await original.click();
+  await expect(duplicate).toBeVisible();
+  await duplicate.click();
+  const copy = page.getByRole('button', { name: 'Handmade platform copy', exact: true });
+  await expect(copy).toHaveAttribute('aria-pressed', 'true');
+  await expect(page.getByRole('spinbutton', { name: 'X', exact: true })).toHaveValue('374.00');
+  await original.click();
+  await remove.click();
+  await expect(original).toHaveCount(0);
+  await expect(copy).toBeVisible();
+  await page.getByRole('button', { name: 'Undo code edit', exact: true }).click();
+  await expect(original).toBeVisible();
+  await page.getByRole('button', { name: 'Redo code edit', exact: true }).click();
+  await expect(original).toHaveCount(0);
+
+  const saved = page.waitForResponse(response => response.request().method() === 'PUT' &&
+    response.url().endsWith('/api/scripts/script'));
+  await page.getByRole('button', { name: 'Save script', exact: true }).click();
+  await saved;
+  expect(source).toMatch(/new Platform\(\{\s*tag: ['"]Handmade platform copy['"],\s*position: new Vec\(374, 244\)/);
+  await page.reload();
+  await expect(copy).toBeVisible();
+  await expect(original).toHaveCount(0);
+  await expect(page.getByRole('button', { name: 'Bound platform', exact: true })).toBeVisible();
+});
+
 test('keeps live Inspector values and save controls readable in a narrow panel', async ({ page }) => {
   await page.setViewportSize({ width: 768, height: 800 });
   await page.route('**/files', route => route.fulfill({ json: ['script'] }));

@@ -25,6 +25,7 @@ export interface ObjectSourceMapping {
   contentEnd: number;
   hasDynamicProperties: boolean;
   properties: Record<string, PropertyLocation>;
+  standalone?: { start: number; end: number; options?: Record<string, unknown>; canDuplicate: boolean };
 }
 
 let sourceMappingRegistry: Record<string, ObjectSourceMapping> = {};
@@ -109,6 +110,58 @@ function sceneDeclarations(ast: acorn.Program, imports: Map<string, string>) {
   });
 }
 
+function readSceneObjectOptions(node: acorn.ObjectExpression, imports: Map<string, string>, reuseSpriteImage: boolean) {
+  const readOptions = (node: any, root = false): Record<string, unknown> => {
+    if (node.type !== 'ObjectExpression') throw new Error('Expected constructor options');
+    const options = new Map<string, unknown>();
+    for (const prop of node.properties) {
+      if (prop.type !== 'Property' || prop.kind !== 'init' || prop.computed || prop.key.type !== 'Identifier' ||
+          options.has(prop.key.name) || prop.key.name === '__proto__') throw new Error('Unsupported option');
+      const key = prop.key.name;
+      if (root && reuseSpriteImage && key === 'img') {
+        options.set(key, undefined); // The copy uses the original sprite's loaded image.
+      } else {
+        options.set(key, readValue(prop.value));
+      }
+    }
+    return Object.fromEntries(options);
+  };
+  const readValue = (node: any): unknown => {
+    if (node.type === 'Literal' && ['number', 'boolean', 'string'].includes(typeof node.value)) return node.value;
+    if (node.type === 'UnaryExpression' && ['-', '+'].includes(node.operator) &&
+        node.argument.type === 'Literal' && typeof node.argument.value === 'number') {
+      return node.operator === '-' ? -node.argument.value : node.argument.value;
+    }
+    if (node.type === 'ObjectExpression') return readOptions(node);
+    if (node.type === 'NewExpression' && imports.get(node.callee.name) === 'Vector2') {
+      const [x, y] = node.arguments.map(readValue);
+      if (node.arguments.length === 2 && typeof x === 'number' && typeof y === 'number') return new Vector2(x, y);
+    }
+    throw new Error('Unsupported option value');
+  };
+
+  try {
+    return readOptions(node, true);
+  } catch {
+    return undefined;
+  }
+}
+
+function getStandaloneConstructor(statement: acorn.ExpressionStatement, imports: Map<string, string>) {
+  const { expression } = statement;
+  const callee = expression.type === 'CallExpression' ? expression.callee : undefined;
+  const isPlay = callee?.type === 'MemberExpression' && !callee.computed &&
+    callee.property.type === 'Identifier' && callee.property.name === 'play' &&
+    expression.type === 'CallExpression' && !expression.arguments.length;
+  const constructor = isPlay ? callee.object : expression;
+  if (constructor.type !== 'NewExpression' || constructor.callee.type !== 'Identifier' || constructor.arguments.length !== 1) return;
+  const type = imports.get(constructor.callee.name);
+  const options = constructor.arguments[0];
+  if (options.type !== 'ObjectExpression' ||
+      !(isPlay ? type === 'Sprite' : sceneObjectKinds.some(kind => kind === type))) return;
+  return constructor;
+}
+
 export interface InstrumentationResult {
   code: string;
   error?: string;
@@ -187,15 +240,19 @@ export const instrumentCode = (code: string, trackEditorSource = true, scriptId?
     
     // Broad heuristic: known Dino GE classes OR any class instantiation that takes an object with a 'tag' property
     const knownClasses = ['Sprite', 'Rectangle', 'Circle', 'Line', 'Text', 'Tilemap'];
-    if (knownClasses.includes(node.callee.name)) return true;
+    if (knownClasses.includes(imports.get(node.callee.name) ?? node.callee.name)) return true;
     
     const hasTag = args[0].properties.some((p: any) => p.key?.type === 'Identifier' && p.key.name === 'tag');
     return hasTag;
   };
 
-  // Simple recursive walker
-  const walk = (node: any) => {
+  const standaloneStatements = new Map<number, acorn.ExpressionStatement>();
+  const walk = (node: any, parent?: any) => {
     if (!node) return;
+    if (trackEditorSource && node.type === 'ExpressionStatement' && ['Program', 'BlockStatement'].includes(parent?.type)) {
+      const constructor = getStandaloneConstructor(node, imports);
+      if (constructor) standaloneStatements.set(constructor.start, node);
+    }
 
     if (node.type === 'NewExpression') {
       const args = node.arguments;
@@ -213,17 +270,27 @@ export const instrumentCode = (code: string, trackEditorSource = true, scriptId?
         const sourceId = `${idKey}-${index}`;
         
         // Record property locations (using original offsets)
-        if (trackEditorSource) sourceMappingRegistry[sourceId] = {
-          sourceId,
-          type: imports.get(node.callee.name) ?? node.callee.name,
-          start: node.start,
-          end: node.end,
-          contentStart: args[0].start + 1, // After {
-          contentEnd: args[0].end - 1,    // Before }
-          hasDynamicProperties: props.some((prop: any) => prop.type !== 'Property' || prop.computed ||
-            (prop.key.type === 'Literal' && prop.key.value === 'position')),
-          properties: mapProperties(args[0], imports, code),
-        };
+        if (trackEditorSource) {
+          const importedType = imports.get(type) ?? type;
+          const properties = mapProperties(args[0], imports, code);
+          const statement = standaloneStatements.get(node.start);
+          const generated = type.startsWith('DinoPlace');
+          const options = statement && readSceneObjectOptions(args[0], imports, generated && importedType === 'Sprite');
+          const safeOptions = options && (generated || importedType !== 'Sprite' || typeof options.img === 'string');
+          const canDuplicate = !!safeOptions && typeof options.tag === 'string' && properties.position?.args?.length === 2 &&
+            properties.position.args.every(arg => arg.numeric);
+          sourceMappingRegistry[sourceId] = {
+            sourceId, type: importedType, start: node.start, end: node.end,
+            contentStart: args[0].start + 1, // After {
+            contentEnd: args[0].end - 1,    // Before }
+            hasDynamicProperties: props.some((prop: any) => prop.type !== 'Property' || prop.computed ||
+              (prop.key.type === 'Literal' && prop.key.value === 'position')),
+            properties,
+            standalone: statement && (generated || safeOptions) ? {
+              start: statement.start, end: statement.end, options, canDuplicate,
+            } : undefined,
+          };
+        }
 
         // Inject __sourceId into the object literal in the instrumented version
         const injection = `__sourceId: ${JSON.stringify(sourceId)}, `;
@@ -236,9 +303,9 @@ export const instrumentCode = (code: string, trackEditorSource = true, scriptId?
     for (const key in node) {
       const child = node[key];
       if (Array.isArray(child)) {
-        child.forEach(walk);
+        child.forEach(item => walk(item, node));
       } else if (child && typeof child === 'object' && child.type) {
-        walk(child);
+        walk(child, node);
       }
     }
   };
@@ -262,52 +329,22 @@ export interface CanvasPlacementTransaction {
   transforms: CanvasTransformChange[];
 }
 
-/** Find a standalone constructor written by the visual editor. */
-function findPaletteStatement(source: string, sourceId: string) {
-  if (!sourceId.startsWith('DinoPlace') || instrumentCode(source).error) return null;
+/** Read source capabilities for one unambiguous standalone constructor. */
+export function getStandaloneSceneObject(sourceId: string) {
   const mapping = getSourceMapping()[sourceId];
   const group = sourceId.slice(0, sourceId.lastIndexOf('-') + 1);
-  if (!mapping || Object.keys(getSourceMapping()).filter(id => id.startsWith(group) &&
+  if (!mapping?.standalone || Object.keys(getSourceMapping()).filter(id => id.startsWith(group) &&
       /^\d+$/.test(id.slice(group.length))).length !== 1) return null;
+  return { statement: mapping.standalone, mapping };
+}
 
-  const ast = acorn.parse(source, { ecmaVersion: 'latest', sourceType: 'module' });
-  const imports = dinoImports(ast);
-  const matches: { statement: acorn.ExpressionStatement; options: acorn.ObjectExpression }[] = [];
-  const visit = (node: any) => {
-    if (matches.length || node.start > mapping.start || node.end < mapping.end) return;
-    if (node.type === 'BlockStatement') {
-      for (const child of node.body) {
-        if (child.type !== 'ExpressionStatement') continue;
-        const expression = child.expression;
-        const isPlay = expression.type === 'CallExpression' && !expression.arguments.length &&
-          expression.callee.type === 'MemberExpression' && !expression.callee.computed &&
-          expression.callee.property.name === 'play';
-        const constructor = isPlay ? expression.callee.object : expression;
-        if (constructor.type !== 'NewExpression' || constructor.start !== mapping.start ||
-            constructor.end !== mapping.end || !constructor.callee.name?.startsWith('DinoPlace')) continue;
-        const type = imports.get(constructor.callee.name);
-        const options = constructor.arguments[0];
-        if (options?.type === 'ObjectExpression' &&
-            (isPlay ? type === 'Sprite' : type === 'Rectangle' || type === 'Circle' || type === 'Text' || type === 'Line')) {
-          matches.push({ statement: child, options });
-          return;
-        }
-      }
-    }
-    for (const value of Object.values(node)) {
-      for (const child of Array.isArray(value) ? value : [value]) {
-        if (child && typeof child === 'object' && 'type' in child) visit(child);
-      }
-    }
-  };
-  visit(ast);
-  const [match] = matches;
-  if (!match) return null;
-  return { ...match, mapping, imports };
+function findStandaloneSceneObject(source: string, sourceId: string) {
+  if (instrumentCode(source).error) return null;
+  return getStandaloneSceneObject(sourceId);
 }
 
 export function getSceneObjectDeletion(source: string, sourceId: string): Edit | null {
-  const match = findPaletteStatement(source, sourceId);
+  const match = findStandaloneSceneObject(source, sourceId);
   if (!match) return null;
   const { statement } = match;
   const lineStart = source.lastIndexOf('\n', statement.start - 1) + 1;
@@ -322,7 +359,8 @@ export function getSceneObjectDeletion(source: string, sourceId: string): Edit |
 const spriteImageExpression = (source: string) => `Object.assign(new Image(), { src: ${source} })`;
 
 export function getSpriteImageReplacement(source: string, sourceId: string, imageSource: string): Edit | null {
-  const match = findPaletteStatement(source, sourceId);
+  if (!sourceId.startsWith('DinoPlace')) return null;
+  const match = findStandaloneSceneObject(source, sourceId);
   const img = match?.mapping.properties.img;
   if (match?.mapping.type !== 'Sprite' || !img) return null;
   return { start: img.valueStart, end: img.valueEnd, newText: spriteImageExpression(imageSource) };
@@ -330,48 +368,12 @@ export function getSpriteImageReplacement(source: string, sourceId: string, imag
 
 /** Copy the constructor's static options without evaluating the game script. */
 export function getSceneObjectDuplication(source: string, sourceId: string, x: number, y: number) {
-  const match = findPaletteStatement(source, sourceId);
+  const match = findStandaloneSceneObject(source, sourceId);
   if (!match || !Number.isFinite(x) || !Number.isFinite(y)) return null;
-  const { statement, mapping, imports } = match;
+  const { statement, mapping } = match;
+  const { options, canDuplicate } = statement;
   const { tag, position } = mapping.properties;
-  if (!tag || position?.args?.length !== 2 || position.args.some(arg => !arg.numeric)) return null;
-
-  const readOptions = (node: any, root = false): Record<string, unknown> => {
-    if (node.type !== 'ObjectExpression') throw new Error('Expected constructor options');
-    const options = new Map<string, unknown>();
-    for (const prop of node.properties) {
-      if (prop.type !== 'Property' || prop.kind !== 'init' || prop.computed || prop.key.type !== 'Identifier' ||
-          options.has(prop.key.name) || prop.key.name === '__proto__') throw new Error('Unsupported option');
-      const key = prop.key.name;
-      if (root && mapping.type === 'Sprite' && key === 'img') {
-        options.set(key, undefined); // The copy uses the original sprite's loaded image.
-      } else {
-        options.set(key, readValue(prop.value));
-      }
-    }
-    return Object.fromEntries(options);
-  };
-  const readValue = (node: any): unknown => {
-    if (node.type === 'Literal' && ['number', 'boolean', 'string'].includes(typeof node.value)) return node.value;
-    if (node.type === 'UnaryExpression' && ['-', '+'].includes(node.operator) &&
-        node.argument.type === 'Literal' && typeof node.argument.value === 'number') {
-      return node.operator === '-' ? -node.argument.value : node.argument.value;
-    }
-    if (node.type === 'ObjectExpression') return readOptions(node);
-    if (node.type === 'NewExpression' && imports.get(node.callee.name) === 'Vector2') {
-      const [x, y] = node.arguments.map(readValue);
-      if (node.arguments.length === 2 && typeof x === 'number' && typeof y === 'number') return new Vector2(x, y);
-    }
-    throw new Error('Unsupported option value');
-  };
-
-  let options: Record<string, unknown>;
-  try {
-    options = readOptions(match.options, true);
-  } catch {
-    return null;
-  }
-  if (typeof options.tag !== 'string') return null;
+  if (!canDuplicate || typeof options?.tag !== 'string' || !tag || !position?.args) return null;
   const base = `${options.tag} copy`;
   let newTag = base;
   for (let i = 2; source.includes(newTag); i++) newTag = `${base} ${i}`;
