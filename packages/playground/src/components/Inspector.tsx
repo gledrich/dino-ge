@@ -7,7 +7,7 @@ import type { ScenePoint, SceneTransformState } from '../utils/scene-objects';
 import '../styles/inspector.css';
 
 const { Engine } = Dino;
-type Manipulation = 'drag' | 'resize';
+type Manipulation = 'drag' | 'resize' | 'rotate';
 
 interface InspectorProps {
   visible: boolean;
@@ -109,8 +109,6 @@ const Inspector: React.FC<InspectorProps> = ({ visible }) => {
   };
 
   useEffect(() => {
-    if (!visible) return;
-
     const onSelectedObjectChanged = (e: any) => {
       setSelectedObject(e.detail as InspectableObject | null);
       setPlacement(e.detail ? pendingPlacement.current.get(e.detail) : undefined);
@@ -138,6 +136,7 @@ const Inspector: React.FC<InspectorProps> = ({ visible }) => {
       const changes = new Map(pendingPlacement.current.get(object));
       if (state.position) changes.delete('drag');
       if (state.scale || state.size) changes.delete('resize');
+      if (state.rotation !== undefined) changes.delete('rotate');
       if (changes.size) pendingPlacement.current.set(object, changes);
       else pendingPlacement.current.delete(object);
       if (Engine.selectedObject === object) {
@@ -163,7 +162,7 @@ const Inspector: React.FC<InspectorProps> = ({ visible }) => {
       window.removeEventListener('playground-placement-history', onPlacementHistory);
       window.removeEventListener('playground-update-inspector', onEngineUpdate);
     };
-  }, [visible]);
+  }, []);
 
   const applyPlacement = () => {
     if (!selectedObject || !placement) return;
@@ -187,13 +186,13 @@ const Inspector: React.FC<InspectorProps> = ({ visible }) => {
     const shape = selectedObject.getComponent(Dino.ShapeComponent);
     const paths: string[] = [];
     if (placement.has('drag')) paths.push('position.x', 'position.y');
+    if (placement.has('rotate')) paths.push('rotation');
     if (placement.has('resize')) {
       if (mapping?.type === 'Sprite') paths.push('scale.x', 'scale.y');
       else if (mapping?.type === 'Circle') paths.push('radius');
       else if (mapping?.type === 'Rectangle' || mapping?.type === 'Text') paths.push('width', 'height');
     }
-    // Only replace existing numeric options. Computed values and constructors
-    // with different placement APIs should be edited directly in source.
+    // Movement and resizing require existing numeric options. An absent rotation defaults to zero.
     const valueAt = (path: string): unknown => {
       if (path === 'radius') return shape?.width;
       const resolved = resolveComponentPath(selectedObject, path);
@@ -205,22 +204,24 @@ const Inspector: React.FC<InspectorProps> = ({ visible }) => {
       const property = properties?.[option];
       const literal = axis ? property?.args?.[axis === 'x' ? 0 : 1] : property;
       const value = valueAt(path);
-      if (!literal?.numeric || typeof value !== 'number' || !Number.isFinite(value)) break;
+      if ((!literal?.numeric && !(path === 'rotation' && !property)) ||
+          typeof value !== 'number' || !Number.isFinite(value)) break;
       const edit = getSurgicalEdit(sourceId, path, Number(value.toFixed(6)), valueAt);
       if (!edit) break;
       edits.push(edit);
     }
     if (!paths.length || edits.length !== paths.length ||
         (placement.has('resize') && !['Sprite', 'Circle', 'Rectangle', 'Text'].includes(mapping?.type))) {
-      setPlacementStatus('Add explicit numeric position or size options in the script before applying this edit.');
+      setPlacementStatus('Use literal transform options in the script to apply this edit.');
       return;
     }
-    const before: SceneTransformState = { position: placement.get('drag') };
+    const before: SceneTransformState = { position: placement.get('drag'), rotation: placement.get('rotate')?.x };
     const after: SceneTransformState = {};
     if (before.position) {
       const { x, y } = selectedObject.transform.position;
       after.position = { x, y };
     }
+    if (before.rotation !== undefined) after.rotation = selectedObject.transform.rotation;
     if (placement.has('resize')) {
       if (mapping.type === 'Sprite') {
         before.scale = placement.get('resize');
@@ -237,6 +238,9 @@ const Inspector: React.FC<InspectorProps> = ({ visible }) => {
     if (!applied) {
       setPlacementStatus('The open script could not be updated.');
       return;
+    }
+    if (after.rotation !== undefined) {
+      window.dispatchEvent(new CustomEvent('playground-placement-history', { detail: { object: selectedObject, state: after } }));
     }
     pendingPlacement.current.delete(selectedObject);
     setPlacement(undefined);

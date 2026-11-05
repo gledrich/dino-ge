@@ -266,20 +266,18 @@ function App() {
             });
           }}
         >
-          {isInspectorVisible && (
-            <div className="panel-container" data-testid="inspector-panel">
-              <div 
-                className="panel-header" 
-                onClick={() => setIsInspectorVisible(false)}
-                style={{ cursor: 'pointer' }}
-              >
-                Inspector
-              </div>
-              <div className="panel-content">
-                <Inspector visible={isInspectorVisible} />
-              </div>
+          <div className="panel-container" data-testid="inspector-panel" hidden={!isInspectorVisible}>
+            <div
+              className="panel-header"
+              onClick={() => setIsInspectorVisible(false)}
+              style={{ cursor: 'pointer' }}
+            >
+              Inspector
             </div>
-          )}
+            <div className="panel-content">
+              <Inspector visible={isInspectorVisible} />
+            </div>
+          </div>
         </Panel>
       </Group>
     </div>

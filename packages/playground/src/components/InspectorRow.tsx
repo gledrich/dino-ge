@@ -204,6 +204,9 @@ const InspectorRow: React.FC<{
           },
         }));
         if (!accepted) return;
+        window.dispatchEvent(new CustomEvent('playground-placement-history', {
+          detail: { object: selectedObject, state: { rotation: val } },
+        }));
       } else {
         window.dispatchEvent(new CustomEvent('playground-apply-edit', { detail: edit }));
       }

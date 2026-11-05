@@ -81,7 +81,7 @@ new Engine({
     // Collapsing - click the header
     await inspectorHeader.click();
     
-    // It should be removed from DOM (due to conditional rendering in App.tsx)
+    // The panel is hidden while the Inspector keeps tracking scene edits.
     await expect(inspectorPanel).not.toBeVisible();
 
     // Expanding - click the expand button (new in App.tsx)

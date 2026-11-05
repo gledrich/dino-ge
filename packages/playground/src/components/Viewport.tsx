@@ -101,6 +101,9 @@ const Viewport: React.FC = () => {
       const y = Math.round(value.y * 100) / 100;
       if (kind === 'drag') {
         setManipulationReadout(`Move · ${object.transform.parent ? 'Local ' : ''}X ${x} · Y ${y}`);
+      } else if (kind === 'rotate') {
+        const degrees = Math.round(value.x * (180 / Math.PI) * 100) / 100;
+        setManipulationReadout(`Rotate · ${degrees}°`);
       } else if (object.getComponent(SpriteComponent)) {
         setManipulationReadout(`Resize · Scale X ${x} · Y ${y}`);
       } else {
@@ -485,7 +488,8 @@ const Viewport: React.FC = () => {
             </div>
             <span id="scene-keyboard-hint" className="scene-edit-hint">
               Middle drag pans · {isGridSnapping ? 'Arrows move 1 cell · Shift moves 10 cells' : 'Arrows move 1 px · Shift moves 10 px'}<br />
-              Esc cancels a move or resize
+              Drag the round handle to rotate · Hold Shift to snap to 15°<br />
+              Esc cancels the current edit
             </span>
           </>}
           {placementStatus?.error ? (

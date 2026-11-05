@@ -179,6 +179,66 @@ new Engine({
   await expect(page.locator('body')).toHaveAttribute('data-game-action', 'pressed');
 });
 
+test('rotates a scene object by its handle and saves the angle', async ({ page }) => {
+  await page.route('**/files', route => route.fulfill({ json: ['script'] }));
+  await page.route('**/api/scripts/script', route => route.fulfill({ json: `
+import { Engine, Rectangle, Vector2 } from 'dino-ge';
+new Engine({ onLoad() {
+  new Rectangle({ tag: 'Rotating platform', position: new Vector2(370, 235), width: 80, height: 40 });
+}, update() {} }, { containerId: 'playground-canvas-container' });` }));
+  await page.goto('/');
+  const object = page.getByRole('button', { name: 'Rotating platform', exact: true });
+  await expect(object).toBeVisible();
+  await page.getByRole('button', { name: 'Edit scene', exact: true }).click();
+  await object.click();
+  const canvas = page.locator('#canvas');
+  await canvas.evaluate((element: HTMLCanvasElement) => {
+    element.style.width = `${element.width}px`;
+    element.style.height = `${element.height}px`;
+  });
+  const box = (await canvas.boundingBox())!;
+  const angle = page.getByRole('spinbutton', { name: 'Rotation (°)', exact: true });
+  const readout = page.getByRole('group', { name: 'Current scene gesture' });
+  const startRotation = async () => {
+    await page.mouse.move(box.x + 410, box.y + 215);
+    await expect(canvas).toHaveCSS('cursor', 'grab');
+    await page.mouse.down();
+  };
+  await startRotation();
+  await page.mouse.move(box.x + 390, box.y + 275, { steps: 5 });
+  await expect(readout).toHaveText(/^Rotate · \d+(\.\d+)?°$/);
+  const unsnappedAngle = Number((await readout.innerText()).match(/[\d.]+/)![0]);
+  // Pointer coordinates can be rounded to CSS pixels by the browser.
+  expect(Math.abs(unsnappedAngle - 90)).toBeLessThan(3);
+  await expect(angle).toHaveValue(unsnappedAngle.toFixed(2));
+  await page.keyboard.press('Escape');
+  await expect(readout).toHaveCount(0);
+  await page.mouse.up();
+  await expect(angle).toHaveValue('0.00');
+
+  await startRotation();
+  await page.keyboard.down('Shift');
+  await page.mouse.move(box.x + 393, box.y + 273, { steps: 5 });
+  await expect(readout).toHaveText('Rotate · 90°');
+  await page.mouse.up();
+  await page.keyboard.up('Shift');
+  await expect(readout).toHaveCount(0);
+  const inspector = page.getByTestId('inspector-panel');
+  await inspector.locator('.panel-header').click();
+  await expect(inspector).toBeHidden();
+  await page.getByTestId('inspector-expand-button').click();
+  await expect(angle).toHaveValue('90.00');
+  await page.getByRole('button', { name: 'Apply placement to code' }).click();
+  await expect(page.getByRole('status').filter({ hasText: 'Applied to code' })).toBeVisible();
+  await expect.poll(() => page.evaluate(() => {
+    const { monaco } = window as typeof window & { monaco: Monaco };
+    return monaco.editor.getEditors()[0].getValue();
+  })).toContain('rotation: 1.570796');
+  await expect(page.getByRole('spinbutton', { name: 'X', exact: true })).toHaveValue('370.00');
+  await page.getByRole('button', { name: 'Undo code edit' }).click();
+  await expect(angle).toHaveValue('0.00');
+});
+
 test('keeps the canvas clear in Edit scene and restores the debug HUD for play', async ({ page }) => {
   await page.route('**/files', route => route.fulfill({ json: ['script'] }));
   await page.route('**/api/scripts/script', route => route.fulfill({ json: `
