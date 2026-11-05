@@ -2053,10 +2053,14 @@ new Engine({ onLoad() {
   await expect(group).toHaveAttribute('aria-pressed', 'true');
   await page.getByRole('button', { name: 'Reset view', exact: true }).click();
   expect(await readView()).toMatchObject({ x: 40, y: 30, zoom: 1 });
+  await page.getByRole('region', { name: 'Scene viewport' }).press('f');
+  await assertFramed(1160, 732, 1328, 980);
+  await page.getByRole('button', { name: 'Reset view', exact: true }).click();
 
   const platform = page.getByRole('button', { name: 'Tall platform', exact: true });
-  await platform.click();
-  await page.getByRole('region', { name: 'Scene viewport' }).press('f');
+  await platform.press('f');
+  await expect(platform).toHaveAttribute('aria-pressed', 'true');
+  await expect(platform).toBeFocused();
   await assertFramed(1160, 740, 1200, 980);
   await expect(platform).toHaveAccessibleDescription('');
   await expect(page.getByRole('spinbutton', { name: 'X', exact: true })).toHaveValue('20.00');

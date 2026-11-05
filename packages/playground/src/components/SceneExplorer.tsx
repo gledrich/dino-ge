@@ -1,7 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import * as Dino from 'dino-ge';
 import { usePlayground } from '../context/PlaygroundContext';
-import { nudgeSceneSelection, revealSceneObjectEvent, type CanvasPlacement } from '../utils/scene-objects';
+import { frameSceneObjectEvent, isSceneFrameShortcut, nudgeSceneSelection, revealSceneObjectEvent, type CanvasPlacement } from '../utils/scene-objects';
 import '../styles/scene-explorer.css';
 
 const { Engine } = Dino;
@@ -57,15 +57,21 @@ const SceneNode: React.FC<{ object: Dino.GameObject; depth: number; tree: SceneT
         )}
         <button type="button" className="scene-node-select" aria-pressed={isSelected}
           ref={object === tree.revealTarget ? tree.revealRow : undefined}
+          aria-keyshortcuts={editing ? 'F' : undefined}
           aria-description={pendingDescription} onClick={() => onSelect(object)}
           onKeyDown={event => {
-            if (editing && isSelected && nudgeSceneSelection(event)) {
+            if (!editing) return;
+            if (isSceneFrameShortcut(event)) {
+              event.preventDefault();
+              event.stopPropagation();
+              if (!event.repeat) window.dispatchEvent(new CustomEvent(frameSceneObjectEvent, { detail: object }));
+            } else if (isSelected && nudgeSceneSelection(event)) {
               event.preventDefault();
               event.stopPropagation();
             }
           }}>
           <i className={`fa-solid ${getIconForObject(object)} type-icon`} aria-hidden="true" />
-          <span className="node-tag">{tag}</span>
+          <span className="node-tag" title={editing ? `${tag} · F to frame` : tag}>{tag}</span>
           {pendingDescription && (
             <i className="fa-solid fa-pen scene-node-pending" title={pendingDescription} aria-hidden="true" />
           )}
@@ -239,7 +245,7 @@ const SceneExplorer: React.FC = () => {
       )}</p>
       <div className="explorer-content">
         {!matches && rootObjects.length === 0 && <div className="empty-scene">No objects in scene</div>}
-        {rootObjects.map(object => <SceneNode key={object.id} object={object} depth={0} tree={tree} />)}
+        {isExplorerVisible && rootObjects.map(object => <SceneNode key={object.id} object={object} depth={0} tree={tree} />)}
       </div>
     </div>
   );

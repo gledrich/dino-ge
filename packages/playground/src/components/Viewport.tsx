@@ -1,9 +1,9 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { Engine, Input, SpriteComponent, getViewportAlignment, snapToGrid, type ObjectManipulationPreview } from 'dino-ge';
+import { Engine, Input, SpriteComponent, getViewportAlignment, snapToGrid, type GameObject, type ObjectManipulationPreview } from 'dino-ge';
 import { usePlayground } from '../context/PlaygroundContext';
 import Toolbar from './Toolbar';
 import Logo from './Logo';
-import { getAssetSource, getDefaultSceneObjectTag, getSceneArrowMovement, getSceneAssetPreviewType, getSceneSelectionBounds, getSceneSource, getSceneSpritePlacement, getSceneSpriteScale, isReplaceableSprite, nudgeSceneSelection, sceneAssetDragEvent, sceneAssetDragType, sceneKeyboardPlacementEvent, sceneObjectDefaults, sceneObjectDragType, sceneObjectKinds, scenePointerDragEvent, type SceneImageAsset, type SceneKeyboardPlacementRequest, type SceneObjectKind, type SceneObjectPlacement, type ScenePointerDrag, type ScenePoint } from '../utils/scene-objects';
+import { frameSceneObjectEvent, getAssetSource, getDefaultSceneObjectTag, getSceneArrowMovement, getSceneAssetPreviewType, getSceneSelectionBounds, getSceneSource, getSceneSpritePlacement, getSceneSpriteScale, isReplaceableSprite, isSceneFrameShortcut, nudgeSceneSelection, sceneAssetDragEvent, sceneAssetDragType, sceneKeyboardPlacementEvent, sceneObjectDefaults, sceneObjectDragType, sceneObjectKinds, scenePointerDragEvent, type SceneImageAsset, type SceneKeyboardPlacementRequest, type SceneObjectKind, type SceneObjectPlacement, type ScenePointerDrag, type ScenePoint } from '../utils/scene-objects';
 import { getSpriteImageFileError, importSpriteImage } from '../utils/helpers';
 
 const shapePreviewDimensions: Record<SceneObjectKind, { width: number; height: number }> = {
@@ -751,14 +751,14 @@ const Viewport: React.FC = () => {
     return () => viewport.removeEventListener('wheel', wheelZoom, true);
   }, [isEditingScene, zoomView]);
 
-  const frameSelection = () => {
-    if (!selectedObject || keyboardPlacement || pan.current || dropPan.current || Input.isManipulatingObject) return;
+  const frameObject = useCallback((object: GameObject | null) => {
+    if (!isEditingScene || !object || keyboardPlacement || pan.current || dropPan.current || Input.isManipulatingObject) return;
     const canvas = viewportContainerRef.current?.querySelector<HTMLCanvasElement>('canvas#canvas');
     const view = canvas?.getBoundingClientRect();
     if (!canvas?.width || !canvas.height || !view?.height) return;
     const members = Engine.currentScene?.objects ?? Engine.objects;
-    if (!members.has(selectedObject)) return;
-    const bounds = getSceneSelectionBounds(selectedObject, members);
+    if (!members.has(object)) return;
+    const bounds = getSceneSelectionBounds(object, members);
     if (!Object.values(bounds).every(Number.isFinite)) return;
 
     const { width, height } = canvas;
@@ -779,7 +779,14 @@ const Viewport: React.FC = () => {
     setZoomPercent(Math.round(zoom * 100));
     Engine.camera.position.set(bounds.left + selectionWidth / 2 - width / (2 * zoom),
       bounds.top + selectionHeight / 2 - (top + bottom) / (2 * zoom));
-  };
+    Engine.selectedObject = object;
+  }, [isEditingScene, keyboardPlacement, rememberCamera]);
+
+  useEffect(() => {
+    const onFrameObject = (event: Event) => frameObject((event as CustomEvent<GameObject>).detail);
+    window.addEventListener(frameSceneObjectEvent, onFrameObject);
+    return () => window.removeEventListener(frameSceneObjectEvent, onFrameObject);
+  }, [frameObject]);
 
   const suppressGameActivation = (event: React.MouseEvent | React.KeyboardEvent) => {
     if (!isEditingScene || !(event.target instanceof HTMLCanvasElement)) return;
@@ -952,12 +959,12 @@ const Viewport: React.FC = () => {
             }
             const isHistoryShortcut = !event.altKey && (event.ctrlKey || event.metaKey) &&
               (key === 'z' || (key === 'y' && event.ctrlKey && !event.metaKey && !event.shiftKey));
-            const isFrameShortcut = key === 'f' && !event.ctrlKey && !event.metaKey && !event.altKey && !event.shiftKey;
+            const isFrameShortcut = isSceneFrameShortcut(event);
             if (isHistoryShortcut || isFrameShortcut || nudgeSceneSelection(event)) {
               event.preventDefault();
               event.stopPropagation();
               if (isHistoryShortcut && !event.repeat) changeSceneHistory(event.shiftKey || key === 'y' ? 'redo' : 'undo');
-              if (isFrameShortcut && !event.repeat) frameSelection();
+              if (isFrameShortcut && !event.repeat) frameObject(selectedObject);
               return;
             }
           }
@@ -1009,7 +1016,7 @@ const Viewport: React.FC = () => {
                 onClick={restoreCamera}><i className="fa-solid fa-arrows-rotate" aria-hidden="true" /></button>
               <button type="button" className="scene-control" aria-label="Frame selection" title="Frame selected object or group (F)"
                 aria-keyshortcuts="F" disabled={!selectedObject || !!keyboardPlacement || !!manipulationReadout}
-                onClick={frameSelection}>Frame</button>
+                onClick={() => frameObject(selectedObject)}>Frame</button>
               <button type="button" className="scene-control" aria-label="Snap to grid"
                 aria-pressed={isGridSnapping} title={`Snap moves, resizes and drops to the ${sceneGridSize} px grid`}
                 onClick={() => setSnapMode(mode => mode === 'grid' ? 'off' : 'grid')}>Grid snap</button>

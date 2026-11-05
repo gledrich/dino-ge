@@ -8,6 +8,7 @@ export const sceneKeyboardPlacementEvent = 'playground-position-scene-item';
 export const sceneObjectCodeEvent = 'playground-insert-scene-object-code';
 export const openEntryObjectSourceEvent = 'playground-open-entry-object-source';
 export const revealSceneObjectEvent = 'playground-reveal-scene-object';
+export const frameSceneObjectEvent = 'playground-frame-scene-object';
 export const renameEntryObjectEvent = 'playground-rename-entry-object';
 export const sceneObjectTagHistoryEvent = 'playground-object-tag-history';
 export interface EntryObjectRename { object: Dino.GameObject; tag: string; previousTag: string; error?: string }
@@ -111,9 +112,13 @@ function gridNudge(coordinate: number, steps: number, cellSize: number): number 
   return (boundary + steps) * cellSize - coordinate;
 }
 
-type SceneArrowEvent = Pick<KeyboardEvent, 'key' | 'shiftKey' | 'altKey' | 'ctrlKey' | 'metaKey'>;
+type SceneKeyEvent = Pick<KeyboardEvent, 'key' | 'shiftKey' | 'altKey' | 'ctrlKey' | 'metaKey'>;
 
-export function getSceneArrowMovement(event: SceneArrowEvent): ScenePoint | undefined {
+export function isSceneFrameShortcut(event: SceneKeyEvent) {
+  return event.key.toLowerCase() === 'f' && !event.ctrlKey && !event.metaKey && !event.altKey && !event.shiftKey;
+}
+
+export function getSceneArrowMovement(event: SceneKeyEvent): ScenePoint | undefined {
   const { key, shiftKey, altKey, ctrlKey, metaKey } = event;
   if (altKey || ctrlKey || metaKey) return;
   const step = shiftKey ? 10 : 1;
@@ -126,7 +131,7 @@ export function getSceneArrowMovement(event: SceneArrowEvent): ScenePoint | unde
 }
 
 /** Move the selection in viewport axes while retaining its local transform. */
-export function nudgeSceneSelection(event: SceneArrowEvent): boolean {
+export function nudgeSceneSelection(event: SceneKeyEvent): boolean {
   const movement = getSceneArrowMovement(event);
   if (!movement) return false;
   if (Dino.Input.isManipulatingObject) return true;
