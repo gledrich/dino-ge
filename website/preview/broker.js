@@ -1,9 +1,14 @@
-const editorOrigin = document.referrer ? new URL(document.referrer).origin : null;
 const allowedOrigin = document.querySelector('meta[name="dino-editor-origin"]')?.content;
 
-if (editorOrigin && allowedOrigin && editorOrigin !== allowedOrigin && parent !== window) {
-  parent.postMessage({ type: "preview-denied" }, editorOrigin);
-} else if (editorOrigin && parent !== window) {
+async function connect(event) {
+  if (parent === window || event.source !== parent || event.data?.type !== "preview-connect") return;
+  const editorOrigin = event.origin;
+  if (!/^https?:\/\//.test(editorOrigin)) return;
+  if (allowedOrigin && editorOrigin !== allowedOrigin) {
+    parent.postMessage({ type: "preview-denied" }, editorOrigin);
+    return;
+  }
+  window.removeEventListener("message", connect);
   parent.postMessage({ type: "preview-broker-loaded" }, editorOrigin);
   try {
     await navigator.serviceWorker.register("./worker.js");
@@ -18,3 +23,5 @@ if (editorOrigin && allowedOrigin && editorOrigin !== allowedOrigin && parent !=
     parent.postMessage({ type: "preview-error", message: error instanceof Error ? error.message : String(error) }, editorOrigin);
   }
 }
+
+window.addEventListener("message", connect);

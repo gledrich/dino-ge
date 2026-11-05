@@ -103,6 +103,9 @@ try {
         clearTimeout(timeout);
         resolve(event.data?.type);
       });
+      iframe.addEventListener('load', () => {
+        iframe.contentWindow.postMessage({ type: 'preview-connect' }, origin);
+      });
       iframe.src = href;
       document.body.append(iframe);
     }), { href: broker.href, origin: broker.origin });

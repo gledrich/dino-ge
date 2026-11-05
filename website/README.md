@@ -20,6 +20,8 @@ If those ports are in use, set `DINO_SITE_PORT` and `DINO_PREVIEW_PORT` when sta
 
 The first visit opens an editable copy of Amber Ruins. Saves and imported files stay in the current browser. Use **Export saved project** to download a backup or **Restore backup** to bring it into another browser. Pause the game before editing an object in the Inspector. Inspector changes apply to the current run, and saved code is used on the next run.
 
+On iPhone, open the Playground in Safari. If a link opens in an app's built-in browser and the preview times out, use **Open in Safari**. The standalone game link is also available if you only want to play Amber Ruins.
+
 ## Static hosting layout
 
 Set `VITE_DINO_PREVIEW_URL` to the HTTPS address of `/broker.html` on the preview origin when building. Serve `website/dist/site` and `website/dist/preview` at the roots of two distinct origins. Keep the preview origin dedicated to game previews and configure your host to serve directory indexes for `/docs/` and `/playground/`. Preserve the paths to the engine modules and service worker. Both outputs come from the same build.

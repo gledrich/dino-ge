@@ -67,8 +67,11 @@ export function startBrowserPreview(
   const broker = document.createElement('iframe');
   broker.hidden = true;
   broker.title = 'Prepare game preview';
-  broker.referrerPolicy = 'origin';
+  broker.referrerPolicy = 'no-referrer';
   broker.src = brokerUrl.href;
+  broker.addEventListener('load', () => {
+    broker.contentWindow?.postMessage({ type: 'preview-connect' }, origin);
+  });
 
   const channel = new MessageChannel();
   let frame: HTMLIFrameElement | undefined;
