@@ -1247,6 +1247,69 @@ new Engine({ onLoad() {
   await expect.poll(source).toContain('radius: 24');
 });
 
+test('resizes a rotated sprite proportionally and switches modes without pointer movement', async ({ page }) => {
+  await page.route('**/files', route => route.fulfill({ json: ['script'] }));
+  await page.route('**/api/scripts/script', route => route.fulfill({ json: `
+import { Engine, Loader, Sprite, Vector2 } from 'dino-ge';
+new Engine({ async onLoad() {
+  Loader.queueImage('banner', '/banner.svg');
+  await Loader.loadAll();
+  new Sprite({ tag: 'Banner', img: 'banner', rows: 1, cols: 1,
+    position: new Vector2(448, 192), scale: new Vector2(1.2, 0.8), rotation: Math.PI / 2 }).play();
+}, update() {} }, { containerId: 'playground-canvas-container' });` }));
+  await page.route('**/banner.svg', route => route.fulfill({
+    contentType: 'image/svg+xml',
+    body: '<svg xmlns="http://www.w3.org/2000/svg" width="80" height="40"><rect width="80" height="40" fill="orange"/></svg>',
+  }));
+  await page.goto('/');
+  const banner = page.getByRole('button', { name: 'Banner', exact: true });
+  await expect(banner).toBeVisible();
+  await page.getByRole('button', { name: 'Edit scene', exact: true }).click();
+  await page.getByRole('button', { name: 'Snap to grid' }).click();
+  await banner.click();
+  const canvas = page.locator('#canvas');
+  const box = (await canvas.boundingBox())!;
+  const size = await canvas.evaluate((element: HTMLCanvasElement) => ({ width: element.width, height: element.height }));
+  const move = (x: number, y: number) => page.mouse.move(
+    box.x + x * box.width / size.width, box.y + y * box.height / size.height,
+  );
+  const readout = page.getByRole('group', { name: 'Current scene gesture' });
+  const scaleX = page.getByRole('spinbutton', { name: 'Scale X', exact: true });
+  const scaleY = page.getByRole('spinbutton', { name: 'Scale Y', exact: true });
+  const drag = async () => {
+    await move(416, 288);
+    await expect(canvas).toHaveCSS('cursor', 'se-resize');
+    await page.mouse.down();
+    await move(402, 345);
+    await expect(readout).toHaveText('Resize · Scale X 2 · Y 1.2');
+  };
+  await drag();
+  await page.keyboard.down('Shift');
+  await expect(readout).toHaveText('Resize proportionally · Scale X 1.9 · Y 1.26');
+  await page.keyboard.up('Shift');
+  await expect(readout).toHaveText('Resize · Scale X 2 · Y 1.2');
+  await page.keyboard.press('Escape');
+  await page.mouse.up();
+  await expect(scaleX).toHaveValue('1.20');
+  await expect(scaleY).toHaveValue('0.80');
+
+  await drag();
+  await page.keyboard.down('Shift');
+  await expect(readout).toHaveText('Resize proportionally · Scale X 1.9 · Y 1.26');
+  await page.mouse.up();
+  await page.keyboard.up('Shift');
+  await page.getByRole('button', { name: 'Apply placement to code' }).click();
+  await expect.poll(() => page.evaluate(() => {
+    const { monaco } = window as typeof window & { monaco: Monaco };
+    return monaco.editor.getEditors()[0].getValue();
+  })).toContain('scale: new Vector2(1.897367, 1.264911)');
+  await expect(page.getByRole('spinbutton', { name: 'X', exact: true })).toHaveValue('448.00');
+  await expect(page.getByRole('spinbutton', { name: 'Y', exact: true })).toHaveValue('192.00');
+  await page.getByRole('button', { name: 'Undo code edit' }).click();
+  await expect(scaleX).toHaveValue('1.20');
+  await expect(scaleY).toHaveValue('0.80');
+});
+
 test('edits circle radius in the Inspector and undoes it in code and the live scene', async ({ page }) => {
   await page.route('**/files', route => route.fulfill({ json: ['script'] }));
   await page.route('**/api/scripts/script', route => route.fulfill({ json: `

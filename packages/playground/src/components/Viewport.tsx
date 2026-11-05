@@ -127,7 +127,8 @@ const Viewport: React.FC = () => {
         clear();
         return;
       }
-      const { object, kind, value } = detail;
+      const { object, kind, value, proportional } = detail;
+      const resizeLabel = proportional ? 'Resize proportionally' : 'Resize';
       const x = Math.round(value.x * 100) / 100;
       const y = Math.round(value.y * 100) / 100;
       if (kind === 'drag') {
@@ -138,9 +139,9 @@ const Viewport: React.FC = () => {
       } else if (kind === 'p1' || kind === 'p2') {
         setManipulationReadout(`Line ${kind === 'p1' ? 'start' : 'end'} · Local X ${x} · Y ${y}`);
       } else if (object.getComponent(SpriteComponent)) {
-        setManipulationReadout(`Resize · Scale X ${x} · Y ${y}`);
+        setManipulationReadout(`${resizeLabel} · Scale X ${x} · Y ${y}`);
       } else {
-        setManipulationReadout(`Resize · W ${x} · H ${y}`);
+        setManipulationReadout(`${resizeLabel} · W ${x} · H ${y}`);
       }
     };
     Engine.on('objectManipulationPreview', update);
@@ -643,6 +644,7 @@ const Viewport: React.FC = () => {
             {!keyboardPlacement && <span id="scene-keyboard-hint" className="scene-edit-hint">
               Middle drag pans · {isGridSnapping ? 'Arrows move 1 cell · Shift moves 10 cells' : 'Arrows move 1 px · Shift moves 10 px'}<br />
               Drag the round handle to rotate · Hold Shift to snap to 15°<br />
+              Hold Shift while resizing to keep proportions<br />
               Esc cancels the current edit
             </span>}
             {!isInspectorVisible && selectedObject && pendingCanvasPlacements.has(selectedObject) && (

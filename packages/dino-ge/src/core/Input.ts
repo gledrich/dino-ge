@@ -13,6 +13,8 @@ export interface ObjectManipulationPreview {
   object: GameObject;
   kind: 'drag' | 'resize' | 'rotate' | 'p1' | 'p2';
   value: Vector2;
+  /** True while resizing along the object's starting diagonal. */
+  proportional?: true;
 }
 
 type ObjectGesture = {
@@ -21,8 +23,10 @@ type ObjectGesture = {
   pointer?: { id: number; canvas: HTMLCanvasElement };
   initial?: Vector2;
   previewValue?: Vector2;
+  previewProportional?: boolean;
 } & (
-  | { kind: 'drag' | 'resize'; offset: Vector2; initialBounds?: Vector2 }
+  | { kind: 'drag'; offset: Vector2 }
+  | { kind: 'resize'; offset: Vector2; initialBounds?: Vector2; initialWorldSize: Vector2 }
   | { kind: 'rotate'; pointerAngle: number; rotation: number }
   | { kind: 'p1' | 'p2'; object: Line; offset: Vector2 }
 );
@@ -78,14 +82,18 @@ export default class Input {
     }
   }
 
-  private static publishPreview(gesture: ObjectGesture) {
+  private static publishPreview(gesture: ObjectGesture, proportional = false) {
     const previous = gesture.previewValue ?? gesture.initial;
     if (!previous) return;
     const { object, kind } = gesture;
     const value = this.getGestureValue(object, kind);
-    if (value.x === previous.x && value.y === previous.y) return;
+    if (value.x === previous.x && value.y === previous.y &&
+        proportional === (gesture.previewProportional ?? false)) return;
     gesture.previewValue = value;
-    Engine.emit('objectManipulationPreview', { object, kind, value: value.clone() } satisfies ObjectManipulationPreview);
+    gesture.previewProportional = proportional;
+    Engine.emit('objectManipulationPreview', {
+      object, kind, value: value.clone(), ...(proportional ? { proportional: true } : {}),
+    } satisfies ObjectManipulationPreview);
   }
 
   private static updateMousePosition(event: MouseEvent, canvas: HTMLCanvasElement | null) {
@@ -145,6 +153,65 @@ export default class Input {
       Math.abs(x - endpoint.x) <= tolerance && Math.abs(y - endpoint.y) <= tolerance);
   }
 
+  private static resizeGesture(gesture: Extract<ObjectGesture, { kind: 'resize' }>, shiftKey: boolean) {
+    const obj = gesture.object;
+    const geometry = getViewportGeometry(obj);
+    const sprite = obj.getComponent(SpriteComponent);
+    const resizesSprite = sprite && sprite.frameWidth > 0 && sprite.frameHeight > 0;
+    const shape = resizesSprite ? undefined : obj.getComponent(ShapeComponent);
+    const isCircle = shape?.type === 'circle';
+    const proportional = shiftKey && !isCircle;
+    const step = Engine.debugPositionGridSize;
+    const x = this.mouseX - gesture.offset.x;
+    const y = this.mouseY - gesture.offset.y;
+    const snapCorner = !isCircle && !proportional;
+    const pointer = projectOntoObjectAxes(geometry, snapCorner ? snapToGrid(x, step) : x,
+      snapCorner ? snapToGrid(y, step) : y);
+    const signX = Math.sign(geometry.scaleX);
+    const signY = Math.sign(geometry.scaleY);
+    let width = pointer.x * signX;
+    let height = pointer.y * signY;
+    if (proportional) {
+      const { x: initialWidth, y: initialHeight } = gesture.initialWorldSize;
+      const diagonal = Math.hypot(initialWidth, initialHeight);
+      const directionX = initialWidth / diagonal;
+      const directionY = initialHeight / diagonal;
+      const minDistance = 5 / Math.min(directionX, directionY);
+      const minimum = step > 0 ? Math.ceil(minDistance / step) * step : minDistance;
+      // Project onto the original diagonal before snapping, so both axes keep the same factor.
+      const distance = Math.max(minimum, snapToGrid(width * directionX + height * directionY, step));
+      width = distance * directionX;
+      height = distance * directionY;
+    } else {
+      // A circle has one resize axis, so snap its diameter instead of its corner.
+      const minWidth = isCircle && step > 0 ? Math.ceil(5 / step) * step : 5;
+      width = Math.max(minWidth, isCircle ? snapToGrid(width, step) : width);
+      height = Math.max(5, height);
+    }
+
+    if (resizesSprite) {
+      const parentScale = obj.transform.parent?.worldScale;
+      const parentX = parentScale?.x ?? 1;
+      const parentY = parentScale?.y ?? 1;
+      if (signX && parentX) obj.transform.scale.x = width * signX / (sprite.frameWidth * parentX);
+      if (signY && parentY) obj.transform.scale.y = height * signY / (sprite.frameHeight * parentY);
+    } else if (signX && signY) {
+      const localWidth = width / Math.abs(geometry.scaleX);
+      const localHeight = height / Math.abs(geometry.scaleY);
+
+      if (isCircle) {
+        shape.width = localWidth / 2;
+      } else {
+        const size = shape ?? obj.getComponent(TextComponent) ?? obj.bounds;
+        if (size) {
+          size.width = localWidth;
+          size.height = localHeight;
+        }
+      }
+    }
+    this.publishPreview(gesture, proportional);
+  }
+
   /**
    * initialises input event listeners.
    */
@@ -199,46 +266,7 @@ export default class Input {
       }
 
       if (gesture?.kind === 'resize') {
-        const obj = gesture.object;
-        const geometry = getViewportGeometry(obj);
-        const sprite = obj.getComponent(SpriteComponent);
-        const resizesSprite = sprite && sprite.frameWidth > 0 && sprite.frameHeight > 0;
-        const shape = resizesSprite ? undefined : obj.getComponent(ShapeComponent);
-        const isCircle = shape?.type === 'circle';
-        const step = Engine.debugPositionGridSize;
-        const x = this.mouseX - gesture.offset.x;
-        const y = this.mouseY - gesture.offset.y;
-        // A circle has one resize axis. Snap its diameter, since its corner
-        // cannot independently follow both coordinates of a world grid point.
-        const pointer = projectOntoObjectAxes(geometry, isCircle ? x : snapToGrid(x, step),
-          isCircle ? y : snapToGrid(y, step));
-        const signX = Math.sign(geometry.scaleX);
-        const signY = Math.sign(geometry.scaleY);
-        const minWidth = isCircle && step > 0 ? Math.ceil(5 / step) * step : 5;
-        const width = Math.max(minWidth, isCircle ? snapToGrid(pointer.x * signX, step) : pointer.x * signX);
-        const height = Math.max(5, pointer.y * signY);
-
-        if (resizesSprite) {
-          const parentScale = obj.transform.parent?.worldScale;
-          const parentX = parentScale?.x ?? 1;
-          const parentY = parentScale?.y ?? 1;
-          if (signX && parentX) obj.transform.scale.x = width * signX / (sprite.frameWidth * parentX);
-          if (signY && parentY) obj.transform.scale.y = height * signY / (sprite.frameHeight * parentY);
-        } else if (signX && signY) {
-          const localWidth = width / Math.abs(geometry.scaleX);
-          const localHeight = height / Math.abs(geometry.scaleY);
-
-          if (isCircle) {
-            shape.width = localWidth / 2;
-          } else {
-            const size = shape ?? obj.getComponent(TextComponent) ?? obj.bounds;
-            if (size) {
-              size.width = localWidth;
-              size.height = localHeight;
-            }
-          }
-        }
-        this.publishPreview(gesture);
+        this.resizeGesture(gesture, event.shiftKey);
         return;
       }
 
@@ -341,6 +369,7 @@ export default class Input {
             offset: new Vector2(worldPos.x - handle.cornerX, worldPos.y - handle.cornerY),
             initial: this.getGestureValue(selected, 'resize'),
             initialBounds: selected.bounds && new Vector2(selected.bounds.width, selected.bounds.height),
+            initialWorldSize: new Vector2(Math.abs(handle.width), Math.abs(handle.height)),
           };
           return;
         }
@@ -417,7 +446,15 @@ export default class Input {
       if (this.gesture?.pointer?.id === event.pointerId) this.finishGesture();
     });
 
+    const updateResizeModifier = (event: KeyboardEvent) => {
+      const gesture = this.gesture;
+      if (event.key === 'Shift' && gesture?.kind === 'resize' && gesture.previewValue && this.isGestureActive(gesture)) {
+        this.resizeGesture(gesture, event.shiftKey);
+      }
+    };
+
     document.addEventListener('keydown', (event: KeyboardEvent) => {
+      updateResizeModifier(event);
       const target = event.target as HTMLElement;
       if (
         target && (
@@ -450,6 +487,7 @@ export default class Input {
     });
 
     document.addEventListener('keyup', (event: KeyboardEvent) => {
+      updateResizeModifier(event);
       this.keys.delete(String(event.key).toLowerCase());
     });
 
