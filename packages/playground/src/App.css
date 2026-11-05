@@ -122,6 +122,13 @@
   background: #43aa8b26;
 }
 
+.scene-drop-line {
+  position: absolute;
+  transform: translateY(-50%);
+  background: var(--accent-primary);
+  box-shadow: 0 0 0 1px var(--bg-primary);
+}
+
 .scene-drop-image {
   display: block;
   width: 100%;

@@ -46,7 +46,7 @@ const snippets: Snippet[] = [
   endCol: 4,
   zIndex: 5
 });` },
-  { icon: 'fa-minus', label: 'Line', code: `new Line({
+  { icon: 'fa-minus', label: 'Line', kind: 'Line', code: `new Line({
   tag: 'lineObj',
   width: 2,
   p1: new Vector2(0, 0),

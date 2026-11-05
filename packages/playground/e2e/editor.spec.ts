@@ -410,6 +410,59 @@ new Engine({ onLoad() {
   await expect.poll(readCamera).toEqual({ x: 40, y: 30, zoom: 1 });
 });
 
+test('places a line at the preview anchor, moves it by the stroke and saves its position', async ({ page }) => {
+  let source = `import { Engine } from 'dino-ge';
+new Engine({ onLoad() {}, update() {} }, { containerId: 'playground-canvas-container' });`;
+  await page.route('**/files', route => route.fulfill({ json: ['script'] }));
+  await page.route('**/api/scripts/script', route => {
+    if (route.request().method() === 'PUT') {
+      source = route.request().postDataJSON().data;
+      return route.fulfill({ json: { success: true } });
+    }
+    return route.fulfill({ json: source });
+  });
+  await page.goto('/');
+  const canvas = page.locator('#canvas');
+  await expect(canvas).toBeVisible();
+  await expect(page.locator('.monaco-editor')).toContainText('new Engine');
+  const box = (await canvas.boundingBox())!;
+  const add = page.getByRole('button', { name: 'Add line', exact: true });
+  const transfer = await page.evaluateHandle(() => new DataTransfer());
+  await add.dispatchEvent('dragstart', { dataTransfer: transfer });
+  await canvas.dispatchEvent('dragover', { dataTransfer: transfer, clientX: box.x + 220, clientY: box.y + 175 });
+  await expect(page.locator('.scene-drop-preview')).toContainText('Line · X 220 · Y 175');
+  await expect(page.locator('.scene-drop-line')).toBeVisible();
+  await add.dragTo(canvas, { targetPosition: { x: 220, y: 175 } });
+
+  const line = page.getByRole('button', { name: 'New line', exact: true });
+  const x = page.getByRole('spinbutton', { name: 'X', exact: true });
+  const y = page.getByRole('spinbutton', { name: 'Y', exact: true });
+  await expect(line).toHaveAttribute('aria-pressed', 'true');
+  await expect(x).toHaveValue('220.00');
+  await expect(y).toHaveValue('175.00');
+  await expect(page.locator('.scene-drop-preview')).toHaveCount(0);
+  await page.mouse.click(box.x + 250, box.y + 200);
+  await expect(line).toHaveAttribute('aria-pressed', 'false');
+  await page.mouse.move(box.x + 250, box.y + 175);
+  await page.mouse.down();
+  await page.mouse.move(box.x + 270, box.y + 205, { steps: 4 });
+  await page.mouse.up();
+  await expect.poll(async () => Number(await x.inputValue())).toBeCloseTo(240, 0);
+  await expect.poll(async () => Number(await y.inputValue())).toBeCloseTo(205, 0);
+  const [movedX, movedY] = await Promise.all([x.inputValue(), y.inputValue()]);
+  await page.getByRole('button', { name: 'Apply placement to code' }).click();
+  await expect(page.getByRole('status').filter({ hasText: 'Applied to code' })).toBeVisible();
+
+  const saved = page.waitForResponse(response => response.request().method() === 'PUT' &&
+    response.url().endsWith('/api/scripts/script'));
+  await page.getByRole('button', { name: 'Save script', exact: true }).click();
+  await saved;
+  await page.reload();
+  await line.click();
+  await expect(x).toHaveValue(movedX);
+  await expect(y).toHaveValue(movedY);
+});
+
 test('explains a rejected palette drop without pausing the game or changing the script', async ({ page }) => {
   const source = `import { Engine } from 'dino-ge';
 function setup() {}

@@ -5,6 +5,12 @@ import Toolbar from './Toolbar';
 import Logo from './Logo';
 import { getAssetSource, getSceneAssetPreviewType, getSceneSource, getSceneSpriteScale, nudgeSceneSelection, sceneAssetDragType, sceneObjectDefaults, sceneObjectDragType, sceneObjectKinds, type SceneObjectKind, type SceneObjectPlacement } from '../utils/scene-objects';
 
+const shapePreviewDimensions: Partial<Record<SceneObjectKind, { width: number; height: number }>> = {
+  Rectangle: sceneObjectDefaults.Rectangle,
+  Circle: { width: sceneObjectDefaults.Circle.radius * 2, height: sceneObjectDefaults.Circle.radius * 2 },
+  Line: { width: sceneObjectDefaults.Line.length, height: sceneObjectDefaults.Line.strokeWidth },
+};
+
 function getCanvasPlacement(canvas: HTMLCanvasElement, clientX?: number, clientY?: number) {
   const bounds = canvas.getBoundingClientRect();
   const { zoom, position } = Engine.camera;
@@ -269,8 +275,7 @@ const Viewport: React.FC = () => {
           const kind = sceneObjectKinds.find(item => types.includes(`${sceneObjectDragType}-${item.toLowerCase()}`));
           const asset = types.includes(sceneAssetDragType)
             ? Loader.getLoadedAssets().find(item => types.includes(getSceneAssetPreviewType(item.tag))) : undefined;
-          const dimensions = kind === 'Rectangle' ? sceneObjectDefaults.Rectangle : kind === 'Circle'
-            ? { width: sceneObjectDefaults.Circle.radius * 2, height: sceneObjectDefaults.Circle.radius * 2 } : undefined;
+          const dimensions = kind && shapePreviewDimensions[kind];
           const spriteScale = asset ? getSceneSpriteScale(asset.image) : 1;
           const width = asset ? asset.image.naturalWidth * spriteScale : dimensions?.width;
           const height = asset ? asset.image.naturalHeight * spriteScale : dimensions?.height;
@@ -340,7 +345,7 @@ const Viewport: React.FC = () => {
         </div>
       )}
       {dropGuide && <div className="scene-drop-preview" aria-hidden="true">
-        {dropGuide.width && dropGuide.height && <div className="scene-drop-outline" style={{
+        {dropGuide.width && dropGuide.height && <div className={dropGuide.kind === 'Line' ? 'scene-drop-line' : 'scene-drop-outline'} style={{
           left: dropGuide.left, top: dropGuide.top, width: dropGuide.width, height: dropGuide.height,
           borderRadius: dropGuide.kind === 'Circle' ? '50%' : undefined,
         }}>{dropGuide.asset && <img className="scene-drop-image" src={dropGuide.asset.src} alt="" />}</div>}

@@ -336,6 +336,7 @@ const Inspector: React.FC<InspectorProps> = ({ visible }) => {
               <div className="no-selection">Click an object to inspect.</div>
             ) : (
               Object.entries(SECTIONS).map(([sectionName, config]) => {
+                if (sectionName === 'Bounds' && selectedObject.hasComponent(Dino.LineComponent)) return null;
                 if (config.component && !selectedObject.hasComponent(config.component)) {
                   return null;
                 }

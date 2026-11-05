@@ -1,6 +1,6 @@
 import * as Dino from 'dino-ge';
 
-export const sceneObjectKinds = ['Rectangle', 'Circle', 'Text'] as const;
+export const sceneObjectKinds = ['Rectangle', 'Circle', 'Text', 'Line'] as const;
 export type SceneObjectKind = typeof sceneObjectKinds[number];
 export const sceneObjectDragType = 'application/x-dino-scene-object';
 export const sceneAssetDragType = 'application/x-dino-scene-asset';
@@ -89,6 +89,7 @@ export const sceneObjectDefaults = {
   Rectangle: { width: 80, height: 48, colour: '#54d6ad' },
   Circle: { radius: 28, colour: '#ffd166' },
   Text: { text: 'New text', colour: '#f4f5f7' },
+  Line: { length: 96, strokeWidth: 4 },
 };
 
 interface PlacementOptions {
@@ -134,6 +135,10 @@ export function createSceneObject(placement: SceneObjectPlacement) {
     case 'Rectangle': return new Dino.Rectangle({ ...options, ...sceneObjectDefaults.Rectangle });
     case 'Circle': return new Dino.Circle({ ...options, ...sceneObjectDefaults.Circle });
     case 'Text': return new Dino.Text({ ...options, ...sceneObjectDefaults.Text });
+    case 'Line': return new Dino.Line({
+      ...options, p1: new Dino.Vector2(0, 0), p2: new Dino.Vector2(sceneObjectDefaults.Line.length, 0),
+      width: sceneObjectDefaults.Line.strokeWidth, visible: true,
+    });
     case 'Sprite': {
       const sprite = new Dino.Sprite({
         ...options, img: placement.asset.image, rows: 1, cols: 1,
@@ -152,6 +157,7 @@ export function duplicateSceneObject(original: Dino.GameObject, type: string, op
     case 'Rectangle': return new Dino.Rectangle(props as ConstructorParameters<typeof Dino.Rectangle>[0]);
     case 'Circle': return new Dino.Circle(props as ConstructorParameters<typeof Dino.Circle>[0]);
     case 'Text': return new Dino.Text(props as ConstructorParameters<typeof Dino.Text>[0]);
+    case 'Line': return new Dino.Line(props as ConstructorParameters<typeof Dino.Line>[0]);
     case 'Sprite': {
       const img = original.getComponent(Dino.SpriteComponent)?.img;
       if (!img) return;

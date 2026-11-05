@@ -278,7 +278,7 @@ function findPaletteStatement(source: string, sourceId: string) {
         const type = imports.get(constructor.callee.name);
         const options = constructor.arguments[0];
         if (options?.type === 'ObjectExpression' &&
-            (isPlay ? type === 'Sprite' : type === 'Rectangle' || type === 'Circle' || type === 'Text')) {
+            (isPlay ? type === 'Sprite' : type === 'Rectangle' || type === 'Circle' || type === 'Text' || type === 'Line')) {
           matches.push({ statement: child, options });
           return;
         }
@@ -461,7 +461,9 @@ export function getSceneObjectCreation(source: string, placement: SceneObjectPla
   for (let i = 2; source.includes(tag); i++) tag = `${placement.tag} ${i}`;
   const options = placement.kind === 'Sprite'
     ? `img: Object.assign(new Image(), { src: ${placement.asset.source} }), rows: 1, cols: 1, scale: new ${vector}(${placement.asset.scale}, ${placement.asset.scale})`
-    : Object.entries(sceneObjectDefaults[placement.kind])
+    : placement.kind === 'Line'
+      ? `p1: new ${vector}(0, 0), p2: new ${vector}(${sceneObjectDefaults.Line.length}, 0), width: ${sceneObjectDefaults.Line.strokeWidth}, visible: true`
+      : Object.entries(sceneObjectDefaults[placement.kind])
       .map(([key, value]) => `${key}: ${JSON.stringify(value)}`).join(', ');
   const registration = placement.kind === 'Sprite' ? '.play()' : '';
   const statement = `new ${constructor}({ tag: ${JSON.stringify(tag)}, position: new ${vector}(${placement.x}, ${placement.y}), ${options} })${registration};`;
