@@ -81,9 +81,14 @@ function App() {
   };
 
   const collapseDock = (id: DockId | 'mobile') => {
+    const previousFocus = document.activeElement;
     if (id === 'mobile') setBottomOpen(false);
     else setDockCollapsed(id, true);
-    requestAnimationFrame(() => document.getElementById(`playground-expand-${id}-dock`)?.focus());
+    requestAnimationFrame(() => {
+      if (document.activeElement === previousFocus || document.activeElement === document.body) {
+        document.getElementById(`playground-expand-${id}-dock`)?.focus();
+      }
+    });
   };
 
   const expandDock = (id: DockId | 'mobile') => {
