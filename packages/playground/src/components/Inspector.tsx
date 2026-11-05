@@ -46,6 +46,12 @@ const SECTIONS: Record<string, { rows: PropertyRowDef[], component: any, descrip
       { label: 'Height', type: 'number', propertyPath: 'height' }
     ]
   },
+  Circle: {
+    component: Dino.ShapeComponent,
+    rows: [
+      { label: 'Radius', type: 'number', propertyPath: 'radius', min: Number.MIN_VALUE },
+    ]
+  },
   Line: {
     component: Dino.LineComponent,
     description: 'Drag the square handles in Edit scene. The coordinates below are relative to the line’s origin.',
@@ -76,7 +82,8 @@ const SECTIONS: Record<string, { rows: PropertyRowDef[], component: any, descrip
 const getInspectorSections = (object: InspectableObject) => Object.entries(SECTIONS)
   .filter(([name, { component }]) => {
     if (name === 'Line') return object instanceof Dino.Line && object.hasComponent(component);
-    if (name === 'Bounds' && object.hasComponent(Dino.LineComponent)) return false;
+    if (name === 'Circle') return object instanceof Dino.Circle && object.hasComponent(component);
+    if (name === 'Bounds' && (object instanceof Dino.Circle || object.hasComponent(Dino.LineComponent))) return false;
     return object.hasComponent(component);
   });
 

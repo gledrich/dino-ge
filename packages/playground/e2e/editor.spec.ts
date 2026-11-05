@@ -1247,6 +1247,44 @@ new Engine({ onLoad() {
   await expect.poll(source).toContain('radius: 24');
 });
 
+test('edits circle radius in the Inspector and undoes it in code and the live scene', async ({ page }) => {
+  await page.route('**/files', route => route.fulfill({ json: ['script'] }));
+  await page.route('**/api/scripts/script', route => route.fulfill({ json: `
+import { Engine, Circle, Vector2 } from 'dino-ge';
+new Engine({ onLoad() {
+  new Circle({ tag: 'Orb', position: new Vector2(350, 220), radius: 24 });
+}, update() {} }, { containerId: 'playground-canvas-container' });` }));
+  await page.goto('/');
+  const orb = page.getByRole('button', { name: 'Orb', exact: true });
+  await expect(orb).toBeVisible();
+  await page.getByRole('button', { name: 'Edit scene', exact: true }).click();
+  await orb.click();
+  const radius = page.getByRole('spinbutton', { name: 'Radius', exact: true });
+  const readGeometry = () => page.evaluate(() => {
+    const { Engine } = window as unknown as { Engine: {
+      selectedObject: { radius: number; bounds: { width: number; height: number } };
+    } };
+    const { radius, bounds: { width, height } } = Engine.selectedObject;
+    return { radius, width, height };
+  });
+  const readSource = () => page.evaluate(() => {
+    const { monaco } = window as typeof window & { monaco: Monaco };
+    return monaco.editor.getEditors()[0].getValue();
+  });
+  await expect(radius).toHaveValue('24.00');
+  await radius.fill('36');
+  await expect.poll(readGeometry).toEqual({ radius: 36, width: 72, height: 72 });
+  await page.getByRole('button', { name: 'Save Radius to code' }).click();
+  await expect.poll(readSource).toContain('radius: 36');
+  await page.getByRole('button', { name: 'Undo code edit' }).click();
+  await expect(radius).toHaveValue('24.00');
+  await expect.poll(readGeometry).toEqual({ radius: 24, width: 48, height: 48 });
+  await expect.poll(readSource).toContain('radius: 24');
+  await page.getByRole('button', { name: 'Redo code edit' }).click();
+  await expect(radius).toHaveValue('36.00');
+  await expect.poll(readSource).toContain('radius: 36');
+});
+
 test('places a line, moves it by its stroke and restores the saved geometry', async ({ page }) => {
   let source = `import { Engine } from 'dino-ge';
 new Engine({ onLoad() {}, update() {} }, { containerId: 'playground-canvas-container' });`;

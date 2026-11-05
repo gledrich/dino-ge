@@ -196,13 +196,16 @@ const InspectorRow: React.FC<{
     });
 
     if (edit) {
-      if (isRotation) {
-        if (typeof val !== 'number') return;
+      if (isRotation || def.propertyPath === 'radius') {
+        if (typeof val !== 'number' || typeof lastSyncedValue !== 'number') return;
+        const stateFor = (value: number): SceneTransformState => isRotation
+          ? { rotation: value }
+          : { size: { x: value * 2, y: value * 2 } };
         const accepted = !window.dispatchEvent(new CustomEvent<CanvasPlacementTransaction>('playground-apply-placement', {
           cancelable: true,
           detail: {
             edits: [edit], transforms: [{
-              object: selectedObject, before: { rotation: lastSyncedValue }, after: { rotation: val },
+              object: selectedObject, before: stateFor(lastSyncedValue), after: stateFor(val),
             }],
           },
         }));

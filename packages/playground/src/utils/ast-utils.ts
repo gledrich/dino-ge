@@ -573,9 +573,11 @@ export const getSurgicalEdit = (
   };
 
   const found = findPropMapping(mapping.properties, paths);
-  if (propertyPath === 'rotation') {
-    const supportsRotation = mapping.type === 'Sprite' || sceneObjectKinds.some(kind => kind === mapping.type);
-    if (!supportsRotation || (found && !found.mapping.numeric)) return null;
+  if (propertyPath === 'rotation' || propertyPath === 'radius') {
+    const valid = propertyPath === 'rotation'
+      ? (mapping.type === 'Sprite' || sceneObjectKinds.some(kind => kind === mapping.type)) && (!found || found.mapping.numeric)
+      : mapping.type === 'Circle' && found?.mapping.numeric;
+    if (!valid) return null;
     const group = sourceId.slice(0, sourceId.lastIndexOf('-') + 1);
     if (Object.keys(sourceMappingRegistry).filter(id => id.startsWith(group) &&
         /^\d+$/.test(id.slice(group.length))).length !== 1) return null;

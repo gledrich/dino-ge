@@ -213,9 +213,9 @@ const CodeEditor: React.FC<EditorProps> = ({ currentScriptId, onSave, onSelectSc
       const scene = Dino.Engine.currentScene;
       const objects = scene?.objects ?? Dino.Engine.objects;
       if (!model || run?.dataset.playgroundScript !== currentScriptId || !transforms.length) return;
-      for (const { object, after } of transforms) {
-        if (!objects.has(object) || (after.rotation !== undefined && (!object.metadata.sourceId ||
-            Array.from(objects).filter(item => item.metadata.sourceId === object.metadata.sourceId).length !== 1))) return;
+      for (const { object } of transforms) {
+        if (!objects.has(object) || !object.metadata.sourceId ||
+            Array.from(objects).filter(item => item.metadata.sourceId === object.metadata.sourceId).length !== 1) return;
       }
       const previousRevision = model.getAlternativeVersionId();
       if (!applySourceEdits(edits)) return;
