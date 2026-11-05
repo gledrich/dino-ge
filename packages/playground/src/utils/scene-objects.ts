@@ -203,6 +203,12 @@ export function getDefaultSceneObjectTag(kind: SceneObjectKind) {
   return `New ${kind.toLowerCase()}`;
 }
 
+export function insertSceneObjectCode(kind: SceneObjectKind): SceneObjectPlacement {
+  const placement: SceneObjectPlacement = { kind, tag: getDefaultSceneObjectTag(kind), x: 100, y: 100 };
+  window.dispatchEvent(new CustomEvent<SceneObjectPlacement>(sceneObjectCodeEvent, { detail: placement }));
+  return placement;
+}
+
 /** Source options shared by the Library snippet and the canvas-generated constructor. */
 export function getSceneShapeOptionLines(kind: SceneObjectKind, vector = 'Vector2') {
   if (kind === 'Line') {

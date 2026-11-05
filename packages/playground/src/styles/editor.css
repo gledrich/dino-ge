@@ -10,8 +10,47 @@
 
 .editor-textbox {
   flex: 1;
+  min-height: 0;
   width: 100%;
+  position: relative;
 }
+
+.editor-drop-guide {
+  position: absolute;
+  inset: 0;
+  z-index: 10;
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;
+  padding: 8px;
+  border: 2px solid var(--accent-primary);
+  pointer-events: none;
+}
+
+.editor-drop-guide span {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 9px;
+  border: 1px solid var(--accent-primary);
+  border-radius: var(--scene-control-radius);
+  background: var(--bg-primary);
+  font-size: 12px;
+}
+
+.editor-drop-guide i { color: var(--accent-primary); }
+
+.editor-drop-feedback {
+  margin: 0;
+  padding: 6px 10px;
+  border-inline-start: 2px solid var(--accent-primary);
+  border-bottom: 1px solid var(--border-color);
+  background: var(--bg-secondary);
+  font-size: 12px;
+  line-height: 1.4;
+}
+
+.editor-drop-error { border-inline-start-color: var(--accent-secondary); }
 
 .editor .banner {
   display: flex;

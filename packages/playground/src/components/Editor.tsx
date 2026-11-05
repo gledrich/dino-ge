@@ -6,7 +6,7 @@ import { usePlayground } from '../context/PlaygroundContext';
 import ProjectFilesDialog from './ProjectFilesDialog';
 import { createScript, getScript, getFilesList, readGameFolder, importGameFolder, type GameFolder } from '../utils/helpers';
 import { Edit, instrumentCode, getSourceMapping, getSceneObjectCreation, getSceneObjectDeletion, getSceneObjectDuplication, getSpriteImageReplacement, type CanvasPlacementTransaction } from '../utils/ast-utils';
-import { createSceneObject, duplicateSceneObject, getSceneSource, isReplaceableSprite, restoreSceneTransform, sceneObjectCodeEvent, type CanvasTransformChange, type SceneObjectPlacement } from '../utils/scene-objects';
+import { createSceneObject, duplicateSceneObject, getSceneSource, insertSceneObjectCode, isReplaceableSprite, restoreSceneTransform, sceneObjectCodeEvent, sceneObjectDragType, sceneObjectKinds, scenePointerDragEvent, type CanvasTransformChange, type SceneObjectKind, type SceneObjectPlacement, type ScenePointerDrag } from '../utils/scene-objects';
 import { useMonacoEditor } from '../hooks/useMonacoEditor';
 import '../styles/editor.css';
 
@@ -38,11 +38,50 @@ const CodeEditor: React.FC<EditorProps> = ({ currentScriptId, onSave, onSelectSc
   const [importing, setImporting] = useState(false);
   const [importError, setImportError] = useState('');
   const [projectFilesOpen, setProjectFilesOpen] = useState(false);
+  const [isObjectOverEditor, setIsObjectOverEditor] = useState(false);
+  const [dropFeedback, setDropFeedback] = useState<{ scriptId: string; message: string; error: boolean }>();
+  const editorDropTarget = useRef<HTMLDivElement>(null);
   const projectFilesButton = useRef<HTMLButtonElement>(null);
   const folderPicker = useRef<HTMLInputElement>(null);
   const loadedScriptId = useRef('');
   const sceneHistory = useRef<SceneHistoryEntry[]>([]);
   const { monacoEditorRef, formatCode, applyEdits, pushEditOperations } = useMonacoEditor();
+
+  const dropObjectCode = useCallback((kind: SceneObjectKind) => {
+    const { sourceId, tag, error } = insertSceneObjectCode(kind);
+    const message = sourceId ? `Inserted ${tag}. Reset game to preview it.`
+      : error ?? 'Open a script before dropping an object into the editor.';
+    setDropFeedback({ scriptId: currentScriptId, message, error: !sourceId });
+    return !!sourceId;
+  }, [currentScriptId]);
+
+  useEffect(() => {
+    const clearGuide = () => setIsObjectOverEditor(false);
+    const clearDrop = () => {
+      clearGuide();
+      setDropFeedback(undefined);
+    };
+    const updatePointerDrag = (event: Event) => {
+      const { detail } = event as CustomEvent<ScenePointerDrag | null>;
+      if (detail && 'kind' in detail) {
+        const target = document.elementFromPoint(detail.point.x, detail.point.y);
+        if (target && editorDropTarget.current?.contains(target)) {
+          setIsObjectOverEditor(detail.phase === 'preview');
+          if (detail.phase === 'drop') dropObjectCode(detail.kind);
+          return;
+        }
+      }
+      clearGuide();
+    };
+    window.addEventListener(scenePointerDragEvent, updatePointerDrag);
+    window.addEventListener('dragend', clearGuide);
+    window.addEventListener('playground-before-run', clearDrop);
+    return () => {
+      window.removeEventListener(scenePointerDragEvent, updatePointerDrag);
+      window.removeEventListener('dragend', clearGuide);
+      window.removeEventListener('playground-before-run', clearDrop);
+    };
+  }, [dropObjectCode]);
 
   const handleSave = useCallback(async (value: string) => {
     if (loadedScriptId.current !== currentScriptId) return;
@@ -269,6 +308,12 @@ const CodeEditor: React.FC<EditorProps> = ({ currentScriptId, onSave, onSelectSc
         if (codeOnly) {
           setActiveTab('editor');
           setIsEditorVisible(true);
+          const mapping = getSourceMapping()[creation.sourceId];
+          if (mapping) {
+            const position = model.getPositionAt(mapping.start);
+            monacoEditorRef.current?.setPosition(position);
+            monacoEditorRef.current?.revealPositionInCenterIfOutsideViewport(position);
+          }
           return;
         }
         if (!liveRun) return;
@@ -680,7 +725,32 @@ const CodeEditor: React.FC<EditorProps> = ({ currentScriptId, onSave, onSelectSc
           setProjectFilesOpen(false);
           projectFilesButton.current?.focus();
         }} />}
-      <div className="editor-textbox">
+      {dropFeedback?.scriptId === currentScriptId && <p className={`editor-drop-feedback${dropFeedback.error ? ' editor-drop-error' : ''}`}
+        role={dropFeedback.error ? 'alert' : 'status'}>{dropFeedback.message}</p>}
+      <div className="editor-textbox" ref={editorDropTarget}
+        onDragOverCapture={event => {
+          if (!event.dataTransfer.types.includes(sceneObjectDragType)) return;
+          event.preventDefault();
+          event.stopPropagation();
+          event.dataTransfer.dropEffect = 'copy';
+          setIsObjectOverEditor(true);
+        }}
+        onDragLeave={event => {
+          if (!(event.relatedTarget instanceof Node) || !event.currentTarget.contains(event.relatedTarget)) {
+            setIsObjectOverEditor(false);
+          }
+        }}
+        onDropCapture={event => {
+          setIsObjectOverEditor(false);
+          if (!event.dataTransfer.types.includes(sceneObjectDragType)) return;
+          event.preventDefault();
+          event.stopPropagation();
+          const kind = sceneObjectKinds.find(item => item === event.dataTransfer.getData(sceneObjectDragType));
+          if (kind && dropObjectCode(kind)) monacoEditorRef.current?.focus();
+        }}>
+        {isObjectOverEditor && <div className="editor-drop-guide" aria-hidden="true">
+          <span><i className="fa-solid fa-code" /> Drop to insert code</span>
+        </div>}
         <Editor
           height="100%"
           defaultLanguage="javascript"

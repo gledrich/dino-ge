@@ -1,7 +1,7 @@
 import React, { useRef, useState } from 'react';
 import AssetPanel from './AssetPanel';
 import { usePlayground } from '../context/PlaygroundContext';
-import { getDefaultSceneObjectTag, sceneObjectCodeEvent, sceneObjectDragType, type SceneObjectKind, type SceneObjectPlacement } from '../utils/scene-objects';
+import { insertSceneObjectCode, sceneObjectDragType, type SceneObjectKind } from '../utils/scene-objects';
 import { useScenePlacementSource } from '../hooks/useScenePlacementSource';
 import '../styles/sidebar.css';
 
@@ -61,8 +61,7 @@ const Sidebar: React.FC = () => {
   };
 
   const insertShapeCode = (kind: SceneObjectKind) => {
-    const placement: SceneObjectPlacement = { kind, tag: getDefaultSceneObjectTag(kind), x: 100, y: 100 };
-    window.dispatchEvent(new CustomEvent<SceneObjectPlacement>(sceneObjectCodeEvent, { detail: placement }));
+    const placement = insertSceneObjectCode(kind);
     const message = placement.sourceId ? `Inserted ${placement.tag} into the script.`
       : placement.error ?? 'Open a script in the editor before inserting shape code.';
     setFeedback({ scriptId: currentScriptId, message, error: !placement.sourceId });

@@ -583,6 +583,18 @@ new Engine({ onLoad() {}, update() {} }, { containerId: 'playground-canvas-conta
   });
   expect(source).toContain('new DinoPlaceRectangle');
   expect(source).toContain('new DinoPlaceLine');
+
+  const editor = page.locator('.monaco-editor');
+  const editorBox = (await editor.boundingBox())!;
+  const line = await buttonPoint('Add line');
+  const editorPoint = { x: editorBox.x + editorBox.width / 2, y: editorBox.y + editorBox.height / 2 };
+  await session.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [line] });
+  await session.send('Input.dispatchTouchEvent', { type: 'touchMove', touchPoints: [editorPoint] });
+  await expect(page.getByText('Drop to insert code')).toBeVisible();
+  await session.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
+  await expect(page.getByText('Drop to insert code')).toHaveCount(0);
+  await expect(page.getByRole('status').filter({ hasText: 'Inserted New line 2' })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'New line 2', exact: true })).toHaveCount(0);
 });
 
 test('previews and places sprite images from Assets with touch and pen', async ({ page, browserName }) => {
@@ -1425,6 +1437,29 @@ new Engine({ onLoad() {}, update() {} }, { containerId: 'playground-canvas-conta
       await expect(page.getByRole(role, { name, exact: true })).toHaveValue(value);
     }
   }
+});
+
+test('drops a game object into the editor as runnable code', async ({ page }) => {
+  let source = `import { Engine } from 'dino-ge';
+new Engine({ onLoad() {} }, { containerId: 'playground-canvas-container' });`;
+  await page.route('**/files', route => route.fulfill({ json: ['script'] }));
+  await page.route('**/api/scripts/script', route => {
+    if (route.request().method() === 'PUT') {
+      source = route.request().postDataJSON().data;
+      return route.fulfill({ json: { success: true } });
+    }
+    return route.fulfill({ json: source });
+  });
+  await page.goto('/');
+  const editor = page.locator('.monaco-editor');
+  await expect(editor).toContainText('new Engine');
+  await page.getByRole('button', { name: 'Add rectangle', exact: true }).dragTo(editor);
+  await expect(editor).toContainText('new DinoPlaceRectangle', { timeout: 3000 });
+  await expect(page.getByRole('button', { name: 'New rectangle', exact: true })).toHaveCount(0);
+
+  await page.getByRole('button', { name: 'Reset game', exact: true }).click();
+  await expect(page.getByRole('button', { name: 'New rectangle', exact: true })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'New rectangle 2', exact: true })).toHaveCount(0);
 });
 
 test('places a palette object at the drop point and restores it from the saved script', async ({ page }) => {
