@@ -6,6 +6,7 @@ export type ToolId = typeof toolIds[number];
 export const toolLabels: Record<ToolId, string> = {
   explorer: 'Explorer', editor: 'Editor', inspector: 'Inspector', console: 'Console',
 };
+export const minimumDockSize: Record<DockId, number> = { left: 12, right: 16, bottom: 12 };
 
 interface DesktopDock {
   tabs: ToolId[];
@@ -40,7 +41,7 @@ export function readDesktopLayout(value: unknown): DesktopLayout {
       used.add(tab);
       return true;
     });
-    const size = typeof dock.size === 'number' && dock.size >= 5 && dock.size <= 80 ? dock.size : defaults[id].size;
+    const size = typeof dock.size === 'number' && dock.size >= minimumDockSize[id] && dock.size <= 80 ? dock.size : defaults[id].size;
     return { tabs, active: isToolId(dock.active) ? dock.active : null, collapsed: dock.collapsed === true, size };
   };
   const layout = { left: readDock('left'), right: readDock('right'), bottom: readDock('bottom') };

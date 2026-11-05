@@ -191,7 +191,7 @@
   .library-section > .snippet-btn span { white-space: normal; overflow-wrap: anywhere; }
 }
 
-@container (max-width: 134px) {
+@container (max-width: 156px) {
   .sidebar-tabs { flex-direction: column; }
 
   .sidebar-tabs,

@@ -150,8 +150,8 @@ const Viewport: React.FC<{
     currentScriptId,
     isViewportReady, 
     setIsViewportReady, 
-    isInspectorVisible, 
-    setIsInspectorVisible,
+    mobile,
+    openTool,
     selectedObject,
     pendingCanvasPlacements,
     canUndoCanvasEdit,
@@ -309,8 +309,8 @@ const Viewport: React.FC<{
   const enterSceneEditing = useCallback(() => {
     setIsPaused(true);
     setIsDebug(true);
-    setIsInspectorVisible(true);
-  }, [setIsDebug, setIsInspectorVisible, setIsPaused]);
+    if (!mobile) openTool('inspector');
+  }, [mobile, openTool, setIsDebug, setIsPaused]);
 
   const placeLibraryObject = useCallback((kind: SceneObjectKind, x?: number, y?: number) => {
     const placed = addObject(kind, getPlacementPoint(x, y, { kind }));
@@ -605,7 +605,7 @@ const Viewport: React.FC<{
     setIsPaused(editing);
     setIsDebug(editing);
     if (editing) {
-      setIsInspectorVisible(true);
+      if (!mobile) openTool('inspector');
       viewportContainerRef.current?.focus();
     }
   };
@@ -1095,7 +1095,7 @@ const Viewport: React.FC<{
       {isEditingScene && manipulationReadout && (
         <div className="scene-manipulation-readout" role="group" aria-label="Current scene gesture">{manipulationReadout}</div>
       )}
-      <Logo visible={!isInspectorVisible && isViewportReady && !isEditingScene} />
+      <Logo visible={arePanelsMinimized && isViewportReady && !isEditingScene} />
       {runtimeError && <div className="game-runtime-error">
         <div role="alert">
           <strong>{{ script: 'Game script failed to run', startup: 'Game setup failed', frame: 'Game stopped running' }[runtimeError.phase]}</strong>

@@ -64,7 +64,8 @@ new Engine({
     await expect(page.locator('#canvas')).toBeVisible();
 
     // Check Editor tab is active
-    await expect(page.getByRole('tab', { name: 'Editor' })).toBeVisible();
+    await expect(page.getByRole('tab', { name: 'Editor' })).toHaveAttribute('aria-selected', 'true');
+    await expect(page.locator('.monaco-editor')).toContainText('Dino GE Playground');
 
     // Take a screenshot of the initial state for visual testing
     await expect(page).toHaveScreenshot('initial-load.png', {
@@ -73,19 +74,19 @@ new Engine({
     });
   });
 
-  test('should toggle Inspector panel', async ({ page }) => {
-    const inspectorPanel = page.getByTestId('inspector-panel');
-    const inspectorHeader = inspectorPanel.locator('.panel-header');
+  test('can collapse and restore the dock while Inspector is selected', async ({ page }) => {
+    const inspectorPanel = page.getByRole('region', { name: 'Right dock' });
+    await inspectorPanel.getByRole('tab', { name: 'Inspector' }).click();
     await expect(inspectorPanel).toBeVisible();
 
     // Collapsing - click the header
-    await inspectorHeader.click();
+    await page.getByRole('button', { name: 'Collapse right dock' }).click();
     
     // The panel is hidden while the Inspector keeps tracking scene edits.
     await expect(inspectorPanel).not.toBeVisible();
 
     // Expanding - click the expand button (new in App.tsx)
-    const expandButton = page.getByTestId('inspector-expand-button');
+    const expandButton = page.getByRole('button', { name: 'Expand right dock' });
     await expect(expandButton).toBeVisible();
     await expandButton.click();
     
@@ -107,46 +108,45 @@ new Engine({
   });
 
   test('should toggle Explorer panel', async ({ page }) => {
-    const explorerHeader = page.locator('.panel-header').filter({ hasText: 'Explorer' });
-    await expect(explorerHeader).toBeVisible();
+    const explorer = page.getByRole('region', { name: 'Left dock' });
+    await expect(explorer).toBeVisible();
 
     // Collapsing - click the header
-    await explorerHeader.click();
-    await expect(explorerHeader).not.toBeVisible();
+    await page.getByRole('button', { name: 'Collapse left dock' }).click();
+    await expect(explorer).toBeHidden();
 
     // Expanding - click the expand button
-    const expandButton = page.getByTestId('explorer-expand-button');
+    const expandButton = page.getByRole('button', { name: 'Expand left dock' });
     await expect(expandButton).toBeVisible();
     await expandButton.click();
     
-    await expect(explorerHeader).toBeVisible();
+    await expect(explorer).toBeVisible();
   });
 
   test('should toggle Editor panel', async ({ page }) => {
     const editorHeader = page.locator('.panel-header').filter({ hasText: 'Editor' });
     await expect(editorHeader).toBeVisible();
 
-    const collapseButton = page.getByRole('button', { name: 'Collapse editor' });
+    const collapseButton = page.getByRole('button', { name: 'Collapse right dock' });
     await collapseButton.click();
     await expect(editorHeader).not.toBeVisible();
 
     // Expanding - click the expand button
-    const expandButton = page.getByTestId('editor-expand-button');
+    const expandButton = page.getByRole('button', { name: 'Expand right dock' });
     await expect(expandButton).toBeVisible();
     await expandButton.click();
     
     await expect(editorHeader).toBeVisible();
   });
 
-  test('should switch between Editor and Console tabs', async ({ page }) => {
+  test('shows Console output with Inspector open and restores the Editor tab', async ({ page }) => {
     const consoleTab = page.getByRole('tab', { name: 'Console' });
     const editorTab = page.getByRole('tab', { name: 'Editor' });
 
-    // Switch to Console
+    await page.getByRole('tab', { name: 'Inspector' }).click();
     await consoleTab.click();
-    // Find the panel-content specifically within the center group bottom panel
-    const consoleContent = page.locator('.panel-container').filter({ hasText: 'Console' }).locator('.panel-content');
-    await expect(consoleContent).toContainText(/Console/i);
+    const consoleContent = page.getByRole('tabpanel', { name: 'Console' });
+    await expect(consoleContent).toContainText('Game Ready!');
 
     // Take a screenshot of the console state
     await expect(page).toHaveScreenshot('console-tab.png', {

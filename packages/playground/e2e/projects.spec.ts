@@ -314,7 +314,7 @@ export const makeExternal = () => new Rectangle({ tag: 'External platform', posi
   await page.getByRole('tab', { name: 'Console', exact: true }).click();
   await page.getByRole('button', { name: 'Entry platform', exact: true }).click({ timeout: 3000 });
   const source = page.getByRole('button', { name: 'View source', exact: true });
-  await page.getByRole('button', { name: 'Collapse editor', exact: true }).click();
+  await expect(entryEditor).toBeHidden();
   await source.press('Enter', { timeout: 3000 });
   await expect(page.getByRole('tab', { name: 'Editor', exact: true })).toHaveAttribute('aria-selected', 'true');
   await expect(entryEditor).toBeVisible();
@@ -334,10 +334,10 @@ export const makeExternal = () => new Rectangle({ tag: 'External platform', posi
     const editor = monaco.editor.getEditors().find(item => item.getDomNode() === element)!;
     editor.setValue(editor.getValue() + "\nfunction unused() { new Rectangle({ tag: 'Entry platform' }); }");
   });
-  await page.getByRole('tab', { name: 'Console', exact: true }).click();
+  await page.getByRole('tab', { name: 'Inspector', exact: true }).click();
   await source.click();
   await expect(page.getByRole('status').filter({ hasText: 'Could not locate a unique constructor in the open script.' })).toBeVisible();
-  await expect(page.getByRole('tab', { name: 'Console', exact: true })).toHaveAttribute('aria-selected', 'true');
+  await expect(page.getByRole('tab', { name: 'Inspector', exact: true })).toHaveAttribute('aria-selected', 'true');
   await page.getByRole('button', { name: 'Entry callback', exact: true }).click();
   await expect(source).toHaveCount(0);
   await page.getByRole('button', { name: 'External platform', exact: true }).click();
@@ -358,7 +358,8 @@ export const makeExternal = () => new Rectangle({ tag: 'External platform', posi
     return { line: position.lineNumber, visible: !!visible && visible.top >= 0 && visible.top < editor.getLayoutInfo().height };
   })).toEqual({ line: 4, visible: true });
   await dialog.getByRole('button', { name: 'Close', exact: true }).click();
-  await expect(source).toBeFocused();
+  await expect(page.getByRole('tab', { name: 'Editor', exact: true })).toBeFocused();
+  await page.getByRole('tab', { name: 'Inspector', exact: true }).click();
   await page.getByRole('button', { name: 'Deferred label', exact: true }).click();
   await source.click({ timeout: 3000 });
   await expect(dialog.getByLabel('JavaScript module')).toHaveValue(modulePath);
@@ -370,6 +371,7 @@ export const makeExternal = () => new Rectangle({ tag: 'External platform', posi
   await dialog.getByRole('button', { name: 'Save module', exact: true }).click();
   await expect(dialog.getByRole('status')).toContainText('Saved');
   await dialog.getByRole('button', { name: 'Close', exact: true }).click();
+  await page.getByRole('tab', { name: 'Inspector', exact: true }).click();
   await source.click();
   await expect(dialog.getByLabel('JavaScript module')).toHaveValue(modulePath);
   await expect(dialog.getByRole('status')).toHaveText('Reset the game to refresh the source location.');
@@ -472,6 +474,7 @@ new Engine({ onLoad() { makePlatform(); makeWall(); makeQuoted(); makeShadowed(V
     await expect(dialog.getByRole('alert')).toContainText(reason);
     await expect(dialog.getByRole('button', { name: 'Save module', exact: true })).toBeDisabled();
     await dialog.getByRole('button', { name: 'Close', exact: true }).click();
+    await page.getByRole('tab', { name: 'Inspector', exact: true }).click();
     await page.getByRole('button', { name: 'Discard canvas changes', exact: true }).click();
   }
   await platform.click();
@@ -482,6 +485,7 @@ new Engine({ onLoad() { makePlatform(); makeWall(); makeQuoted(); makeShadowed(V
   expect(module).toBe(original);
   await dialog.getByRole('button', { name: 'Discard changes', exact: true }).click();
   await dialog.getByRole('button', { name: 'Close', exact: true }).click();
+  await page.getByRole('tab', { name: 'Inspector', exact: true }).click();
   await expect(platform).toHaveAccessibleDescription('Pending canvas changes');
   const wall = page.getByRole('button', { name: 'Wall', exact: true });
   await wall.click();
@@ -494,6 +498,7 @@ new Engine({ onLoad() { makePlatform(); makeWall(); makeQuoted(); makeShadowed(V
   await save.click();
   await expect(dialog.getByRole('status')).toHaveText('Saved. You can keep editing the scene.');
   await dialog.getByRole('button', { name: 'Close', exact: true }).click();
+  await page.getByRole('tab', { name: 'Inspector', exact: true }).click();
   await expect(platform).not.toHaveAccessibleDescription('Pending canvas changes');
   await expect(wall).not.toHaveAccessibleDescription('Pending canvas changes');
   expect(module.replace(/\r\n/g, '\n')).toBe(original.replace('Vector2(90, 60)', 'Vector2(100, 60)')
@@ -509,6 +514,7 @@ new Engine({ onLoad() { makePlatform(); makeWall(); makeQuoted(); makeShadowed(V
     return position && line ? line.slice(position.column - 1) : '';
   })).toMatch(/^(?:new )?(?:Rectangle)?\(\{ tag: 'Wall'/);
   await dialog.getByRole('button', { name: 'Close', exact: true }).click();
+  await page.getByRole('tab', { name: 'Inspector', exact: true }).click();
   const y = page.getByRole('spinbutton', { name: 'Y', exact: true });
   await y.click();
   await y.fill('8');
@@ -531,6 +537,7 @@ new Engine({ onLoad() { makePlatform(); makeWall(); makeQuoted(); makeShadowed(V
   await save.click();
   await expect(dialog.getByRole('status')).toContainText('Saved');
   await dialog.getByRole('button', { name: 'Close', exact: true }).click();
+  await page.getByRole('tab', { name: 'Inspector', exact: true }).click();
   expect(await liveCanvas?.evaluate(element => element === document.querySelector('#canvas'))).toBe(true);
   await expect(wall).not.toHaveAccessibleDescription('Pending canvas changes');
 
@@ -545,11 +552,13 @@ new Engine({ onLoad() { makePlatform(); makeWall(); makeQuoted(); makeShadowed(V
   await dialog.getByRole('button', { name: 'Discard and reload', exact: true }).click();
   await expect(dialog.locator('.monaco-editor')).toContainText('// External edit');
   await dialog.getByRole('button', { name: 'Close', exact: true }).click();
+  await page.getByRole('tab', { name: 'Inspector', exact: true }).click();
   await expect(wall).toHaveAccessibleDescription('Pending canvas changes');
   await apply.click();
   await expect(dialog.getByRole('alert')).toContainText('Reset the game to refresh the source locations');
   await expect(save).toBeDisabled();
   await dialog.getByRole('button', { name: 'Close', exact: true }).click();
+  await page.getByRole('tab', { name: 'Inspector', exact: true }).click();
   await expect(wall).toHaveAccessibleDescription('Pending canvas changes');
   await page.getByRole('button', { name: 'Discard canvas changes', exact: true }).click();
 
@@ -617,6 +626,7 @@ new Engine({ onLoad() {}, update() {} }, { containerId: 'playground-canvas-conta
     await expect(page.getByRole('spinbutton', { name: 'X', exact: true })).toHaveValue('240.00');
     const saved = page.waitForResponse(response => response.request().method() === 'PUT' &&
       response.url().endsWith('/api/scripts/demo%2Fsrc%2Findex'));
+    await page.getByRole('tab', { name: 'Editor', exact: true }).click();
     await page.getByRole('button', { name: 'Save script', exact: true }).click();
     expect((await saved).ok()).toBe(true);
     expect(await readFile(entry, 'utf8')).toMatch(/new URL\("\.\/_dino-assets\/gem-[a-f0-9]+\.png", import\.meta\.url\)/);
@@ -632,6 +642,7 @@ new Engine({ onLoad() {}, update() {} }, { containerId: 'playground-canvas-conta
     await expect(sprite).toHaveCount(0);
     const savedDeletion = page.waitForResponse(response => response.request().method() === 'PUT' &&
       response.url().endsWith('/api/scripts/demo%2Fsrc%2Findex'));
+    await page.getByRole('tab', { name: 'Editor', exact: true }).click();
     await page.getByRole('button', { name: 'Save script', exact: true }).click();
     expect((await savedDeletion).ok()).toBe(true);
     await page.reload();
@@ -647,6 +658,7 @@ new Engine({ onLoad() {}, update() {} }, { containerId: 'playground-canvas-conta
     await expect(page.getByRole('spinbutton', { name: 'Width', exact: true })).toHaveValue('64.00');
     await expect(page.getByRole('spinbutton', { name: 'X', exact: true })).toHaveValue('280.00');
 
+    await page.getByRole('tab', { name: 'Editor', exact: true }).click();
     const editor = page.locator('.monaco-editor');
     const textTransfer = await page.evaluateHandle(() => {
       const data = new DataTransfer();

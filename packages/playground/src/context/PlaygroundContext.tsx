@@ -3,36 +3,22 @@ import * as Dino from 'dino-ge';
 import { getCurrentScriptId } from '../utils/helpers';
 import type { CanvasPlacement } from '../utils/scene-objects';
 import { useCanvasHistory } from '../hooks/useCanvasHistory';
+import { useWorkspaceDocks } from '../hooks/useWorkspaceDocks';
 
 const { Engine } = Dino;
 
-type EditorTab = 'editor' | 'console';
-export type MobileDockTab = EditorTab | 'explorer' | 'inspector';
-
-interface PlaygroundContextType {
+interface PlaygroundContextType extends ReturnType<typeof useWorkspaceDocks> {
   currentScriptId: string;
   setCurrentScriptId: (id: string) => void;
   isPaused: boolean;
   setIsPaused: (paused: boolean) => void;
   isDebug: boolean;
   setIsDebug: (debug: boolean) => void;
-  isInspectorVisible: boolean;
-  setIsInspectorVisible: (visible: boolean) => void;
   selectedObject: Dino.GameObject | null;
   pendingCanvasPlacements: ReadonlyMap<Dino.GameObject, CanvasPlacement>;
   canUndoCanvasEdit: boolean;
   canRedoCanvasEdit: boolean;
   changeCanvasHistory: (action: 'undo' | 'redo') => boolean;
-  isExplorerVisible: boolean;
-  setIsExplorerVisible: (visible: boolean) => void;
-  isEditorVisible: boolean;
-  setIsEditorVisible: (visible: boolean) => void;
-  activeTab: EditorTab;
-  setActiveTab: (tab: EditorTab) => void;
-  mobileDockTab: MobileDockTab;
-  setMobileDockTab: (tab: MobileDockTab) => void;
-  isMobileDockOpen: boolean;
-  setIsMobileDockOpen: (open: boolean) => void;
   isViewportReady: boolean;
   setIsViewportReady: (ready: boolean) => void;
   arePanelsMinimized: boolean;
@@ -48,16 +34,12 @@ export const PlaygroundProvider: React.FC<{ children: React.ReactNode }> = ({ ch
   const [currentScriptId, setCurrentScriptIdState] = useState(getCurrentScriptId());
   const [isPaused, setIsPausedState] = useState(false);
   const [isDebug, setIsDebugState] = useState(false);
-  const [isInspectorVisible, setIsInspectorVisible] = useState(true);
   const [selectedObject, setSelectedObject] = useState(Engine.selectedObject);
   const canvasHistory = useCanvasHistory();
-  const [isExplorerVisible, setIsExplorerVisible] = useState(true);
-  const [isEditorVisible, setIsEditorVisible] = useState(true);
-  const [activeTab, setEditorTab] = useState<EditorTab>('editor');
-  const [mobileDockTab, setMobileDockTab] = useState<MobileDockTab>('editor');
-  const [isMobileDockOpen, setIsMobileDockOpen] = useState(true);
   const [isViewportReady, setIsViewportReady] = useState(false);
   const [arePanelsMinimized, setArePanelsMinimized] = useState(false);
+  const restorePanels = useCallback(() => setArePanelsMinimized(false), []);
+  const workspace = useWorkspaceDocks(arePanelsMinimized, restorePanels);
 
   // Sync state with Engine
   useEffect(() => {
@@ -92,10 +74,8 @@ export const PlaygroundProvider: React.FC<{ children: React.ReactNode }> = ({ ch
   }, [isPaused, setIsPaused]);
 
   const toggleDebug = useCallback(() => {
-    const newDebug = !isDebug;
-    setIsDebug(newDebug);
-    if (newDebug && !isInspectorVisible) setIsInspectorVisible(true);
-  }, [isDebug, isInspectorVisible, setIsDebug]);
+    setIsDebug(!isDebug);
+  }, [isDebug, setIsDebug]);
 
   const togglePanels = useCallback(() => {
     setArePanelsMinimized(prev => !prev);
@@ -105,12 +85,6 @@ export const PlaygroundProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     setCurrentScriptIdState(id);
   }, []);
 
-  const setActiveTab = useCallback((tab: EditorTab) => {
-    setEditorTab(tab);
-    setMobileDockTab(tab);
-    setIsMobileDockOpen(true);
-  }, []);
-
   const value = {
     currentScriptId,
     setCurrentScriptId,
@@ -118,20 +92,9 @@ export const PlaygroundProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     setIsPaused,
     isDebug,
     setIsDebug,
-    isInspectorVisible,
-    setIsInspectorVisible,
     selectedObject,
     ...canvasHistory,
-    isExplorerVisible,
-    setIsExplorerVisible,
-    isEditorVisible,
-    setIsEditorVisible,
-    activeTab,
-    setActiveTab,
-    mobileDockTab,
-    setMobileDockTab,
-    isMobileDockOpen,
-    setIsMobileDockOpen,
+    ...workspace,
     isViewportReady,
     setIsViewportReady,
     arePanelsMinimized,

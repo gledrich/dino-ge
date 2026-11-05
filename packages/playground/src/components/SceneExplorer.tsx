@@ -98,8 +98,9 @@ const getIconForObject = (obj: Dino.GameObject): string => {
   return 'fa-cube';
 };
 
-const SceneExplorer: React.FC<{ onReveal?: () => void }> = ({ onReveal }) => {
-  const { isPaused, isDebug, isExplorerVisible, setIsExplorerVisible, selectedObject, pendingCanvasPlacements } = usePlayground();
+const SceneExplorer: React.FC = () => {
+  const { isPaused, isDebug, isToolVisible, openTool, selectedObject, pendingCanvasPlacements } = usePlayground();
+  const isExplorerVisible = isToolVisible('explorer');
   const [members, setMembers] = useState(() => new Set(Engine.currentScene?.objects ?? Engine.objects));
   const [collapsedBranches, setCollapsedBranches] = useState<ReadonlySet<Dino.GameObject>>(() => new Set());
   const [query, setQuery] = useState('');
@@ -175,13 +176,12 @@ const SceneExplorer: React.FC<{ onReveal?: () => void }> = ({ onReveal }) => {
       });
       const name = getSceneObjectName(object).toLowerCase();
       setQuery(previous => name.includes(previous.trim().toLowerCase()) ? previous : '');
-      setIsExplorerVisible(true);
-      onReveal?.();
+      openTool('explorer');
       setRevealTarget(object);
     };
     window.addEventListener(revealSceneObjectEvent, reveal);
     return () => window.removeEventListener(revealSceneObjectEvent, reveal);
-  }, [onReveal, setIsExplorerVisible]);
+  }, [openTool]);
 
   useEffect(() => {
     if (!isExplorerVisible || !revealTarget) return;

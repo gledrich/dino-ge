@@ -48,8 +48,9 @@ try {
   await code.locator('.view-lines').click();
   // Monaco uses different document-start shortcuts on macOS and Linux.
   await page.keyboard.press(process.platform === 'darwin' ? 'Meta+ArrowUp' : 'Control+Home');
-  await page.keyboard.insertText('document.documentElement.dataset.releaseCheck = "saved";\n');
-  await code.getByText(/dataset\.releaseCheck/).first().waitFor();
+  const releaseEdit = 'document.documentElement.dataset.releaseCheck = "saved";';
+  await page.keyboard.insertText(releaseEdit + '\n');
+  await page.waitForFunction(edit => window.monaco?.editor.getEditors()[0]?.getValue().includes(edit), releaseEdit);
   await page.getByRole('button', { name: 'Save script' }).click();
   await game.locator('html[data-release-check="saved"]').waitFor({ timeout: 15_000 });
   await page.reload();

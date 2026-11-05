@@ -44,7 +44,7 @@ function updateObjectTag(object: Dino.GameObject, { sourceId, tag }: ObjectTagSt
 const normaliseEntryText = (source: string) => source.replace(/\r\n/g, '\n');
 
 const CodeEditor: React.FC<EditorProps> = ({ currentScriptId, onSave, onSelectScript }) => {
-  const { setActiveTab, setIsEditorVisible } = usePlayground();
+  const { openTool } = usePlayground();
   const [scripts, setScripts] = useState<string[]>([]);
   const [isSaving, setIsSaving] = useState(false);
   const [isFormatting, setIsFormatting] = useState(false);
@@ -77,13 +77,12 @@ const CodeEditor: React.FC<EditorProps> = ({ currentScriptId, onSave, onSelectSc
     const openSource = (event: Event) => {
       const request = (event as CustomEvent<ProjectObjectSourceRequest>).detail;
       if (request.source.scriptId !== currentScriptId) return;
-      setIsEditorVisible(true);
-      setActiveTab('editor');
+      openTool('editor');
       setProjectFiles({ scriptId: currentScriptId, request, trigger: request.trigger });
     };
     window.addEventListener(openProjectObjectSourceEvent, openSource);
     return () => window.removeEventListener(openProjectObjectSourceEvent, openSource);
-  }, [currentScriptId, setActiveTab, setIsEditorVisible]);
+  }, [currentScriptId, openTool]);
 
   const dropObjectCode = useCallback((item: ScenePointerDragItem) => {
     const { sourceId, tag, error } = insertSceneObjectCode(item, currentScriptId);
@@ -284,8 +283,7 @@ const CodeEditor: React.FC<EditorProps> = ({ currentScriptId, onSave, onSelectSc
       const mapping = getUniqueObjectSourceMapping(sourceId);
       if (!mapping) return;
       const revision = model.getVersionId();
-      setActiveTab('editor');
-      setIsEditorVisible(true);
+      openTool('editor');
       cancelAnimationFrame(frame);
       frame = requestAnimationFrame(() => {
         if (Dino.Engine.selectedObject !== object || currentRun(object) !== run ||
@@ -306,7 +304,7 @@ const CodeEditor: React.FC<EditorProps> = ({ currentScriptId, onSave, onSelectSc
       Dino.Engine.off('selectedObjectChanged', onSelectedObjectChanged);
       window.removeEventListener(openEntryObjectSourceEvent, openEntrySource);
     };
-  }, [currentScriptId, monacoEditorRef, setActiveTab, setIsEditorVisible]);
+  }, [currentScriptId, monacoEditorRef, openTool]);
 
 
   useEffect(() => {
@@ -469,8 +467,7 @@ const CodeEditor: React.FC<EditorProps> = ({ currentScriptId, onSave, onSelectSc
         placement.tag = creation.tag;
         placement.sourceId = creation.sourceId;
         if (codeOnly) {
-          setActiveTab('editor');
-          setIsEditorVisible(true);
+          openTool('editor');
           const mapping = getSourceMapping()[creation.sourceId];
           if (mapping) {
             const position = model.getPositionAt(mapping.start);
@@ -637,7 +634,7 @@ const CodeEditor: React.FC<EditorProps> = ({ currentScriptId, onSave, onSelectSc
       window.removeEventListener('playground-apply-edit', handleApplyEditEvent);
       window.removeEventListener('playground-apply-multi-edit', handleApplyMultiEditEvent);
     };
-  }, [currentScriptId, editorValue, isTrustedEntryModel, monacoEditorRef, setActiveTab, setIsEditorVisible]);
+  }, [currentScriptId, editorValue, isTrustedEntryModel, monacoEditorRef, openTool]);
 
   const syncSceneHistory = (model: editor.ITextModel, event: editor.IModelContentChangedEvent, previousRevision: number) => {
     if (!event.isUndoing && !event.isRedoing) return;

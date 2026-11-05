@@ -1,3 +1,4 @@
+import { expect, test } from '@jest/globals';
 import { dockIds, moveDockTab, readDesktopLayout, selectDockTab } from './workspace-docks';
 
 test('restores the default tools, selection and sizes', () => {
@@ -18,6 +19,8 @@ test('repairs duplicate, missing or unknown tools and rejects invalid sizes', ()
   expect(layout.right.active).toBe('inspector');
   expect(layout.bottom.active).toBe('console');
   expect(dockIds.map(id => layout[id].size)).toEqual([20, 33, 28]);
+  const undersized = readDesktopLayout({ left: { size: 5 }, right: { size: 5 }, bottom: { size: 5 } });
+  expect(dockIds.map(id => undersized[id].size)).toEqual([20, 30, 28]);
 });
 
 test('moves, reorders and reopens a tool while keeping valid active tabs', () => {
