@@ -14,6 +14,29 @@ const lineProperties = new Map([
   ['p1.x', 'x1'], ['p1.y', 'y1'], ['p2.x', 'x2'], ['p2.y', 'y2'], ['width', 'strokeWidth'],
 ]);
 
+let colourContext: CanvasRenderingContext2D | null | undefined;
+
+function getCanvasColourHex(value: string) {
+  if (colourContext === undefined) {
+    const canvas = document.createElement('canvas');
+    canvas.width = canvas.height = 1;
+    colourContext = canvas.getContext('2d', { willReadFrequently: true });
+  }
+  if (!colourContext) return;
+  // Invalid canvas colours retain the previous fill style.
+  colourContext.fillStyle = '#000001';
+  colourContext.fillStyle = value;
+  const first = colourContext.fillStyle;
+  colourContext.fillStyle = '#000002';
+  colourContext.fillStyle = value;
+  if (first !== colourContext.fillStyle) return;
+  colourContext.clearRect(0, 0, 1, 1);
+  colourContext.fillRect(0, 0, 1, 1);
+  const channels = colourContext.getImageData(0, 0, 1, 1).data;
+  const hex = Array.from(channels.subarray(0, 3)).map(channel => channel.toString(16).padStart(2, '0'));
+  return `#${hex.join('')}`;
+}
+
 export interface InspectableObject extends Dino.GameObject {
   [key: string]: any;
 }
@@ -30,6 +53,8 @@ export const resolveComponentPath = (obj: InspectableObject, pathStr: string): {
   if (pathStr === 'text' || pathStr === 'colour' || pathStr === 'backgroundColour') {
     const text = obj.getComponent(Dino.TextComponent);
     if (text) return { target: obj instanceof Dino.Text ? obj : text, prop: pathStr };
+    const shape = pathStr === 'colour' && obj.getComponent(Dino.ShapeComponent);
+    if (shape) return { target: obj instanceof Dino.Rectangle || obj instanceof Dino.Circle ? obj : shape, prop: pathStr };
   }
 
   let target: any = obj;
@@ -88,8 +113,11 @@ const InspectorRow: React.FC<{
   deferSave?: boolean;
 }> = ({ def, selectedObject, deferSave }) => {
   const inputRef = useRef<HTMLInputElement>(null);
+  const colourRef = useRef<HTMLInputElement>(null);
   const inputId = useId();
   const isRotation = def.propertyPath === 'rotation';
+  const isColour = def.type === 'colour';
+  const [isValid, setIsValid] = React.useState(true);
   const [prevSelectedObject, setPrevSelectedObject] = React.useState(selectedObject);
   const [lastSyncedValue, setLastSyncedValue] = React.useState<any>(() => {
     const resolved = resolveComponentPath(selectedObject, def.propertyPath);
@@ -100,6 +128,7 @@ const InspectorRow: React.FC<{
   // Sync state during render if selectedObject changes
   if (selectedObject !== prevSelectedObject) {
     setPrevSelectedObject(selectedObject);
+    setIsValid(true);
     const resolved = resolveComponentPath(selectedObject, def.propertyPath);
     setLastSyncedValue(resolved && resolved.target ? resolved.target[resolved.prop] : undefined);
   }
@@ -129,10 +158,15 @@ const InspectorRow: React.FC<{
   // Sync runtime value to the input box and check for modifications
   useEffect(() => {
     let rafId: number;
+    let previousColour: unknown;
     const loop = () => {
       const resolved = resolveComponentPath(selectedObject, def.propertyPath);
       if (resolved && resolved.target) {
         const val = resolved.target[resolved.prop];
+        if (colourRef.current && typeof val === 'string' && val !== previousColour) {
+          previousColour = val;
+          colourRef.current.value = getCanvasColourHex(val) ?? '#000000';
+        }
         
         // Update input if not focused
         if (inputRef.current && document.activeElement !== inputRef.current) {
@@ -144,6 +178,7 @@ const InspectorRow: React.FC<{
           } else {
             inputRef.current.value = val !== undefined ? String(val) : '';
           }
+          if (isColour) setIsValid(true);
         }
 
         // Compare runtime value with baseline to determine modified state
@@ -160,10 +195,12 @@ const InspectorRow: React.FC<{
     };
     rafId = requestAnimationFrame(loop);
     return () => cancelAnimationFrame(rafId);
-  }, [selectedObject, def, isRotation, lastSyncedValue]);
+  }, [selectedObject, def, isColour, isRotation, lastSyncedValue]);
 
   const parseValue = (element: HTMLInputElement) => {
     if (def.type === 'checkbox') return element.checked;
+    const clearsBackground = def.propertyPath === 'backgroundColour' && element.value === '';
+    if (isColour && !clearsBackground && !getCanvasColourHex(element.value)) return;
     if (def.type !== 'number') return element.value;
     const value = element.valueAsNumber;
     if (Number.isFinite(value) && !element.validity.rangeUnderflow) {
@@ -171,8 +208,9 @@ const InspectorRow: React.FC<{
     }
   };
 
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const val = parseValue(e.target);
+  const updateValue = (element: HTMLInputElement) => {
+    const val = parseValue(element);
+    if (isColour) setIsValid(val !== undefined);
     const resolved = resolveComponentPath(selectedObject, def.propertyPath);
     if (resolved?.target && val !== undefined) {
       resolved.target[resolved.prop] = val;
@@ -222,22 +260,38 @@ const InspectorRow: React.FC<{
 
   return (
     <div className={`prop-row ${isModified ? 'modified' : ''}`}>
-      <label htmlFor={inputId}>{def.label}</label>
-      <div className="input-group">
+      {isColour ? <div className="prop-colour-label">
+        <label htmlFor={inputId}>{def.label}</label>
+        <input type="color" ref={colourRef} aria-label={`Choose ${def.label.toLowerCase()}`}
+          title="Choose a solid colour. Use the text field for transparency."
+          onChange={event => {
+            if (!inputRef.current) return;
+            inputRef.current.value = event.currentTarget.value;
+            updateValue(inputRef.current);
+          }} />
+      </div> : <label htmlFor={inputId}>{def.label}</label>}
+      <div className={`input-group${isColour ? ' colour-input-group' : ''}`}>
         <input
           id={inputId}
-          type={def.type}
+          type={isColour ? 'text' : def.type}
           min={def.min}
           step="any"
           ref={inputRef}
-          onChange={handleChange}
+          aria-invalid={isColour && !isValid ? true : undefined}
+          aria-describedby={isColour && !isValid ? `${inputId}-error` : undefined}
+          title={isColour ? 'CSS colour, such as #54d6ad, rebeccapurple or rgba(0, 0, 0, 0.5)' : undefined}
+          onChange={event => updateValue(event.currentTarget)}
         />
         {!deferSave && <button type="button"
           className="save-prop-icon"
           onClick={handleSync}
+          disabled={isColour && !isValid}
           aria-label={`Save ${def.label} to code`}
           title="Save this property to code"
         ><i className="fa-solid fa-floppy-disk" aria-hidden="true" /></button>}
+        {isColour && !isValid && <span className="prop-validation" id={`${inputId}-error`} role="status">
+          Enter a CSS colour, such as #54d6ad or rgba(0, 0, 0, 0.5).
+        </span>}
       </div>
     </div>
   );

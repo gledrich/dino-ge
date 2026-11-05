@@ -104,6 +104,33 @@
   overflow-wrap: anywhere;
 }
 
+.prop-colour-label {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+
+.prop-colour-label input[type="color"] {
+  flex: none;
+  box-sizing: border-box;
+  width: var(--scene-control-height);
+  height: var(--scene-control-height);
+  padding: 3px;
+  border: 1px solid var(--border-color);
+  border-radius: var(--scene-control-radius);
+  background: var(--bg-primary);
+  cursor: pointer;
+}
+
+.prop-colour-label input:focus-visible { outline: 2px solid var(--accent-primary); outline-offset: 1px; }
+.save-prop-icon:disabled { color: var(--text-secondary); opacity: 0.5; cursor: not-allowed; }
+
+.colour-input-group { flex-wrap: wrap; }
+.prop-row .colour-input-group input[type="text"] { min-width: 0; width: 0; }
+.prop-validation { flex-basis: 100%; color: var(--text-secondary); font-size: 11px; line-height: 1.4; }
+
 .input-group {
   flex: 1.5;
   display: flex;
@@ -129,6 +156,8 @@
 .prop-row input:focus {
   border-color: var(--accent-primary);
 }
+
+.prop-row input[aria-invalid="true"] { border-color: var(--accent-secondary); }
 
 .save-prop-icon {
   border: 0;
@@ -170,6 +199,8 @@
     align-items: stretch;
     gap: 4px;
   }
+
+  .prop-colour-label { width: 100%; }
 
   .prop-row input[type="number"],
   .prop-row input[type="text"] {

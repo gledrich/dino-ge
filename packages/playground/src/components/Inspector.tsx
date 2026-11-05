@@ -35,9 +35,13 @@ const SECTIONS: Record<string, { rows: PropertyRowDef[], component: any, descrip
     component: Dino.TextComponent,
     rows: [
       { label: 'Content', type: 'text', propertyPath: 'text' },
-      { label: 'Text colour', type: 'text', propertyPath: 'colour' },
-      { label: 'Background', type: 'text', propertyPath: 'backgroundColour' },
+      { label: 'Text colour', type: 'colour', propertyPath: 'colour' },
+      { label: 'Background', type: 'colour', propertyPath: 'backgroundColour' },
     ]
+  },
+  Appearance: {
+    component: Dino.ShapeComponent,
+    rows: [{ label: 'Fill colour', type: 'colour', propertyPath: 'colour' }],
   },
   Bounds: {
     component: Dino.BoundsComponent,

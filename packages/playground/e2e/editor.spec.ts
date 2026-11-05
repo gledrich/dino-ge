@@ -59,6 +59,58 @@ new Engine({
   })).toContain(`tag: "beta's box"`);
 });
 
+test('previews and saves shape fill colours from CSS text and the colour picker', async ({ page }) => {
+  let source = `import { Engine, Rectangle, Circle, Vector2 } from 'dino-ge';
+new Engine({ onLoad() {
+  new Rectangle({ tag: 'Platform', position: new Vector2(330, 240), width: 64, height: 48, colour: 'red' });
+  new Circle({ tag: 'Badge', position: new Vector2(520, 240), radius: 24 });
+}, update() {} }, { containerId: 'playground-canvas-container' });`;
+  await page.route('**/files', route => route.fulfill({ json: ['script'] }));
+  await page.route('**/api/scripts/script', route => {
+    if (route.request().method() === 'PUT') {
+      source = route.request().postDataJSON().data;
+      return route.fulfill({ json: { success: true } });
+    }
+    return route.fulfill({ json: source });
+  });
+  await page.goto('/');
+  await page.getByRole('button', { name: 'Edit scene', exact: true }).click();
+  await page.getByRole('button', { name: 'Platform', exact: true }).click();
+  const colour = page.getByRole('textbox', { name: 'Fill colour', exact: true });
+  await expect(colour).toHaveValue('red', { timeout: 3000 });
+  const canvas = page.locator('#canvas');
+  const pixel = () => canvas.evaluate((element: HTMLCanvasElement) =>
+    Array.from(element.getContext('2d')!.getImageData(350, 260, 1, 1).data));
+  await colour.fill('rebeccapurple');
+  await expect.poll(pixel).toEqual([102, 51, 153, 255]);
+  const picker = page.getByLabel('Choose fill colour', { exact: true });
+  await expect(picker).toHaveValue('#663399');
+  await colour.fill('broken colour');
+  await expect(colour).toHaveAttribute('aria-invalid', 'true');
+  const save = page.getByRole('button', { name: 'Save Fill colour to code', exact: true });
+  await expect(save).toBeDisabled();
+  expect(await pixel()).toEqual([102, 51, 153, 255]);
+  await picker.fill('#ffd166');
+  await expect(colour).toHaveValue('#ffd166');
+  await expect.poll(pixel).toEqual([255, 209, 102, 255]);
+  await save.click();
+  await page.getByRole('button', { name: 'Badge', exact: true }).click();
+  await expect(colour).toHaveValue('black');
+  await colour.fill('rgba(10, 20, 30, 0.5)');
+  await expect.poll(() => canvas.evaluate((element: HTMLCanvasElement) =>
+    element.getContext('2d')!.getImageData(544, 264, 1, 1).data[0])).toBeGreaterThan(120);
+  await save.click();
+  await page.getByRole('button', { name: 'Save script', exact: true }).click();
+  await expect.poll(() => source).toContain('rgba(10, 20, 30, 0.5)');
+  await page.reload();
+  await page.getByRole('button', { name: 'Edit scene', exact: true }).click();
+  await page.getByRole('button', { name: 'Platform', exact: true }).click();
+  await expect(colour).toHaveValue('#ffd166');
+  await expect.poll(pixel).toEqual([255, 209, 102, 255]);
+  await page.getByRole('button', { name: 'Badge', exact: true }).click();
+  await expect(colour).toHaveValue('rgba(10, 20, 30, 0.5)');
+});
+
 test('uses canvas and code history from the keyboard without losing an unfinished drag', async ({ page }) => {
   await page.route('**/files', route => route.fulfill({ json: ['script'] }));
   await page.route('**/api/scripts/script', route => route.fulfill({ json: `
@@ -2456,6 +2508,9 @@ new Engine({ onLoad() {}, update() {} }, { containerId: 'playground-canvas-conta
   await expect(content).toHaveValue('Ready to play');
   await expect(background).toHaveValue('#fff2bc');
   await expect(page.getByRole('spinbutton', { name: 'X', exact: true })).toHaveValue('210.00');
+  await background.clear();
+  await expect.poll(() => canvas.evaluate((element: HTMLCanvasElement) =>
+    Array.from(element.getContext('2d')!.getImageData(216, 177, 1, 1).data))).toEqual([255, 255, 255, 255]);
 });
 
 test('explains a rejected palette drop without pausing the game or changing the script', async ({ page }) => {
