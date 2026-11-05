@@ -1121,6 +1121,58 @@ new Engine({
   await expect(page.getByText('Click an object to inspect.')).toBeVisible();
 });
 
+test('searches the scene hierarchy while retaining pending changes and branch expansion', async ({ page }) => {
+  await page.route('**/files', route => route.fulfill({ json: ['script'] }));
+  await page.route('**/api/scripts/script', route => route.fulfill({ json: `
+import { Engine, Group, Rectangle, Vector2 } from 'dino-ge';
+new Engine({ onLoad() {
+  const group = new Group('Platforms');
+  const blue = new Rectangle({ tag: 'Blue platform', position: new Vector2(320, 220), width: 64, height: 32 });
+  const red = new Rectangle({ tag: 'Red platform', position: new Vector2(440, 220), width: 64, height: 32 });
+  group.transform.addChild(blue.transform);
+  group.transform.addChild(red.transform);
+  new Rectangle({ tag: 'Spawn marker', position: new Vector2(460, 300), width: 32, height: 32 });
+}, update() {} }, { containerId: 'playground-canvas-container' });` }));
+  await page.goto('/');
+  const group = page.getByRole('button', { name: 'Platforms', exact: true });
+  const blue = page.getByRole('button', { name: 'Blue platform', exact: true });
+  const red = page.getByRole('button', { name: 'Red platform', exact: true });
+  const search = page.getByRole('searchbox', { name: 'Search scene objects', exact: true });
+  await page.getByRole('button', { name: 'Edit scene', exact: true }).click();
+  await page.getByRole('button', { name: 'Collapse children of Platforms', exact: true }).click();
+  await expect(blue).toHaveCount(0);
+
+  await search.fill('  BLUE  ');
+  await expect(group).toBeVisible();
+  await expect(blue).toBeVisible();
+  await expect(red).toHaveCount(0);
+  await expect(page.getByRole('button', { name: 'Spawn marker', exact: true })).toHaveCount(0);
+  await expect(page.getByRole('status').filter({ hasText: '1 match' })).toBeVisible();
+  await search.press('Enter');
+  await expect(blue).toHaveAttribute('aria-pressed', 'true');
+  await blue.press('ArrowRight');
+  await expect(blue).toHaveAccessibleDescription('Pending canvas changes');
+
+  await search.fill('red');
+  await expect(red).toBeVisible();
+  await expect(blue).toHaveCount(0);
+  await expect(group).toHaveAccessibleDescription('Pending canvas changes in filtered children');
+  await expect(page.getByRole('textbox', { name: 'Tag', exact: true })).toHaveValue('Blue platform');
+  await search.press('Escape');
+  await expect(search).toHaveValue('');
+  await expect(group).toHaveAccessibleDescription('Pending canvas changes in collapsed children');
+  await expect(blue).toHaveCount(0);
+
+  await search.fill('missing');
+  await expect(page.getByRole('status').filter({ hasText: 'No matching objects' })).toBeVisible();
+  await page.getByRole('button', { name: 'Clear scene search', exact: true }).click();
+  await expect(search).toBeFocused();
+  await expect(search).toHaveValue('');
+  await page.getByRole('button', { name: 'Expand children of Platforms', exact: true }).click();
+  await expect(blue).toHaveAttribute('aria-pressed', 'true');
+  await expect(blue).toHaveAccessibleDescription('Pending canvas changes');
+});
+
 test('keeps Library labels readable in a narrow sidebar', async ({ page }) => {
   await page.setViewportSize({ width: 768, height: 800 });
   await page.route('**/files', route => route.fulfill({ json: ['script'] }));
