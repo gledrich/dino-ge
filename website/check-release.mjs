@@ -25,7 +25,9 @@ async function verifyTouchMovement(page, game, container, embedded) {
   const cardY = Math.max(54, (box.height - cardHeight - (embedded ? 30 : 0)) / 2);
   await page.touchscreen.tap(box.x + box.width / 2, box.y + cardY + cardHeight - 36);
   const initialX = await game.evaluate(() => window.readExplorerX());
-  await game.getByRole('button', { name: 'Move right' }).tap();
+  const arrow = game.getByRole('button', { name: 'Move right' });
+  assert.equal(await arrow.evaluate(button => getComputedStyle(button).userSelect), 'none');
+  await arrow.tap();
   await game.waitForFunction(x => window.readExplorerX() > x, initialX, { timeout: 5_000 });
 }
 

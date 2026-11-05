@@ -48,6 +48,7 @@ self.addEventListener("fetch", event => {
       '<meta name="viewport" content="width=device-width, initial-scale=1"><title>Game preview</title>' +
       '<style>html,body,#playground-canvas-container{margin:0;width:100%;height:100%;overflow:hidden}canvas{display:block}' +
       '.touch-arrows{position:absolute;inset:auto 0 0;display:flex;justify-content:center;gap:3px;padding:4px;background:#17282a}' +
+      '.touch-arrows,.touch-arrows button{-webkit-user-select:none;user-select:none;-webkit-touch-callout:none}' +
       '.touch-arrows button{flex:1;max-width:56px;min-height:44px;touch-action:none;background:#203234;color:#ffc46f;border:1px solid #586863;border-radius:4px;font:24px system-ui}' +
       '.touch-arrows button:active{background:#ffc46f;color:#20180e}</style>' +
       '<div id="playground-canvas-container"></div>' +

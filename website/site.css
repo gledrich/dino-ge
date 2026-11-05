@@ -65,6 +65,8 @@ pre { overflow: auto; }
 .standalone-game #amber-ruins-viewport { flex: 1; min-height: 0; overflow: hidden; }
 .standalone-game canvas { display: block; }
 .standalone-game .touch-arrows { display: flex; justify-content: center; gap: .3rem; padding: .4rem; background: #17282a; }
+.standalone-game .touch-arrows,
+.standalone-game .touch-arrows button { -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; }
 .standalone-game .touch-arrows button { flex: 1; max-width: 5rem; min-height: 44px; touch-action: none; background: #203234; color: var(--amber); border: 1px solid #586863; border-radius: .25rem; font: 24px system-ui; }
 .standalone-game .touch-arrows button:active { background: var(--amber); color: var(--ink); }
 .relic-demo { display: grid; justify-items: center; gap: .5rem; padding: .75rem 0; }
