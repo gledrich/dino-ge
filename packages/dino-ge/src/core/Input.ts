@@ -201,15 +201,24 @@ export default class Input {
       if (gesture?.kind === 'resize') {
         const obj = gesture.object;
         const geometry = getViewportGeometry(obj);
-        const pointer = projectOntoObjectAxes(geometry,
-          this.mouseX - gesture.offset.x, this.mouseY - gesture.offset.y);
+        const sprite = obj.getComponent(SpriteComponent);
+        const resizesSprite = sprite && sprite.frameWidth > 0 && sprite.frameHeight > 0;
+        const shape = resizesSprite ? undefined : obj.getComponent(ShapeComponent);
+        const isCircle = shape?.type === 'circle';
+        const step = Engine.debugPositionGridSize;
+        const x = this.mouseX - gesture.offset.x;
+        const y = this.mouseY - gesture.offset.y;
+        // A circle has one resize axis. Snap its diameter, since its corner
+        // cannot independently follow both coordinates of a world grid point.
+        const pointer = projectOntoObjectAxes(geometry, isCircle ? x : snapToGrid(x, step),
+          isCircle ? y : snapToGrid(y, step));
         const signX = Math.sign(geometry.scaleX);
         const signY = Math.sign(geometry.scaleY);
-        const width = Math.max(5, pointer.x * signX);
+        const minWidth = isCircle && step > 0 ? Math.ceil(5 / step) * step : 5;
+        const width = Math.max(minWidth, isCircle ? snapToGrid(pointer.x * signX, step) : pointer.x * signX);
         const height = Math.max(5, pointer.y * signY);
 
-        const sprite = obj.getComponent(SpriteComponent);
-        if (sprite && sprite.frameWidth > 0 && sprite.frameHeight > 0) {
+        if (resizesSprite) {
           const parentScale = obj.transform.parent?.worldScale;
           const parentX = parentScale?.x ?? 1;
           const parentY = parentScale?.y ?? 1;
@@ -219,8 +228,7 @@ export default class Input {
           const localWidth = width / Math.abs(geometry.scaleX);
           const localHeight = height / Math.abs(geometry.scaleY);
 
-          const shape = obj.getComponent(ShapeComponent);
-          if (shape?.type === 'circle') {
+          if (isCircle) {
             shape.width = localWidth / 2;
           } else {
             const size = shape ?? obj.getComponent(TextComponent) ?? obj.bounds;

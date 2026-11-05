@@ -1179,6 +1179,74 @@ new Engine({ onLoad() { Engine.camera.position.set(3, 5); }, update() {} },
   await expect(x).toHaveValue('319.00');
 });
 
+test('snaps rotated resize corners and circle diameters with live feedback', async ({ page }) => {
+  await page.route('**/files', route => route.fulfill({ json: ['script'] }));
+  await page.route('**/api/scripts/script', route => route.fulfill({ json: `
+import { Engine, Rectangle, Circle, Vector2 } from 'dino-ge';
+new Engine({ onLoad() {
+  Engine.camera.position.set(13, 17);
+  new Rectangle({ tag: 'Ramp', position: new Vector2(320, 192), width: 64, height: 32, rotation: Math.PI / 4 });
+  new Circle({ tag: 'Orb', position: new Vector2(480, 208), radius: 24 });
+}, update() {} }, { containerId: 'playground-canvas-container' });` }));
+  await page.goto('/');
+  const canvas = page.locator('#canvas');
+  await expect(canvas).toBeVisible();
+  await page.getByRole('button', { name: 'Edit scene', exact: true }).click();
+  await page.getByRole('button', { name: 'Zoom in', exact: true }).click();
+  await page.getByRole('button', { name: 'Snap to grid', exact: true }).click();
+  const box = (await canvas.boundingBox())!;
+  const view = await canvas.evaluate((element: HTMLCanvasElement) => {
+    const { Engine } = window as unknown as {
+      Engine: { camera: { position: { x: number; y: number }; zoom: number } };
+    };
+    const { position, zoom } = Engine.camera;
+    return { x: position.x, y: position.y, zoom, width: element.width, height: element.height };
+  });
+  const move = (x: number, y: number, steps = 1) => page.mouse.move(
+    box.x + (x - view.x) * view.zoom * box.width / view.width,
+    box.y + (y - view.y) * view.zoom * box.height / view.height,
+    { steps },
+  );
+  const readout = page.getByRole('group', { name: 'Current scene gesture' });
+  const width = page.getByRole('spinbutton', { name: 'Width', exact: true });
+  const apply = page.getByRole('button', { name: 'Apply placement to code' });
+  const source = () => page.evaluate(() => {
+    const { monaco } = window as typeof window & { monaco: Monaco };
+    return monaco.editor.getEditors()[0].getValue();
+  });
+  await page.getByRole('button', { name: 'Ramp', exact: true }).click();
+  const dragRampCorner = async () => {
+    await move(342.63, 259.88);
+    await expect(canvas).toHaveCSS('cursor', 'se-resize');
+    await page.mouse.down();
+    await move(365, 277, 5);
+    // The adjusted corner snaps to (368, 272), then projects onto the ramp's axes.
+    await expect(readout).toHaveText('Resize · W 90.51 · H 22.63');
+  };
+  await dragRampCorner();
+  await page.keyboard.press('Escape');
+  await page.mouse.up();
+  await expect(width).toHaveValue('64.00');
+  await expect(apply).toHaveCount(0);
+  await dragRampCorner();
+  await page.mouse.up();
+  await apply.click();
+  await expect.poll(source).toContain('width: 90.509668');
+  await expect.poll(source).toContain('height: 22.627417');
+
+  await page.getByRole('button', { name: 'Orb', exact: true }).click();
+  await move(528, 256);
+  await expect(canvas).toHaveCSS('cursor', 'se-resize');
+  await page.mouse.down();
+  await move(538, 260, 5);
+  await expect(readout).toHaveText('Resize · W 64 · H 64');
+  await page.mouse.up();
+  await apply.click();
+  await expect.poll(source).toContain('radius: 32');
+  await page.getByRole('button', { name: 'Undo code edit' }).click();
+  await expect.poll(source).toContain('radius: 24');
+});
+
 test('places a line, moves it by its stroke and restores the saved geometry', async ({ page }) => {
   let source = `import { Engine } from 'dino-ge';
 new Engine({ onLoad() {}, update() {} }, { containerId: 'playground-canvas-container' });`;

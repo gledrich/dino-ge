@@ -633,7 +633,7 @@ const Viewport: React.FC = () => {
               <button type="button" className="scene-control" onClick={() => zoomView(1.25)}>Zoom in</button>
               <button type="button" className="scene-control" onClick={restoreCamera}>Reset view</button>
               <button type="button" className="scene-control scene-grid-toggle"
-                aria-pressed={isGridSnapping} title={`Snap moves and drops to the ${sceneGridSize} px grid`}
+                aria-pressed={isGridSnapping} title={`Snap moves, resizes and drops to the ${sceneGridSize} px grid`}
                 onClick={() => setIsGridSnapping(enabled => !enabled)}>Snap to grid</button>
               <select className="scene-control scene-grid-size" aria-label="Grid cell size" value={sceneGridSize}
                 onChange={event => setSceneGridSize(Number(event.target.value))}>
