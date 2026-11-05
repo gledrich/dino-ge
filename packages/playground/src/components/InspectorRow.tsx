@@ -1,6 +1,7 @@
 import React, { useEffect, useId, useRef } from 'react';
 import * as Dino from 'dino-ge';
 import { getSurgicalEdit } from '../utils/ast-utils';
+import type { SceneTransformState } from '../utils/scene-objects';
 
 export interface PropertyRowDef {
   label: string;
@@ -22,6 +23,7 @@ export interface InspectableObject extends Dino.GameObject {
  * Maps flat configuration keys (e.g., 'tag', '_physics.velocity.x') to their respective ECS Components.
  */
 export const resolveComponentPath = (obj: InspectableObject, pathStr: string): { target: any, prop: string } | null => {
+  if (pathStr === 'rotation') return { target: obj.transform, prop: 'rotation' };
   const lineProperty = obj instanceof Dino.Line ? lineProperties.get(pathStr) : undefined;
   if (lineProperty) return { target: obj, prop: lineProperty };
 
@@ -86,6 +88,7 @@ const InspectorRow: React.FC<{
 }> = ({ def, selectedObject }) => {
   const inputRef = useRef<HTMLInputElement>(null);
   const inputId = useId();
+  const isRotation = def.propertyPath === 'rotation';
   const [prevSelectedObject, setPrevSelectedObject] = React.useState(selectedObject);
   const [lastSyncedValue, setLastSyncedValue] = React.useState<any>(() => {
     const resolved = resolveComponentPath(selectedObject, def.propertyPath);
@@ -108,13 +111,19 @@ const InspectorRow: React.FC<{
         setLastSyncedValue(resolved.target[resolved.prop]);
       }
     };
+    const onPlacementHistory = (event: Event) => {
+      const { object, state } = (event as CustomEvent<{ object: Dino.GameObject; state: SceneTransformState }>).detail;
+      if (isRotation && object === selectedObject && state.rotation !== undefined) setLastSyncedValue(state.rotation);
+    };
     window.addEventListener('playground-update-code', handleUpdate);
     window.addEventListener('playground-script-selected', handleUpdate);
+    if (isRotation) window.addEventListener('playground-placement-history', onPlacementHistory);
     return () => {
       window.removeEventListener('playground-update-code', handleUpdate);
       window.removeEventListener('playground-script-selected', handleUpdate);
+      if (isRotation) window.removeEventListener('playground-placement-history', onPlacementHistory);
     };
-  }, [selectedObject, def.propertyPath]);
+  }, [selectedObject, def.propertyPath, isRotation]);
 
   // Sync runtime value to the input box and check for modifications
   useEffect(() => {
@@ -129,7 +138,8 @@ const InspectorRow: React.FC<{
           if (def.type === 'checkbox') {
             inputRef.current.checked = !!val;
           } else if (def.type === 'number') {
-            inputRef.current.value = typeof val === 'number' ? val.toFixed(2) : '0';
+            inputRef.current.value = typeof val === 'number'
+              ? (isRotation ? val * (180 / Math.PI) : val).toFixed(2) : '0';
           } else {
             inputRef.current.value = val !== undefined ? String(val) : '';
           }
@@ -139,7 +149,7 @@ const InspectorRow: React.FC<{
         let modified = false;
         if (typeof val === 'number' && typeof lastSyncedValue === 'number') {
           // Use epsilon for float comparison to handle dragging jitter
-          modified = Math.abs(val - lastSyncedValue) > 0.01;
+          modified = Math.abs(val - lastSyncedValue) > (isRotation ? 0.000001 : 0.01);
         } else {
           modified = val !== lastSyncedValue;
         }
@@ -149,13 +159,15 @@ const InspectorRow: React.FC<{
     };
     rafId = requestAnimationFrame(loop);
     return () => cancelAnimationFrame(rafId);
-  }, [selectedObject, def, lastSyncedValue]);
+  }, [selectedObject, def, isRotation, lastSyncedValue]);
 
   const parseValue = (element: HTMLInputElement) => {
     if (def.type === 'checkbox') return element.checked;
     if (def.type !== 'number') return element.value;
     const value = element.valueAsNumber;
-    if (Number.isFinite(value) && !element.validity.rangeUnderflow) return value;
+    if (Number.isFinite(value) && !element.validity.rangeUnderflow) {
+      return isRotation ? value * (Math.PI / 180) : value;
+    }
   };
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -183,7 +195,18 @@ const InspectorRow: React.FC<{
     });
 
     if (edit) {
-      window.dispatchEvent(new CustomEvent('playground-apply-edit', { detail: edit }));
+      if (isRotation) {
+        const accepted = !window.dispatchEvent(new CustomEvent('playground-apply-placement', {
+          cancelable: true,
+          detail: {
+            edits: [edit], object: selectedObject,
+            before: { rotation: lastSyncedValue }, after: { rotation: val },
+          },
+        }));
+        if (!accepted) return;
+      } else {
+        window.dispatchEvent(new CustomEvent('playground-apply-edit', { detail: edit }));
+      }
       setLastSyncedValue(val);
       setIsModified(false);
     } else {

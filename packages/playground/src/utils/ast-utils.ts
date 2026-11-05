@@ -1,6 +1,6 @@
 import * as acorn from 'acorn';
 import { Vector2 } from 'dino-ge';
-import { sceneObjectDefaults, sceneSourceKey, type SceneObjectPlacement } from './scene-objects';
+import { sceneObjectDefaults, sceneObjectKinds, sceneSourceKey, type SceneObjectPlacement } from './scene-objects';
 
 export interface PropertyLocation {
   nodeStart: number;
@@ -551,6 +551,13 @@ export const getSurgicalEdit = (
   };
 
   const found = findPropMapping(mapping.properties, paths);
+  if (propertyPath === 'rotation') {
+    const supportsRotation = mapping.type === 'Sprite' || sceneObjectKinds.some(kind => kind === mapping.type);
+    if (!supportsRotation || (found && !found.mapping.numeric)) return null;
+    const group = sourceId.slice(0, sourceId.lastIndexOf('-') + 1);
+    if (Object.keys(sourceMappingRegistry).filter(id => id.startsWith(group) &&
+        /^\d+$/.test(id.slice(group.length))).length !== 1) return null;
+  }
   if (mapping.type === 'Line' && paths.length === 2 && (paths[0] === 'p1' || paths[0] === 'p2') &&
       !found?.mapping.args?.[paths[1] === 'x' ? 0 : 1]?.numeric) {
     return null;

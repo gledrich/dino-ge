@@ -325,11 +325,24 @@ new Engine({ onLoad() {}, update() {} }, { containerId: 'playground-canvas-conta
   await page.getByRole('spinbutton', { name: 'Width', exact: true }).fill('96');
   await page.getByRole('button', { name: 'Save Width to code', exact: true }).click();
   await expect.poll(readCode).toContain('width: 96');
+  const angle = page.getByRole('spinbutton', { name: 'Rotation (°)', exact: true });
+  const readRotatedPixel = () => canvas.evaluate((element: HTMLCanvasElement) =>
+    Array.from(element.getContext('2d')!.getImageData(145, 180, 1, 1).data));
+  await expect.poll(readRotatedPixel).toEqual([255, 255, 255, 255]);
+  await angle.fill('90');
+  await expect.poll(readRotatedPixel).toEqual([84, 214, 173, 255]);
+  await page.getByRole('button', { name: 'Save Rotation (°) to code', exact: true }).click();
+  await expect.poll(readCode).toContain('rotation: 1.5707963267948966');
+  await undo.click();
+  await expect(angle).toHaveValue('0.00');
+  await redo.click();
+  await expect(angle).toHaveValue('90.00');
   await page.getByRole('button', { name: 'Duplicate object' }).click();
   const copy = page.getByRole('button', { name: 'New rectangle copy', exact: true });
   await expect(copy).toHaveAttribute('aria-pressed', 'true');
   await expect(page.getByRole('spinbutton', { name: 'X', exact: true })).toHaveValue('204.00');
   await expect(page.getByRole('spinbutton', { name: 'Width', exact: true })).toHaveValue('96.00');
+  await expect(angle).toHaveValue('90.00');
   await undo.click();
   await expect(copy).toHaveCount(0);
   await expect.poll(readCode).not.toContain('New rectangle copy');
@@ -347,6 +360,7 @@ new Engine({ onLoad() {}, update() {} }, { containerId: 'playground-canvas-conta
   await rectangle.press('Enter');
   await expect(page.getByRole('spinbutton', { name: 'X', exact: true })).toHaveValue('180.00');
   await expect(page.getByRole('spinbutton', { name: 'Y', exact: true })).toHaveValue('150.00');
+  await expect(angle).toHaveValue('90.00');
   await expect(circle).toHaveCount(0);
   await expect(copy).toBeVisible();
 });

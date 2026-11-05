@@ -27,6 +27,7 @@ export interface ScenePoint { x: number; y: number }
 
 export interface SceneTransformState {
   position?: ScenePoint;
+  rotation?: number;
   scale?: ScenePoint;
   size?: ScenePoint;
 }
@@ -82,6 +83,7 @@ export function nudgeSceneSelection(event: Pick<KeyboardEvent, 'key' | 'shiftKey
 
 export function restoreSceneTransform(object: Dino.GameObject, state: SceneTransformState) {
   if (state.position) object.transform.position.set(state.position.x, state.position.y);
+  if (state.rotation !== undefined) object.transform.rotation = state.rotation;
   if (state.scale) object.transform.scale.set(state.scale.x, state.scale.y);
   if (!state.size) return;
   const shape = object.getComponent(Dino.ShapeComponent);

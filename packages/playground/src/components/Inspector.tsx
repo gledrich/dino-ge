@@ -29,7 +29,7 @@ const SECTIONS: Record<string, { rows: PropertyRowDef[], component: any, descrip
       { label: 'Y', type: 'number', propertyPath: 'position.y' },
       { label: 'Scale X', type: 'number', propertyPath: 'scale.x' },
       { label: 'Scale Y', type: 'number', propertyPath: 'scale.y' },
-      { label: 'Rotation', type: 'number', propertyPath: 'rotation' }
+      { label: 'Rotation (°)', type: 'number', propertyPath: 'rotation' }
     ]
   },
   Text: {

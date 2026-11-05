@@ -208,8 +208,11 @@ const CodeEditor: React.FC<EditorProps> = ({ currentScriptId, onRefresh }) => {
       const model: editor.ITextModel | null = monacoEditorRef.current?.getModel();
       const run = document.querySelector<HTMLElement>('script[data-playground-script]');
       const scene = Dino.Engine.currentScene;
+      const objects = scene?.objects ?? Dino.Engine.objects;
       if (!model || run?.dataset.playgroundScript !== currentScriptId ||
-          !(scene?.objects ?? Dino.Engine.objects).has(object)) return;
+          !objects.has(object)) return;
+      if (after.rotation !== undefined && (!object.metadata.sourceId ||
+          Array.from(objects).filter(item => item.metadata.sourceId === object.metadata.sourceId).length !== 1)) return;
       const previousRevision = model.getAlternativeVersionId();
       if (!applySourceEdits(edits)) return;
       const revision = model.getAlternativeVersionId();
@@ -461,7 +464,8 @@ const CodeEditor: React.FC<EditorProps> = ({ currentScriptId, onRefresh }) => {
       const state = event.isUndoing ? transform.before : transform.after;
       restoreSceneTransform(object, state);
       window.dispatchEvent(new CustomEvent('playground-placement-history', { detail: { object, state } }));
-      const detail = `${event.isUndoing ? 'Undid' : 'Restored'} placement for ${object.metadata.tag}.`;
+      const change = state.rotation === undefined ? 'placement' : 'rotation';
+      const detail = `${event.isUndoing ? 'Undid' : 'Restored'} ${change} for ${object.metadata.tag}.`;
       window.dispatchEvent(new CustomEvent('playground-scene-history', { detail }));
       return;
     }
