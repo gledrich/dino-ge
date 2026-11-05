@@ -52,6 +52,46 @@ new Engine({
   })).toContain(`tag: "beta's box"`);
 });
 
+test('keeps live Inspector values and save controls readable in a narrow panel', async ({ page }) => {
+  await page.setViewportSize({ width: 768, height: 800 });
+  await page.route('**/files', route => route.fulfill({ json: ['script'] }));
+  await page.route('**/api/scripts/script', route => route.fulfill({ json: `
+import { Engine, Rectangle, Vector2 } from 'dino-ge';
+new Engine({ onLoad() {
+  new Rectangle({ tag: 'Platform', position: new Vector2(350, 220), width: 64, height: 48 });
+}, update() {} }, { containerId: 'playground-canvas-container' });` }));
+  await page.goto('/');
+  await page.getByRole('button', { name: 'Edit scene', exact: true }).click();
+  await page.getByRole('button', { name: 'Platform', exact: true }).click();
+
+  const rotation = page.getByRole('spinbutton', { name: 'Rotation (°)', exact: true });
+  await expect(rotation).toHaveValue('0.00');
+  const layout = await rotation.evaluate((input: HTMLInputElement) => {
+    const field = input.getBoundingClientRect();
+    const label = input.labels![0].getBoundingClientRect();
+    return { fieldWidth: field.width, labelAboveField: label.bottom <= field.top };
+  });
+  expect(layout.labelAboveField).toBe(true);
+  expect(layout.fieldWidth).toBeGreaterThanOrEqual(72);
+
+  await rotation.fill('-123.45');
+  await expect.poll(() => page.evaluate(() => {
+    const { Engine } = window as unknown as { Engine: { selectedObject: { transform: { rotation: number } } } };
+    return Engine.selectedObject.transform.rotation * 180 / Math.PI;
+  })).toBeCloseTo(-123.45);
+  const save = page.getByRole('button', { name: 'Save Rotation (°) to code', exact: true });
+  await expect(save).toHaveCSS('opacity', '1');
+  const { width, height } = (await save.boundingBox())!;
+  expect(Math.min(width, height)).toBeGreaterThanOrEqual(32);
+  await save.press('Enter');
+  await expect.poll(() => page.evaluate(() => {
+    const { monaco } = window as typeof window & { monaco: Monaco };
+    const code = monaco.editor.getEditors()[0].getValue();
+    const angle = code.match(/new Rectangle\(\{\s*rotation:\s*(-[\d.]+),/)?.[1];
+    return Number(angle) * 180 / Math.PI;
+  })).toBeCloseTo(-123.45);
+});
+
 test('Edit scene isolates gameplay and shows live changes to a nested object', async ({ page }) => {
   await page.route('**/files', route => route.fulfill({ json: ['script'] }));
   await page.route('**/api/scripts/script', route => route.fulfill({ json: `
