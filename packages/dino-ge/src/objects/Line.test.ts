@@ -100,6 +100,26 @@ describe('Line', () => {
     expect(containsViewportPoint(line, geometry, 130, 30, 5)).toBe(false);
   });
 
+  it('updates the rendered endpoints, stroke and bounds through the line properties', () => {
+    const line = new Line({
+      position: new Vector2(120, 50),
+      p1: new Vector2(0, 0),
+      p2: new Vector2(96, 0),
+      width: 4,
+    });
+    line.x1 = 10;
+    line.y1 = -5;
+    line.x2 = 140;
+    line.y2 = 25;
+    line.strokeWidth = 12;
+    const segment = line.getComponent(LineComponent)!;
+    expect(segment.p1).toEqual(new Vector2(10, -5));
+    expect(segment.p2).toEqual(new Vector2(140, 25));
+    expect(segment.strokeWidth).toBe(12);
+    expect(line.bounds).toMatchObject({ width: 130, height: 30 });
+    expect(line.transform.position).toMatchObject({ x: 120, y: 50 });
+  });
+
   it('initialises with isSensor set to true', () => {
     const obj = new Line({ 
       p1: new Vector2(), 

@@ -49,16 +49,46 @@ const defaultProps = {
  * A basic line object that can be drawn between two points.
  */
 export default class Line extends GameObject {
+  private readonly lineComponent: LineComponent;
+
   /** Stroke width of the line in pixels. */
-  public strokeWidth: number;
-  /** Start x coordinate in world space. */
-  public x1: number;
-  /** Start y coordinate in world space. */
-  public y1: number;
-  /** End x coordinate in world space. */
-  public x2: number;
-  /** End y coordinate in world space. */
-  public y2: number;
+  get strokeWidth(): number { return this.lineComponent.strokeWidth; }
+  set strokeWidth(value: number) { this.lineComponent.strokeWidth = value; }
+
+  /** Start x coordinate relative to the line's transform. */
+  get x1(): number { return this.lineComponent.p1.x; }
+  set x1(value: number) {
+    this.lineComponent.p1.x = value;
+    this.updateBounds();
+  }
+
+  /** Start y coordinate relative to the line's transform. */
+  get y1(): number { return this.lineComponent.p1.y; }
+  set y1(value: number) {
+    this.lineComponent.p1.y = value;
+    this.updateBounds();
+  }
+
+  /** End x coordinate relative to the line's transform. */
+  get x2(): number { return this.lineComponent.p2.x; }
+  set x2(value: number) {
+    this.lineComponent.p2.x = value;
+    this.updateBounds();
+  }
+
+  /** End y coordinate relative to the line's transform. */
+  get y2(): number { return this.lineComponent.p2.y; }
+  set y2(value: number) {
+    this.lineComponent.p2.y = value;
+    this.updateBounds();
+  }
+
+  private updateBounds() {
+    const bounds = this.bounds;
+    if (!bounds) return;
+    bounds.width = Math.abs(this.x2 - this.x1);
+    bounds.height = Math.abs(this.y2 - this.y1);
+  }
 
   /** Gets the starting position of the line as a Vector2. */
   public get startPosition(): Vector2 { return new Vector2(this.x1, this.y1); }
@@ -76,11 +106,7 @@ export default class Line extends GameObject {
     };
 
     this.metadata.tag = defaultedProps.tag;
-    this.strokeWidth = defaultedProps.width;
-    this.x1 = defaultedProps.p1.x;
-    this.y1 = defaultedProps.p1.y;
-    this.x2 = defaultedProps.p2.x;
-    this.y2 = defaultedProps.p2.y;
+    this.lineComponent = new LineComponent(defaultedProps.width, defaultedProps.p1, defaultedProps.p2);
     this.metadata.zIndex = defaultedProps.zIndex;
     this.transform.position = defaultedProps.position ?? defaultedProps.p1;
 
@@ -89,7 +115,7 @@ export default class Line extends GameObject {
     this.bounds = new BoundsComponent(width, height);
     this.addComponent(this.bounds);
 
-    this.addComponent(new LineComponent(this.strokeWidth, defaultedProps.p1, defaultedProps.p2));
+    this.addComponent(this.lineComponent);
 
     if (props.visible !== undefined) {
       this.addComponent(new VisibilityComponent(props.visible));
