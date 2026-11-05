@@ -3,6 +3,7 @@ import Editor from '@monaco-editor/react';
 import { typescript, type editor } from 'monaco-editor';
 import * as Dino from 'dino-ge';
 import { usePlayground } from '../context/PlaygroundContext';
+import { restoreInspectorProperty, type InspectorPropertyEdit } from './InspectorRow';
 import ProjectFilesDialog from './ProjectFilesDialog';
 import { openProjectObjectSourceEvent, type ProjectObjectSourceRequest } from '../utils/project-object-source';
 import { createScript, getCurrentScriptId, getScript, getFilesList, getSpriteImageFileError, readGameFolder, importGameFolder, importSpriteImage, type GameFolder } from '../utils/helpers';
@@ -28,6 +29,7 @@ type SceneHistoryEntry = {
 } & (
   | { transforms: CanvasTransformChange[] }
   | { object: Dino.GameObject; tagChange: { before: ObjectTagState; after: ObjectTagState } }
+  | { object: Dino.GameObject; propertyChange: Omit<InspectorPropertyEdit, 'edit' | 'object'> }
   | { object: Dino.GameObject; spriteImage?: { before: HTMLImageElement; after: HTMLImageElement }; removed?: boolean }
 );
 
@@ -538,7 +540,17 @@ const CodeEditor: React.FC<EditorProps> = ({ currentScriptId, onSave, onSelectSc
     };
 
     const handleApplyEditEvent = (event: Event) => {
-      if (applySourceEdits([(event as CustomEvent<Edit>).detail])) event.preventDefault();
+      const { edit, object, ...propertyChange } = (event as CustomEvent<InspectorPropertyEdit>).detail;
+      const model = monacoEditorRef.current?.getModel();
+      const run = document.querySelector<HTMLElement>('script[data-playground-script]');
+      const scene = Dino.Engine.currentScene;
+      const objects = scene?.objects ?? Dino.Engine.objects;
+      if (!model || run?.dataset.playgroundScript !== currentScriptId || !objects.has(object)) return;
+      const before = model.getAlternativeVersionId();
+      if (!applySourceEdits([edit])) return;
+      const after = model.getAlternativeVersionId();
+      if (before !== after) recordSceneHistory({ model, run, scene, object, before, after, propertyChange });
+      event.preventDefault();
     };
 
     const handleApplyMultiEditEvent = (event: Event) => {
@@ -637,6 +649,12 @@ const CodeEditor: React.FC<EditorProps> = ({ currentScriptId, onSave, onSelectSc
       updateObjectTag(entry.object, state);
       const detail = `${event.isUndoing ? 'Undid' : 'Restored'} the tag change for ${state.tag}.`;
       window.dispatchEvent(new CustomEvent('playground-scene-history', { detail }));
+      return;
+    }
+    if ('propertyChange' in entry) {
+      const { object, propertyChange } = entry;
+      if (!objects.has(object)) return;
+      restoreInspectorProperty(object, propertyChange.path, event.isUndoing ? propertyChange.before : propertyChange.after);
       return;
     }
     const { object, spriteImage, removed } = entry;

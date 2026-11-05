@@ -1,6 +1,6 @@
 import React, { useEffect, useId, useLayoutEffect, useRef } from 'react';
 import * as Dino from 'dino-ge';
-import { getSurgicalEdit, type CanvasPlacementTransaction } from '../utils/ast-utils';
+import { getSurgicalEdit, type CanvasPlacementTransaction, type Edit } from '../utils/ast-utils';
 import { getCanvasPlacementBaseline, isCanvasTransformProperty, renameEntryObjectEvent, restoreSceneTransform, sceneObjectTagHistoryEvent, type EntryObjectRename, type SceneTransformState } from '../utils/scene-objects';
 
 export interface PropertyRowDef {
@@ -10,6 +10,17 @@ export interface PropertyRowDef {
   min?: number;
   emptyColourLabel?: string;
 }
+
+export interface InspectorPropertyEdit {
+  edit: Edit;
+  object: Dino.GameObject;
+  path: string;
+  before: unknown;
+  after: string | number | boolean;
+}
+
+const inspectorPropertyHistoryEvent = 'playground-inspector-property-history';
+const inspectorBaselines = new WeakMap<Dino.GameObject, Map<string, unknown>>();
 
 const lineProperties = new Map([
   ['p1.x', 'x1'], ['p1.y', 'y1'], ['p2.x', 'x2'], ['p2.y', 'y2'], ['width', 'strokeWidth'],
@@ -107,6 +118,21 @@ export const resolveComponentPath = (obj: InspectableObject, pathStr: string): {
   return { target, prop: propPath };
 };
 
+function getInspectorBaseline(object: Dino.GameObject, path: string) {
+  const baselines = inspectorBaselines.get(object);
+  if (baselines?.has(path)) return baselines.get(path);
+  const resolved = resolveComponentPath(object, path);
+  return resolved?.target?.[resolved.prop];
+}
+
+export function restoreInspectorProperty(object: Dino.GameObject, path: string, value: unknown) {
+  const resolved = resolveComponentPath(object, path);
+  if (!resolved?.target) return;
+  resolved.target[resolved.prop] = value;
+  inspectorBaselines.get(object)?.delete(path);
+  window.dispatchEvent(new CustomEvent(inspectorPropertyHistoryEvent, { detail: { object, path } }));
+}
+
 /**
  * Individual input row for a property, handles its own sync loop and value formatting.
  */
@@ -130,10 +156,7 @@ const InspectorRow: React.FC<{
   const [syncError, setSyncError] = React.useState('');
   const invalid = (isColour || isModuleDimension) && !isValid;
   const [prevSelectedObject, setPrevSelectedObject] = React.useState(selectedObject);
-  const [lastSyncedValue, setLastSyncedValue] = React.useState<any>(() => {
-    const resolved = resolveComponentPath(selectedObject, def.propertyPath);
-    return resolved && resolved.target ? resolved.target[resolved.prop] : undefined;
-  });
+  const [lastSyncedValue, setLastSyncedValue] = React.useState(() => getInspectorBaseline(selectedObject, def.propertyPath));
   const [isModified, setIsModified] = React.useState(false);
 
   useLayoutEffect(() => {
@@ -146,8 +169,7 @@ const InspectorRow: React.FC<{
     setPrevSelectedObject(selectedObject);
     setIsValid(true);
     setSyncError('');
-    const resolved = resolveComponentPath(selectedObject, def.propertyPath);
-    setLastSyncedValue(resolved && resolved.target ? resolved.target[resolved.prop] : undefined);
+    setLastSyncedValue(getInspectorBaseline(selectedObject, def.propertyPath));
   }
 
   // Refresh baseline when code is updated externally
@@ -155,6 +177,7 @@ const InspectorRow: React.FC<{
     const handleUpdate = () => {
       const resolved = resolveComponentPath(selectedObject, def.propertyPath);
       if (resolved && resolved.target) {
+        inspectorBaselines.get(selectedObject)?.delete(def.propertyPath);
         setLastSyncedValue(resolved.target[resolved.prop]);
       }
     };
@@ -168,15 +191,21 @@ const InspectorRow: React.FC<{
         setSyncError('');
       }
     };
+    const onPropertyHistory = (event: Event) => {
+      const { object, path } = (event as CustomEvent<Pick<InspectorPropertyEdit, 'object' | 'path'>>).detail;
+      if (object === selectedObject && path === def.propertyPath) handleUpdate();
+    };
     window.addEventListener('playground-update-code', handleUpdate);
     window.addEventListener('playground-script-selected', handleUpdate);
     window.addEventListener('playground-placement-history', onPlacementHistory);
     window.addEventListener(sceneObjectTagHistoryEvent, onTagHistory);
+    window.addEventListener(inspectorPropertyHistoryEvent, onPropertyHistory);
     return () => {
       window.removeEventListener('playground-update-code', handleUpdate);
       window.removeEventListener('playground-script-selected', handleUpdate);
       window.removeEventListener('playground-placement-history', onPlacementHistory);
       window.removeEventListener(sceneObjectTagHistoryEvent, onTagHistory);
+      window.removeEventListener(inspectorPropertyHistoryEvent, onPropertyHistory);
     };
   }, [selectedObject, def.propertyPath]);
 
@@ -255,6 +284,13 @@ const InspectorRow: React.FC<{
     }
     const resolved = resolveComponentPath(selectedObject, def.propertyPath);
     if (resolved?.target && val !== undefined) {
+      // Keep the starting value with the live object when the row is unmounted.
+      let baselines = inspectorBaselines.get(selectedObject);
+      if (!baselines) {
+        baselines = new Map();
+        inspectorBaselines.set(selectedObject, baselines);
+      }
+      if (!baselines.has(def.propertyPath)) baselines.set(def.propertyPath, lastSyncedValue);
       resolved.target[resolved.prop] = val;
     }
   };
@@ -300,8 +336,12 @@ const InspectorRow: React.FC<{
         }));
         if (!accepted) return;
       } else {
-        if (window.dispatchEvent(new CustomEvent('playground-apply-edit', { detail: edit, cancelable: true }))) return;
+        if (window.dispatchEvent(new CustomEvent<InspectorPropertyEdit>('playground-apply-edit', {
+          detail: { edit, object: selectedObject, path: def.propertyPath, before: lastSyncedValue, after: val },
+          cancelable: true,
+        }))) return;
       }
+      inspectorBaselines.get(selectedObject)?.delete(def.propertyPath);
       setLastSyncedValue(val);
       setIsModified(false);
     } else {

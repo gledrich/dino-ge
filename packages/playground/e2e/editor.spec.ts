@@ -1839,9 +1839,26 @@ new Engine({ onLoad() {}, update() {} }, { containerId: 'playground-canvas-conta
   await expect(circle).toHaveCount(0);
 
   await rectangle.press('Enter');
-  await page.getByRole('spinbutton', { name: 'Width', exact: true }).fill('96');
+  const width = page.getByRole('spinbutton', { name: 'Width', exact: true });
+  const height = page.getByRole('spinbutton', { name: 'Height', exact: true });
+  const readWidth = () => page.evaluate(() => (window as typeof window & {
+    Engine: { selectedObject?: { bounds: { width: number } } };
+  }).Engine.selectedObject?.bounds.width);
+  await width.fill('96');
   await page.getByRole('button', { name: 'Save Width to code', exact: true }).click();
   await expect.poll(readCode).toContain('width: 96');
+  await height.fill('60');
+  await undo.click();
+  await expect.poll(readCode).toContain('width: 80');
+  await expect(width).toHaveValue('80.00');
+  await expect.poll(readWidth).toBe(80);
+  await expect(height).toHaveValue('60.00');
+  await redo.click();
+  await expect.poll(readCode).toContain('width: 96');
+  await expect(width).toHaveValue('96.00');
+  await expect.poll(readWidth).toBe(96);
+  await expect(height).toHaveValue('60.00');
+  await height.fill('48');
   const angle = page.getByRole('spinbutton', { name: 'Rotation (°)', exact: true });
   const readRotatedPixel = () => canvas.evaluate((element: HTMLCanvasElement) =>
     Array.from(element.getContext('2d')!.getImageData(145, 180, 1, 1).data));
@@ -2594,6 +2611,32 @@ new Engine({ async onLoad() {
   await page.getByRole('button', { name: 'Undo code edit' }).click();
   await expect(scaleX).toHaveValue('1.20');
   await expect(scaleY).toHaveValue('0.80');
+});
+
+test('keeps the original Inspector value for undo after switching selection', async ({ page }) => {
+  await page.route('**/files', route => route.fulfill({ json: ['script'] }));
+  await page.route('**/api/scripts/script', route => route.fulfill({ json: `
+import { Engine, Rectangle, Vector2 } from 'dino-ge';
+new Engine({ onLoad() {
+  new Rectangle({ tag: 'Gate', position: new Vector2(120, 120), width: 80, height: 48 });
+  new Rectangle({ tag: 'Key', position: new Vector2(220, 120), width: 32, height: 24 });
+} }, { containerId: 'playground-canvas-container' });` }));
+  await page.goto('/');
+  await page.getByRole('button', { name: 'Edit scene', exact: true }).click();
+  const gate = page.getByRole('button', { name: 'Gate', exact: true });
+  const width = page.getByRole('spinbutton', { name: 'Width', exact: true });
+  await gate.press('Enter');
+  await expect(width).toHaveValue('80.00');
+  await width.fill('96');
+  await page.getByRole('button', { name: 'Key', exact: true }).press('Enter');
+  await expect(width).toHaveValue('32.00');
+  await gate.press('Enter');
+  await expect(width).toHaveValue('96.00');
+  const saveWidth = page.getByRole('button', { name: 'Save Width to code', exact: true });
+  await expect(saveWidth).toHaveCSS('pointer-events', 'all');
+  await saveWidth.click();
+  await page.getByRole('button', { name: 'Undo code edit', exact: true }).click();
+  await expect(width).toHaveValue('80.00');
 });
 
 test('edits circle radius in the Inspector and undoes it in code and the live scene', async ({ page }) => {
