@@ -44,6 +44,10 @@ export interface ScreenUIControl extends ScreenRect {
   colour?: string;
   background?: string;
   font?: string;
+  reversedX?: boolean;
+  reversedY?: boolean;
+  /** Preview bounds at the original position, before applying move offsets. */
+  painted?: ScreenRect;
 }
 
 export interface ScreenUISnapshot {
@@ -59,6 +63,18 @@ export interface ScreenUIPositionPreview {
   /** Offset from the current draw position in canvas pixels. */
   x: number;
   y: number;
+  properties?: ScreenUIPropertyChanges;
+}
+
+export interface ScreenUIPropertyChanges {
+  /** Change in the visual dimensions in canvas pixels. */
+  width?: number;
+  height?: number;
+  text?: string;
+  colour?: string;
+  background?: string;
+  font?: string;
+  enabled?: boolean;
 }
 
 export interface ScreenUIEditing {
@@ -79,6 +95,23 @@ interface ObservedFrame {
 }
 
 const controlTextFields = ['id', 'text', 'colour', 'background', 'font'] as const;
+let styleContext: CanvasRenderingContext2D | null | undefined;
+
+/** Check whether Canvas 2D accepts a Screen UI style without changing the game's context. */
+export function isScreenUIStyle(field: 'colour' | 'background' | 'font', value: string): boolean {
+  if (typeof document === 'undefined') return false;
+  styleContext ??= document.createElement('canvas').getContext('2d');
+  if (!styleContext) return false;
+  const property = field === 'font' ? 'font' : 'fillStyle';
+  const sentinels = field === 'font' ? ['11px serif', '23px monospace'] : ['#123456', '#fedcba'];
+  for (const sentinel of sentinels) {
+    styleContext[property] = sentinel;
+    const before = styleContext[property];
+    styleContext[property] = value;
+    if (styleContext[property] !== before) return true;
+  }
+  return false;
+}
 
 function matchesDrawnControl(control: ScreenUIControl, target: ScreenUIControl): boolean {
   if (control.kind !== target.kind) return false;
@@ -86,7 +119,42 @@ function matchesDrawnControl(control: ScreenUIControl, target: ScreenUIControl):
   return control.x === target.x && control.y === target.y &&
     control.width === target.width && control.height === target.height &&
     control.text === target.text && control.colour === target.colour &&
-    control.background === target.background && control.font === target.font;
+    control.background === target.background && control.font === target.font &&
+    control.reversedX === target.reversedX && control.reversedY === target.reversedY;
+}
+
+function normaliseRect(rect: ScreenRect): void {
+  if (rect.width < 0) {
+    rect.x += rect.width;
+    rect.width = -rect.width;
+  }
+  if (rect.height < 0) {
+    rect.y += rect.height;
+    rect.height = -rect.height;
+  }
+}
+
+function resizedDimension(size: number, delta?: number): number {
+  if (!delta || !Number.isFinite(delta)) return size;
+  const magnitude = Math.abs(size) + delta;
+  return Number.isFinite(magnitude) ? Math.max(1, magnitude) * (size < 0 ? -1 : 1) : size;
+}
+
+function previewRect({ x, y, width, height }: ScreenRect, control: ScreenUIControl, edit: ScreenUIPositionPreview): ScreenRect {
+  const painted = {
+    x: x + edit.x, y: y + edit.y,
+    width: resizedDimension(width, edit.properties?.width),
+    height: resizedDimension(height, edit.properties?.height),
+  };
+  if (painted.width !== width || painted.height !== height) {
+    control.painted = { ...painted, x, y };
+    normaliseRect(control.painted);
+  }
+  return painted;
+}
+
+function previewText(value: string | undefined, original: string): string {
+  return typeof value === 'string' ? value : original;
 }
 
 /** A screen-space canvas layer. The game chooses which controls to draw each frame. */
@@ -192,8 +260,10 @@ export default class ScreenUI {
       return;
     }
     const { x, y, width, height } = rect;
-    const position = this.record(frame, { kind: 'panel', x, y, width, height, colour });
-    this.drawPanel({ x: position ? x + position.x : x, y: position ? y + position.y : y, width, height }, colour);
+    const dimensions = { x, y, width, height };
+    const control: ScreenUIControl = { kind: 'panel', ...dimensions, colour };
+    const edit = this.record(frame, control);
+    this.drawPanel(edit ? previewRect(dimensions, control, edit) : dimensions, previewText(edit?.properties?.colour, colour));
   }
 
   label(label: ScreenLabel): void {
@@ -202,12 +272,14 @@ export default class ScreenUI {
 
   image(image: CanvasImageSource, { x, y, width, height }: ScreenRect): void {
     const frame = this.observedFrame;
-    const position = frame && this.record(frame, { kind: 'image', x, y, width, height });
-    if (position) {
-      x += position.x;
-      y += position.y;
+    const control: ScreenUIControl | undefined = frame && { kind: 'image', x, y, width, height };
+    const edit = frame && control && this.record(frame, control);
+    if (control && edit) {
+      const painted = previewRect({ x, y, width, height }, control, edit);
+      this.ctx.drawImage(image, painted.x, painted.y, painted.width, painted.height);
+    } else {
+      this.ctx.drawImage(image, x, y, width, height);
     }
-    this.ctx.drawImage(image, x, y, width, height);
   }
 
   button(button: ScreenButton): void {
@@ -215,29 +287,35 @@ export default class ScreenUI {
     const { x, y, width, height, text, enabled = true, colour = '#fff',
       background = '#25383e', hoverBackground = '#39515a', font = 'bold 14px sans-serif' } = button;
     const frame = this.observedFrame;
-    const position = frame && this.record(frame, {
+    const control: ScreenUIControl | undefined = frame && {
       kind: 'button', x, y, width, height, id: button.id, text, enabled, colour, background, font,
-    });
-    const paintX = position ? x + position.x : x;
-    const paintY = position ? y + position.y : y;
-    const highlighted = enabled && !frame?.editing && ((this.pointer && this.contains(button, this.pointer)) ||
+    };
+    const edit = frame && control && this.record(frame, control);
+    const properties = edit?.properties;
+    const rect = { x, y, width, height };
+    const painted = control && edit ? previewRect(rect, control, edit) : rect;
+    const paintEnabled = typeof properties?.enabled === 'boolean' ? properties.enabled : enabled;
+    const highlighted = paintEnabled && !frame?.editing && ((this.pointer && this.contains(button, this.pointer)) ||
       (this.focused === (button.id ?? text) && document.activeElement === this.canvas));
-    this.drawPanel({ x: paintX, y: paintY, width, height }, highlighted ? hoverBackground : enabled ? background : '#424c4e');
-    this.drawLabel({ x: paintX + width / 2, y: paintY + height / 2, text, align: 'center', colour, font, maxWidth: width - 8 });
+    this.drawPanel(painted, highlighted ? hoverBackground : paintEnabled ? previewText(properties?.background, background) : '#424c4e');
+    this.drawLabel({
+      x: painted.x + painted.width / 2, y: painted.y + painted.height / 2,
+      text: previewText(properties?.text, text), align: 'center', colour: previewText(properties?.colour, colour),
+      font: previewText(properties?.font, font), maxWidth: painted.width - 8,
+    });
   }
 
   progressBar({ value, colour = '#f6b754', background = '#30434a', x, y, width, height }: ScreenProgressBar): void {
     const progress = Number.isFinite(value) ? Math.min(1, Math.max(0, value)) : 0;
     const frame = this.observedFrame;
-    const position = frame && this.record(frame, {
+    const control: ScreenUIControl | undefined = frame && {
       kind: 'progressBar', x, y, width, height, value: progress, colour, background,
-    });
-    if (position) {
-      x += position.x;
-      y += position.y;
-    }
-    this.drawPanel({ x, y, width, height }, background);
-    this.drawPanel({ x, y, width: width * progress, height }, colour);
+    };
+    const edit = frame && control && this.record(frame, control);
+    const rect = { x, y, width, height };
+    const painted = control && edit ? previewRect(rect, control, edit) : rect;
+    this.drawPanel(painted, previewText(edit?.properties?.background, background));
+    this.drawPanel({ ...painted, width: painted.width * progress }, previewText(edit?.properties?.colour, colour));
   }
 
   dispose(): void {
@@ -267,24 +345,36 @@ export default class ScreenUI {
     this.ctx.textAlign = align;
     this.ctx.textBaseline = 'middle';
     if (frame && typeof text === 'string') {
-      const metrics = this.ctx.measureText(text);
-      const scale = maxWidth === undefined || metrics.width <= 0
-        ? 1 : Math.min(1, Math.max(0, maxWidth) / metrics.width);
-      const position = this.record(frame, {
-        kind: 'label',
-        x: x - metrics.actualBoundingBoxLeft * scale,
-        y: y - metrics.actualBoundingBoxAscent,
-        width: (metrics.actualBoundingBoxLeft + metrics.actualBoundingBoxRight) * scale,
-        height: metrics.actualBoundingBoxAscent + metrics.actualBoundingBoxDescent,
-        text, colour, font: this.ctx.font,
-      });
-      if (position) {
-        x += position.x;
-        y += position.y;
+      const control: ScreenUIControl = {
+        kind: 'label', ...this.measureLabel(x, y, text, maxWidth), text, colour, font: this.ctx.font,
+      };
+      const edit = this.record(frame, control);
+      if (edit) {
+        x += edit.x;
+        y += edit.y;
+        const paintedText = previewText(edit.properties?.text, text);
+        this.ctx.fillStyle = previewText(edit.properties?.colour, colour);
+        this.ctx.font = previewText(edit.properties?.font, font);
+        if (paintedText !== text || this.ctx.font !== control.font) {
+          control.painted = this.measureLabel(x - edit.x, y - edit.y, paintedText, maxWidth);
+        }
+        text = paintedText;
       }
     }
     if (maxWidth === undefined) this.ctx.fillText(text, x, y);
     else this.ctx.fillText(text, x, y, maxWidth);
+  }
+
+  private measureLabel(x: number, y: number, text: string, maxWidth?: number): ScreenRect {
+    const metrics = this.ctx.measureText(text);
+    const scale = maxWidth === undefined || metrics.width <= 0
+      ? 1 : Math.min(1, Math.max(0, maxWidth) / metrics.width);
+    return {
+      x: x - metrics.actualBoundingBoxLeft * scale,
+      y: y - metrics.actualBoundingBoxAscent,
+      width: (metrics.actualBoundingBoxLeft + metrics.actualBoundingBoxRight) * scale,
+      height: metrics.actualBoundingBoxAscent + metrics.actualBoundingBoxDescent,
+    };
   }
 
   private getEditing(): ScreenUIEditing | undefined {
@@ -308,14 +398,9 @@ export default class ScreenUI {
 
   private record(frame: ObservedFrame, control: ScreenUIControl): ScreenUIPositionPreview | undefined {
     const { width, height } = control;
-    if (width < 0) {
-      control.x += width;
-      control.width = -width;
-    }
-    if (height < 0) {
-      control.y += height;
-      control.height = -height;
-    }
+    if (width < 0) control.reversedX = true;
+    if (height < 0) control.reversedY = true;
+    normaliseRect(control);
     if (![control.x, control.y, width, height].every(Number.isFinite)) return;
     for (const field of controlTextFields) {
       if (typeof control[field] !== 'string') delete control[field];

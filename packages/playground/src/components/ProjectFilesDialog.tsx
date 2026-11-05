@@ -146,7 +146,9 @@ export default function ProjectFilesDialog({ scriptId, initialSource, screenUISo
                   value.replace(/\r\n/g, '\n') === location.source.replace(/\r\n/g, '\n')
                   ? getScreenUIMoveEdits(value, location.kind, location, offset, location.source) : undefined;
                 if (!model || !edits) {
-                  setError('The Screen UI module changed. Reset the game before applying this move.');
+                  setError(offset.properties && Object.keys(offset.properties).length
+                    ? 'The Screen UI module changed. Reset the game before applying these changes.'
+                    : 'The Screen UI module changed. Reset the game before applying this move.');
                 } else {
                   const before = model.getAlternativeVersionId();
                   model.pushStackElement();

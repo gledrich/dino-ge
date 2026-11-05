@@ -1,4 +1,5 @@
 import { parse, type AnyNode, type CallExpression, type Position, type Property } from 'acorn';
+import type { ScreenUIPropertyChanges } from 'dino-ge';
 import type { editor } from 'monaco-editor';
 import type { Edit } from './ast-utils';
 import type { ScreenUISource } from './screen-ui-preview';
@@ -8,12 +9,13 @@ export type ScreenUIControlKind = 'panel' | 'label' | 'image' | 'button' | 'prog
 export const applyScreenUIMoveEvent = 'playground-apply-screen-ui-move';
 export type ApplyScreenUIMove = {
   location: ScreenUISource;
-  offset: { x: number; y: number };
+  offset: ScreenUIEdit;
   trigger: HTMLButtonElement;
   applied: () => void;
   reverted?: () => void;
 };
 
+type ScreenUIEdit = { x: number; y: number; properties?: ScreenUIPropertyChanges };
 type SourceSpan = { start: number; end: number };
 type ScreenUIMoveEdit = Edit & { property?: SourceSpan };
 
@@ -297,47 +299,123 @@ function isUniqueScreenDraw(call: CallExpression, scan: ReturnType<typeof inspec
   return false;
 }
 
-/** Rewrite a verified singleton draw call while retaining its original coordinate expressions. */
+const rectangularControls: readonly ScreenUIControlKind[] = ['panel', 'image', 'button', 'progressBar'];
+const propertyControls: Record<keyof ScreenUIPropertyChanges, readonly ScreenUIControlKind[]> = {
+  width: rectangularControls,
+  height: rectangularControls,
+  text: ['label', 'button'],
+  colour: ['panel', 'label', 'button', 'progressBar'],
+  background: ['button', 'progressBar'],
+  font: ['label', 'button'],
+  enabled: ['button'],
+};
+
+/** Rewrite a verified singleton draw call while retaining responsive geometry and game state. */
 export function getScreenUIMoveEdits(
-  source: string, kind: ScreenUIControlKind, position: SourcePosition, offset: { x: number; y: number }, runtimeSource = source,
+  source: string, kind: ScreenUIControlKind, position: SourcePosition, offset: ScreenUIEdit, runtimeSource = source,
 ): ScreenUIMoveEdit[] | undefined {
-  if (![offset.x, offset.y].every(Number.isFinite) || (!offset.x && !offset.y)) return;
+  return prepareScreenUIEdits(source, kind, position, runtimeSource)?.(offset);
+}
+
+export function prepareScreenUIEdits(
+  source: string, kind: ScreenUIControlKind, position: SourcePosition, runtimeSource = source,
+): ((offset: ScreenUIEdit) => ScreenUIMoveEdit[] | undefined) | undefined {
   try {
     const scan = inspectSource(source, kind, true);
     const runtime = source === runtimeSource ? scan.calls : inspectSource(runtimeSource, kind).calls;
     const match = findMatchingCalls(scan.calls, runtime, position);
-    if (match && isUniqueScreenDraw(match.call, scan)) return offsetDrawArguments(source, kind, offset, match);
+    if (match && isUniqueScreenDraw(match.call, scan)) return offset => offsetDrawArguments(source, kind, offset, match);
   } catch {
     return;
   }
 }
 
 function offsetDrawArguments(
-  source: string, kind: ScreenUIControlKind, offset: { x: number; y: number },
+  source: string, kind: ScreenUIControlKind, offset: ScreenUIEdit,
   { call, runningCall }: { call: CallExpression; runningCall: CallExpression },
 ) {
   const argument = kind === 'image' ? 1 : 0;
   const options = call.arguments[argument];
-  if (options?.type !== 'ObjectExpression' || options.properties.some(property =>
-    property.type !== 'Property' || (property.computed && propertyName(property) === undefined))) return;
+  if (!options || options.type === 'SpreadElement' || (kind === 'image' &&
+      (call.arguments[0]?.type === 'SpreadElement' || runningCall.arguments[0]?.type === 'SpreadElement'))) return;
   if (call !== runningCall && nodeShape(options) !== nodeShape(runningCall.arguments[argument])) return;
 
+  const fields = Object.entries(offset.properties ?? {});
+  if (fields.some(([field]) => !Object.prototype.hasOwnProperty.call(propertyControls, field) ||
+      !propertyControls[field as keyof ScreenUIPropertyChanges].includes(kind))) return;
+
   const edits: ScreenUIMoveEdit[] = [];
-  for (const axis of ['x', 'y'] as const) {
-    const delta = offset[axis];
+  const colourField = fields.find(([field]) => field === 'colour');
+  if (kind === 'panel' && colourField) {
+    const [, colourChange] = colourField;
+    const colour = call.arguments[1];
+    if (typeof colourChange !== 'string' || colourChange.length > 500 ||
+        colour?.type !== 'Literal' || typeof colour.value !== 'string' ||
+        nodeShape(colour) !== nodeShape(runningCall.arguments[1])) return;
+    if (colour.value !== colourChange) edits.push({ start: colour.start, end: colour.end, newText: JSON.stringify(colourChange) });
+  }
+  const geometry = { x: offset.x, y: offset.y, width: offset.properties?.width, height: offset.properties?.height };
+  if (![offset.x, offset.y].every(Number.isFinite) ||
+      [geometry.width, geometry.height].some(delta => delta !== undefined && !Number.isFinite(delta))) return;
+  if (kind === 'panel' && !Object.values(geometry).some(Boolean)) return edits.length ? edits : undefined;
+  if (options.type !== 'ObjectExpression' || options.properties.some(property =>
+    property.type !== 'Property' || (property.computed && propertyName(property) === undefined))) return;
+  const properties = options.properties.filter((property): property is Property => property.type === 'Property');
+  for (const axis of ['x', 'y', 'width', 'height'] as const) {
+    const delta = geometry[axis];
     if (!delta) continue;
-    const matches = options.properties.filter((property): property is Property =>
-      property.type === 'Property' && propertyName(property) === axis);
+    const matches = properties.filter(property => propertyName(property) === axis);
     if (matches.length !== 1 || matches[0].kind !== 'init' || matches[0].method) return;
     const property = matches[0];
     const { value } = property;
-    const literal = value.type === 'Literal' && typeof value.value === 'number' ? value.value + delta : undefined;
-    const newValue = literal !== undefined && Number.isFinite(literal) ? String(literal)
-      : `(${source.slice(value.start, value.end)}) ${delta > 0 ? '+' : '-'} ${Math.abs(delta)}`;
+    const original = numericLiteral(value);
+    let newValue: string;
+    if (original === undefined) {
+      newValue = `(${source.slice(value.start, value.end)}) ${delta > 0 ? '+' : '-'} ${Math.abs(delta)}`;
+      if (axis === 'width' || axis === 'height') newValue = `Math.max(1, ${newValue})`;
+    } else {
+      const adjusted = original + delta;
+      if (!Number.isFinite(adjusted) || ((axis === 'width' || axis === 'height') && (original < 0 || adjusted < 1))) return;
+      newValue = String(adjusted);
+    }
     const span = { start: property.start, end: property.end };
     edits.push(property.shorthand
       ? { ...span, newText: `${axis}: ${newValue}`, property: span }
       : { start: value.start, end: value.end, newText: newValue, property: span });
   }
-  return edits;
+
+  const defaults: string[] = [];
+  for (const [field, value] of fields) {
+    if (field === 'width' || field === 'height' || (kind === 'panel' && field === 'colour')) continue;
+    if (field === 'enabled' ? typeof value !== 'boolean' : (typeof value !== 'string' || value.length > 500)) return;
+    const newText = JSON.stringify(value);
+    const matches = properties.filter(property => propertyName(property) === field);
+    if (!matches.length) {
+      if (field === 'text') return;
+      defaults.push(`${field}: ${newText}`);
+      continue;
+    }
+    const [property] = matches;
+    const original = property.value;
+    if (matches.length !== 1 || property.kind !== 'init' || property.method ||
+        original.type !== 'Literal' || typeof original.value !== typeof value) return;
+    if (original.value !== value) edits.push({
+      start: original.start, end: original.end, newText,
+      property: { start: property.start, end: property.end },
+    });
+  }
+  if (defaults.length) {
+    const last = properties[properties.length - 1];
+    const insert = last?.end ?? options.start + 1;
+    edits.push({ start: insert, end: insert, newText: `${last ? ', ' : ''}${defaults.join(', ')}` });
+  }
+  return edits.length ? edits : undefined;
+}
+
+function numericLiteral(value: Property['value']): number | undefined {
+  if (value.type === 'Literal' && typeof value.value === 'number') return value.value;
+  if (value.type === 'UnaryExpression' && (value.operator === '+' || value.operator === '-') &&
+      value.argument.type === 'Literal' && typeof value.argument.value === 'number') {
+    return value.operator === '-' ? -value.argument.value : value.argument.value;
+  }
 }

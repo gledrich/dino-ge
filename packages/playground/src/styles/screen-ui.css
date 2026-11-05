@@ -17,8 +17,26 @@
 
 .screen-ui-properties dd {
   margin: 0;
+  min-width: 0;
   overflow-wrap: anywhere;
 }
+
+.screen-ui-properties dd:has(input:not([type='checkbox'])) { flex: 0 1 65%; }
+
+.screen-ui-properties input:not([type='checkbox']) {
+  box-sizing: border-box;
+  width: 100%;
+  min-width: 0;
+  color: var(--text-primary);
+  background: var(--bg-primary);
+  border: 1px solid var(--border-color);
+  border-radius: 4px;
+  padding: 3px 6px;
+  font: inherit;
+}
+
+.screen-ui-properties input:focus-visible { outline: 2px solid var(--accent-primary); }
+.screen-ui-properties input[aria-invalid='true'] { border-color: var(--danger-color, #df7278); }
 
 .screen-ui-inspector .scene-control:disabled {
   opacity: 0.6;
@@ -62,6 +80,22 @@
 .screen-ui-drag-handle:hover,
 .screen-ui-drag-handle:focus-visible { outline: 2px dashed var(--accent-primary); }
 
+.screen-ui-resize-handle {
+  position: absolute;
+  z-index: 2;
+  transform: translate(-50%, -50%);
+  width: 10px;
+  height: 10px;
+  padding: 0;
+  background: var(--accent-primary);
+  border: 1px solid var(--bg-primary);
+  border-radius: 2px;
+  pointer-events: auto;
+  touch-action: none;
+}
+
+.screen-ui-resize-handle:focus-visible { outline: 2px solid var(--text-primary); }
+
 @media (pointer: coarse) {
   .screen-ui-drag-handle[aria-pressed='true'] { z-index: 1; }
 
@@ -73,5 +107,11 @@
     width: max(44px, 100%);
     height: max(44px, 100%);
     transform: translate(-50%, -50%);
+  }
+
+  .screen-ui-resize-handle::after {
+    content: '';
+    position: absolute;
+    inset: -12px;
   }
 }

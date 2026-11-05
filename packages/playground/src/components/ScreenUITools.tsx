@@ -1,15 +1,11 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore, type ReactNode } from 'react';
 import { Engine, type GameObject, type ScreenUIControl } from 'dino-ge';
 import { usePlayground } from '../context/PlaygroundContext';
-import { openScreenUISourceEvent, screenUIPreview, type OpenScreenUISource, type ScreenUIBounds, type ScreenUIMove } from '../utils/screen-ui-preview';
-import { applyScreenUIMoveEvent, getScreenUIMoveEdits, type ApplyScreenUIMove } from '../utils/screen-ui-source';
+import { getScreenUIBounds, openScreenUISourceEvent, screenUIArrowOffsets, screenUIPreview, type OpenScreenUISource, type ScreenUIBounds, type ScreenUIMove } from '../utils/screen-ui-preview';
+import { applyScreenUIMoveEvent, prepareScreenUIEdits, type ApplyScreenUIMove } from '../utils/screen-ui-source';
+import { ScreenUIFields, screenUIControlKinds, screenUIControlName } from './ScreenUIFields';
+import { ScreenUIResizeHandles } from './ScreenUIResizeHandles';
 import '../styles/screen-ui.css';
-
-const controlNames = { panel: 'Panel', label: 'Label', image: 'Image', button: 'Button', progressBar: 'Progress bar' };
-const controlName = (control: ScreenUIControl) => control.text || control.id || controlNames[control.kind];
-const arrowOffsets: Record<string, [number, number]> = {
-  ArrowLeft: [-1, 0], ArrowRight: [1, 0], ArrowUp: [0, -1], ArrowDown: [0, 1],
-};
 
 export function ScreenUIExplorer() {
   const { frame, selected, moves } = useSyncExternalStore(screenUIPreview.subscribe, screenUIPreview.getSnapshot);
@@ -19,16 +15,17 @@ export function ScreenUIExplorer() {
     <section className="screen-ui-explorer" aria-label="Screen UI">
       <h3>Screen UI</h3>
       {frame.controls.map((control, index) => {
-        const pending = moves.some(move => move.index === index && !move.applied);
+        const move = moves.find(item => item.index === index);
+        const pending = move && !move.applied;
         return <div className={`scene-node${selected === index ? ' selected' : ''}`} key={index}>
           <button type="button" className="scene-node-select" aria-pressed={selected === index}
-            aria-description={pending ? 'Pending move' : undefined}
-            title={controlNames[control.kind]} onClick={() => {
+            aria-description={pending ? 'Pending Screen UI changes' : undefined}
+            title={screenUIControlKinds[control.kind]} onClick={() => {
               screenUIPreview.select(index);
               openTool('inspector');
             }}>
             <i className="fa-solid fa-layer-group type-icon" aria-hidden="true" />
-            <span className="node-tag">{controlName(control)}</span>
+            <span className="node-tag">{screenUIControlName(control, move)}</span>
             {pending && <i className="fa-solid fa-pen scene-node-pending" aria-hidden="true" />}
           </button>
         </div>;
@@ -62,12 +59,17 @@ export function ScreenUIInspector({ children }: { children: ReactNode }) {
   }, []);
   return <>
     <div style={{ display: control || editing ? 'none' : 'contents' }}>{children}</div>
-    {(control || editing) && <ScreenUIProperties control={control} source={source} move={move} editing={editing} pending={pending}
+    {(control || editing) && <ScreenUIProperties key={selected} control={control} source={source} move={move} editing={editing} pending={pending}
       onStart={() => {
+        const previousFocus = document.activeElement;
         if (!screenUIPreview.beginEditing(isPaused)) return;
         setIsPaused(true);
-        requestAnimationFrame(() => document.querySelector<HTMLButtonElement>('.screen-ui-drag-handle[aria-pressed="true"]')
-          ?.focus({ preventScroll: true }));
+        requestAnimationFrame(() => {
+          if (document.activeElement === previousFocus || document.activeElement === document.body) {
+            document.querySelector<HTMLButtonElement>('.screen-ui-drag-handle[aria-pressed="true"]')
+              ?.focus({ preventScroll: true });
+          }
+        });
       }}
       onFinish={() => { if (screenUIPreview.finishEditing()) setIsPaused(wasPaused); }} />}
   </>;
@@ -77,43 +79,30 @@ function ScreenUIProperties({ control, source, move, editing, pending, onStart, 
   control?: ScreenUIControl; source?: OpenScreenUISource['location']; move?: ScreenUIMove;
   editing: boolean; pending: boolean; onStart: () => void; onFinish: () => void;
 }) {
-  const canApply = useMemo(() => source?.writeVerified &&
-    !!getScreenUIMoveEdits(source.source, source.kind, source, { x: 1, y: 1 }), [source]);
-  const rows = control ? [
-    ['Type', controlNames[control.kind]],
-    ['ID', control.id],
-    ['Text', control.text],
-    ['X', (control.x + (move?.x ?? 0)).toFixed(1)],
-    ['Y', (control.y + (move?.y ?? 0)).toFixed(1)],
-    ['Width', control.width.toFixed(1)],
-    ['Height', control.height.toFixed(1)],
-    ['Colour', control.colour],
-    ['Background', control.background],
-    ['Font', control.font],
-    ['Enabled', control.enabled === undefined ? undefined : control.enabled ? 'Yes' : 'No'],
-    ['Value', control.value === undefined ? undefined : `${Math.round(control.value * 100)}%`],
-  ] : [];
+  const prepareEdits = useMemo(() => source?.writeVerified
+    ? prepareScreenUIEdits(source.source, source.kind, source) : undefined, [source]);
+  const reversedSize = (control?.reversedX && move?.properties?.width) ||
+    (control?.reversedY && move?.properties?.height);
+  const canApply = !!move && !reversedSize && !!prepareEdits?.(move);
+  const changeLabel = move?.properties ? 'changes' : 'move';
   return (
     <div className="inspector-container">
       <div className="inspector-body">
         <section className="inspector-section screen-ui-inspector" aria-label="Screen UI properties">
-          <h3>{control ? controlName(control) : 'Screen UI'}</h3>
+          <h3>{control ? screenUIControlName(control, move) : 'Screen UI'}</h3>
           <p className="inspector-section-description">{editing
-            ? 'Drag a control or focus it and use the arrow keys. Hold Shift to move 10 pixels.'
+            ? 'Drag to move, pull a corner to resize, or edit a value below. Hold Shift with the arrow keys for 10-pixel steps.'
             : 'Screen UI · Live preview'}</p>
-          <dl className="screen-ui-properties">
-            {rows.map(([label, value]) => value !== undefined &&
-              <div className="prop-row" key={label}><dt>{label}</dt><dd>{value}</dd></div>)}
-          </dl>
+          {control && <ScreenUIFields control={control} move={move} editable={editing && !move?.applied} />}
           {source && <button type="button" className="scene-control" onClick={event =>
             window.dispatchEvent(new CustomEvent<OpenScreenUISource>(openScreenUISourceEvent, {
               detail: { location: source, trigger: event.currentTarget },
             }))}>View source</button>}
           {editing && move && (move.applied
-            ? <p role="status">Move applied to the draft. Save the script to keep it.</p>
+            ? <p role="status">{move.properties ? 'Changes applied' : 'Move applied'} to the draft. Save the script to keep it.</p>
             : <>
               {!canApply && <p className="inspector-section-description">
-                This move is preview-only because its source position cannot be safely changed here.
+                These edits are preview-only because the source cannot be safely changed here.
               </p>}
               <button type="button" className="scene-control" disabled={!canApply}
                 onClick={event => {
@@ -126,11 +115,11 @@ function ScreenUIProperties({ control, source, move, editing, pending, onStart, 
                         else appliedMove = screenUIPreview.markApplied(move);
                       }, reverted: () => appliedMove?.remove() },
                   }));
-                }}>Apply move</button>
-              <button type="button" className="scene-control" onClick={() => screenUIPreview.discardMove()}>Discard move</button>
+                }}>Apply {changeLabel}</button>
+              <button type="button" className="scene-control" onClick={() => screenUIPreview.discardMove()}>Discard {changeLabel}</button>
             </>)}
           {editing && pending && (!move || move.applied) && <p className="inspector-section-description">
-            Apply or discard the other pending moves to finish editing.
+            Apply or discard the other pending changes to finish editing.
           </p>}
           {editing
             ? <button type="button" className="scene-control" disabled={pending} onClick={onFinish}>Finish editing Screen UI</button>
@@ -177,17 +166,21 @@ export function ScreenUIOutline() {
   const control = selected === undefined ? undefined : frame?.controls[selected];
   const scaleX = frame?.width ? (canvas?.width ?? bounds?.width ?? 0) / frame.width : 0;
   const scaleY = frame?.height ? (canvas?.height ?? bounds?.height ?? 0) / frame.height : 0;
-  const project = (control: ScreenUIControl, offset?: ScreenUIMove) => ({
-      left: (bounds?.x ?? 0) + (canvas?.x ?? 0) + (control.x + (offset?.x ?? 0)) * scaleX,
-      top: (bounds?.y ?? 0) + (canvas?.y ?? 0) + (control.y + (offset?.y ?? 0)) * scaleY,
-      width: control.width * scaleX,
-      height: control.height * scaleY,
-  });
+  const project = (control: ScreenUIControl, offset?: ScreenUIMove) => {
+    const box = getScreenUIBounds(control, offset);
+    return {
+      left: (bounds?.x ?? 0) + (canvas?.x ?? 0) + box.x * scaleX,
+      top: (bounds?.y ?? 0) + (canvas?.y ?? 0) + box.y * scaleY,
+      width: box.width * scaleX,
+      height: box.height * scaleY,
+    };
+  };
+  const selectedMove = moves.find(move => move.index === selected);
   return <div ref={origin} className="screen-ui-outline-layer" data-editing={editing || undefined}
     aria-hidden={editing ? undefined : true}>
     {bounds && scaleX > 0 && scaleY > 0 && (editing ? frame?.controls.map((item, index) => {
       const offset = moves.find(move => move.index === index);
-      return <button key={index} type="button" aria-label={`Move ${controlName(item)}`}
+      return <button key={index} type="button" aria-label={`Move ${screenUIControlName(item, offset)}`}
         aria-pressed={selected === index} aria-disabled={!!offset?.applied || undefined}
         className={`screen-ui-drag-handle${selected === index ? ' screen-ui-outline' : ''}`}
         style={project(item, offset)}
@@ -217,7 +210,7 @@ export function ScreenUIOutline() {
         onClick={() => screenUIPreview.select(index)}
         onKeyDown={event => {
           if (offset?.applied || event.altKey || event.ctrlKey || event.metaKey) return;
-          const direction = arrowOffsets[event.key];
+          const direction = screenUIArrowOffsets[event.key];
           if (!direction) return;
           event.preventDefault();
           event.stopPropagation();
@@ -226,5 +219,8 @@ export function ScreenUIOutline() {
           screenUIPreview.move((offset?.x ?? 0) + direction[0] * step, (offset?.y ?? 0) + direction[1] * step);
         }} />;
     }) : control && <div className="screen-ui-outline" style={project(control)} />)}
+    {editing && bounds && control && control.kind !== 'label' && !selectedMove?.applied && scaleX > 0 && scaleY > 0 &&
+      <ScreenUIResizeHandles key={selected} control={control} move={selectedMove}
+        projection={project(control, selectedMove)} scaleX={scaleX} scaleY={scaleY} />}
   </div>;
 }

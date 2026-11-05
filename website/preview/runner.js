@@ -1,4 +1,4 @@
-import { Engine } from "dino-ge";
+import { Engine, isScreenUIStyle } from "dino-ge";
 import { addTouchArrows } from "./touch-arrows.js";
 
 const editorOrigin = new URL(document.referrer).origin;
@@ -12,6 +12,18 @@ let screenUISourceRequest;
 let screenUIEditing;
 let latestScreenUI = [];
 let latestPreviewControls = [];
+
+function isScreenUIProperties(properties) {
+  if (properties === undefined) return true;
+  if (!properties || typeof properties !== "object" || Array.isArray(properties)) return false;
+  return Object.entries(properties).every(([key, value]) => {
+    if (key === "width" || key === "height") return Number.isFinite(value) && Math.abs(value) <= 65_536;
+    if (key === "enabled") return typeof value === "boolean";
+    if (typeof value !== "string" || value.length > 500) return false;
+    if (key === "colour" || key === "background" || key === "font") return isScreenUIStyle(key, value);
+    return key === "text";
+  });
+}
 
 document.addEventListener("keydown", event => {
   if (screenUIEditing && event.key.toLowerCase() === "p") event.stopPropagation();
@@ -50,13 +62,15 @@ window.addEventListener("message", event => {
     } else if (Array.isArray(data.editing?.positions) && data.editing.positions.length <= 250) {
       screenUIEditing = { positions: data.editing.positions.flatMap(move => {
         if (!move || !Number.isInteger(move.index) || !move.control || !Number.isFinite(move.x) ||
-            !Number.isFinite(move.y) || Math.abs(move.x) > 65_536 || Math.abs(move.y) > 65_536) return [];
+            !Number.isFinite(move.y) || Math.abs(move.x) > 65_536 || Math.abs(move.y) > 65_536 ||
+            !isScreenUIProperties(move.properties)) return [];
         const current = latestPreviewControls[move.index];
         if (!current || current.kind !== move.control.kind) return [];
         const matches = current.id ? current.id === move.control.id
-          : ["id", "text", "font", "colour", "background", "x", "y", "width", "height"]
+          : ["id", "text", "font", "colour", "background", "x", "y", "width", "height", "reversedX", "reversedY"]
             .every(key => current[key] === move.control[key]);
-        return matches ? [{ index: move.index, control: latestScreenUI[move.index], x: move.x, y: move.y }] : [];
+        return matches ? [{ index: move.index, control: latestScreenUI[move.index],
+          x: move.x, y: move.y, properties: move.properties }] : [];
       }) };
     }
   } else if (data?.type === "preview-scene-command" && typeof data.id === "string") {

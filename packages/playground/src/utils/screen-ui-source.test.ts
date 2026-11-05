@@ -111,6 +111,67 @@ test('supports a named draw callback and a helper called once in that callback',
   expect(applyEdits(source, edits!)).toContain("ui.label({ x: ui.width / 2, y: 26, text: 'Title' });");
 });
 
+test('applies size and literal style together without replacing the responsive calculation', () => {
+  const source = [
+    "import { Engine } from 'dino-ge';",
+    'new Engine({ drawUI(ui) {',
+    "  ui.button({ x: 12, y: 30, width: ui.width / 2, height: 25, text: 'Play', onPress() {}, });",
+    '} });',
+  ].join('\n');
+  const offset = { x: 4, y: 0, properties: { width: 15, height: 5, text: 'New "game"', font: '18px serif', enabled: false } };
+  const edits = getScreenUIMoveEdits(source, 'button', { lineNumber: 3, column: 3 }, offset);
+  expect(edits).toBeDefined();
+  expect(applyEdits(source, edits!)).toContain(
+    'ui.button({ x: 16, y: 30, width: Math.max(1, (ui.width / 2) + 15), height: 30, text: "New \\"game\\"", onPress() {}, font: "18px serif", enabled: false, });',
+  );
+});
+
+test('edits only a verified literal panel colour argument', () => {
+  const source = [
+    "import { Engine } from 'dino-ge';",
+    "new Engine({ drawUI(ui) { ui.panel({ x: 10, y: 20, width: 50, height: 25 }, 'red'); } });",
+  ].join('\n');
+  const position = { lineNumber: 2, column: 27 };
+  const offset = { x: 0, y: 0, properties: { colour: '#229944' } };
+  const edits = getScreenUIMoveEdits(source, 'panel', position, offset);
+  expect(edits).toBeDefined();
+  expect(applyEdits(source, edits!)).toContain('}, "#229944");');
+  const draft = source.replace("'red'", "'blue'");
+  expect(getScreenUIMoveEdits(draft, 'panel', position, offset, source)).toBeUndefined();
+  expect(getScreenUIMoveEdits(source.replace("'red'", 'theme.panel'), 'panel', position, offset)).toBeUndefined();
+  const computedRect = source.replace('{ x: 10, y: 20, width: 50, height: 25 }', 'layout.panel');
+  const colourOnly = getScreenUIMoveEdits(computedRect, 'panel', position, offset);
+  expect(colourOnly).toBeDefined();
+  expect(applyEdits(computedRect, colourOnly!)).toContain('ui.panel(layout.panel, "#229944");');
+  expect(getScreenUIMoveEdits(computedRect, 'panel', position, { ...offset, x: 4 })).toBeUndefined();
+});
+
+test('rejects the entire edit when one field is computed, unsupported or invalid', () => {
+  const source = [
+    "import { Engine } from 'dino-ge';",
+    'new Engine({ drawUI(ui) {',
+    '  ui.button({ x: 12, y: 30, width: 40, height: 25, text: state.title, enabled: state.ready, onPress() {} });',
+    '} });',
+  ].join('\n');
+  const position = { lineNumber: 3, column: 3 };
+  for (const properties of [{ text: 'New game' }, { enabled: false }, { width: -40 }, { value: 0.5 }]) {
+    const offset = { x: 10, y: 0, properties };
+    expect(getScreenUIMoveEdits(source, 'button', position, offset)).toBeUndefined();
+  }
+});
+
+test('rejects an image size edit when a spread can shift the rectangle argument', () => {
+  const source = [
+    "import { Engine } from 'dino-ge';",
+    'new Engine({ drawUI(ui) {',
+    '  ui.image(...images, { x: 12, y: 30, width: 40, height: 25 });',
+    '} });',
+  ].join('\n');
+  expect(getScreenUIMoveEdits(source, 'image', { lineNumber: 3, column: 3 }, {
+    x: 0, y: 0, properties: { width: 10 },
+  })).toBeUndefined();
+});
+
 test.each([
   'for (let i = 0; i < 2; i++) drawTitle(ui);',
   'drawTitle(ui); drawTitle(ui);',

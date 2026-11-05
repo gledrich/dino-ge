@@ -138,6 +138,93 @@ describe('ScreenUI', () => {
     expect(listener).toHaveBeenCalledWith(expect.objectContaining({ controls: [edit.control] }));
   });
 
+  it('previews button properties without mutating its options or inspection values', () => {
+    const { ui, ctx, canvas } = setup();
+    const listener = jest.fn();
+    const getEditing = jest.fn();
+    const observers = new Set([{ listener, getEditing }]);
+    const action = jest.fn();
+    const button = Object.freeze({ x: 10, y: 20, width: 80, height: 30, id: 'play', text: 'Play', onPress: action });
+    const draw = (frame: ScreenUI) => frame.button(button);
+    ui.render(draw, observers);
+    const control = listener.mock.calls[0][0].controls[0];
+    getEditing.mockReturnValue({
+      positions: [{ index: 0, control, x: 2, y: -3,
+        properties: { width: 20, height: -100, text: 'Begin', colour: 'blue', font: '18px serif', enabled: false } }],
+    });
+    ui.render(draw, observers);
+    ui.render(draw, observers);
+    expect(ctx.fillRect.mock.calls.slice(-2)).toEqual([[12, 17, 100, 1], [12, 17, 100, 1]]);
+    expect(ctx.fillText).toHaveBeenLastCalledWith('Begin', 62, 17.5, 92);
+    expect(ctx).toMatchObject({ fillStyle: 'blue', font: '18px serif' });
+    expect(listener).toHaveBeenCalledTimes(2);
+    expect(listener.mock.calls[1][0].controls[0]).toEqual({
+      ...control, painted: { x: 10, y: 20, width: 100, height: 1 },
+    });
+    expect(control).toMatchObject({ x: 10, y: 20, width: 80, height: 30, text: 'Play', enabled: true });
+    canvas.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter' }));
+    expect(action).not.toHaveBeenCalled();
+    getEditing.mockReturnValue(undefined);
+    ui.render(draw, observers);
+    expect(ctx.fillRect).toHaveBeenLastCalledWith(10, 20, 80, 30);
+    expect(ctx.fillText).toHaveBeenLastCalledWith('Play', 50, 35, 72);
+  });
+
+  it('remeasures edited label text while retaining its original identity and source geometry', () => {
+    const { ui, ctx } = setup();
+    const listener = jest.fn();
+    const getEditing = jest.fn();
+    const observers = new Set([{ listener, getEditing }]);
+    const draw = (frame: ScreenUI) => frame.label({ x: 50, y: 30, text: 'Hi', align: 'center', maxWidth: 35 });
+    ui.render(draw, observers);
+    const control = listener.mock.calls[0][0].controls[0];
+    ctx.measureText.mockImplementation((text: string) => text === 'Hello'
+      ? { width: 80, actualBoundingBoxLeft: 32, actualBoundingBoxRight: 48,
+        actualBoundingBoxAscent: 9, actualBoundingBoxDescent: 6 }
+      : { width: 60, actualBoundingBoxLeft: 30, actualBoundingBoxRight: 30,
+        actualBoundingBoxAscent: 6, actualBoundingBoxDescent: 4 });
+    getEditing.mockReturnValue({ positions: [{
+      index: 0, control, x: 2, y: 4, properties: { text: 'Hello', font: '20px serif', colour: 'orange' },
+    }] });
+    ui.render(draw, observers);
+    expect(ctx.fillText).toHaveBeenLastCalledWith('Hello', 52, 34, 35);
+    expect(ctx).toMatchObject({ fillStyle: 'orange', font: '20px serif' });
+    expect(listener.mock.calls[1][0].controls[0]).toEqual({
+      ...control, painted: { x: 36, y: 21, width: 35, height: 15 },
+    });
+  });
+
+  it('resizes panels, images and progress bars while retaining the progress value', () => {
+    const { ui, ctx } = setup();
+    const listener = jest.fn();
+    const getEditing = jest.fn();
+    const observers = new Set([{ listener, getEditing }]);
+    const rect = { x: 10, y: 20, width: -80, height: 30 };
+    const image = document.createElement('img');
+    const colours: string[] = [];
+    ctx.fillRect.mockImplementation(() => { colours.push((ctx as unknown as CanvasRenderingContext2D).fillStyle as string); });
+    const draw = (frame: ScreenUI) => {
+      frame.panel(rect, 'red');
+      frame.image(image, rect);
+      frame.progressBar({ ...rect, value: 0.25 });
+    };
+    ui.render(draw, observers);
+    const controls = listener.mock.calls[0][0].controls;
+    const edits = [{ width: 20, colour: 'purple' }, { height: 10 }, { width: -50, background: 'black', colour: 'gold' }];
+    getEditing.mockReturnValue({ positions: controls.map((control: object, index: number) => ({
+      index, control, x: 0, y: 0, properties: edits[index],
+    })) });
+    ui.render(draw, observers);
+    expect(ctx.fillRect.mock.calls.slice(-3)).toEqual([[10, 20, -100, 30], [10, 20, -30, 30], [10, 20, -7.5, 30]]);
+    expect(colours.slice(-3)).toEqual(['purple', 'black', 'gold']);
+    expect(ctx.drawImage).toHaveBeenLastCalledWith(image, 10, 20, -80, 40);
+    expect(listener.mock.calls[1][0].controls.map((control: { painted: object }) => control.painted)).toEqual([
+      { x: -90, y: 20, width: 100, height: 30 },
+      { x: -70, y: 20, width: 80, height: 40 },
+      { x: -20, y: 20, width: 30, height: 30 },
+    ]);
+  });
+
   it('keeps a position preview scoped to the intended draw slot', () => {
     const { ui, ctx } = setup();
     const listener = jest.fn();

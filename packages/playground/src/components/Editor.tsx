@@ -641,12 +641,17 @@ const CodeEditor: React.FC<EditorProps> = ({ currentScriptId, onSave, onSelectSc
       const edits = model && value !== undefined && runMatches && (exact || trusted)
         ? getScreenUIMoveEdits(value, location.kind, location, offset, location.source) : undefined;
       const before = model?.getAlternativeVersionId();
+      const propertyChange = !!offset.properties && Object.keys(offset.properties).length > 0;
       if (!model || before === undefined || !edits || !applySourceEdits(edits)) {
-        setDropFeedback({ scriptId: currentScriptId, message: 'The Screen UI draft changed. Reset the game before applying this move.', error: true });
+        setDropFeedback({ scriptId: currentScriptId, error: true, message: propertyChange
+          ? 'The Screen UI draft changed. Reset the game before applying these changes.'
+          : 'The Screen UI draft changed. Reset the game before applying this move.' });
         return;
       }
       trackScreenUIMoveDraft(model, request, before, edits);
-      setDropFeedback({ scriptId: currentScriptId, message: 'Applied Screen UI move. Save the script to keep it.', error: false });
+      setDropFeedback({ scriptId: currentScriptId, error: false, message: propertyChange
+        ? 'Applied Screen UI changes. Save the script to keep them.'
+        : 'Applied Screen UI move. Save the script to keep it.' });
     };
 
     window.addEventListener('playground-insert-text', handleInsertText);

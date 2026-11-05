@@ -1,5 +1,5 @@
 import { describe, expect, it, jest } from '@jest/globals';
-import { createScreenUIPreview } from './screen-ui-preview';
+import { createScreenUIPreview, getScreenUIBounds } from './screen-ui-preview';
 
 const control = (id?: string) => ({ kind: 'button' as const, id, text: 'Play', x: 0, y: 0, width: 30, height: 20 });
 const frame = (...controls: ReturnType<typeof control>[]) => ({ width: 100, height: 100, controls });
@@ -82,5 +82,27 @@ describe('Screen UI preview selection', () => {
     expect(preview.getSnapshot().moves).toHaveLength(0);
     applied?.restore();
     expect(preview.getSnapshot().moves[0]).toMatchObject({ index: 1, x: 10 });
+  });
+
+  it('keeps property edits when moving a control and drops values restored to their original state', () => {
+    const preview = createScreenUIPreview();
+    const run = preview.start(jest.fn());
+    run.publish(frame(control('play')));
+    preview.select(0);
+    preview.beginEditing();
+    preview.setProperties({ width: 15, text: 'Continue' });
+    preview.move(4, 2);
+    expect(preview.getSnapshot().moves[0]).toMatchObject({ x: 4, y: 2, properties: { width: 15, text: 'Continue' } });
+    preview.setProperties({ width: 0, text: 'Play' });
+    expect(preview.getSnapshot().moves[0]).toEqual({ index: 0, control: control('play'), x: 4, y: 2 });
+    preview.move(0, 0);
+    expect(preview.getSnapshot().moves).toHaveLength(0);
+  });
+
+  it('uses the latest move offset with previously measured label bounds', () => {
+    const label = { kind: 'label' as const, x: 10, y: 8, width: 20, height: 12, text: 'Hi',
+      painted: { x: 6, y: 8, width: 28, height: 12 } };
+    const edit = { control: label, index: 0, x: 30, y: 6, properties: { text: 'Hello' } };
+    expect(getScreenUIBounds(label, edit)).toEqual({ x: 36, y: 14, width: 28, height: 12 });
   });
 });

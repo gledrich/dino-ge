@@ -144,6 +144,13 @@ try {
   assert.equal(Math.round((await handle.boundingBox()).x - start.x), 20);
   await properties.getByRole('button', { name: 'Discard move', exact: true }).click();
   assert.equal((await handle.boundingBox()).x, start.x);
+  await properties.getByRole('textbox', { name: 'Text', exact: true }).fill('Amber Ruins HUD check');
+  await page.waitForFunction(width => {
+    const renamed = document.querySelector('[aria-label="Move Amber Ruins HUD check"]');
+    return (renamed?.getBoundingClientRect().width ?? 0) > width;
+  }, start.width);
+  await properties.getByRole('button', { name: 'Discard changes', exact: true }).click();
+  await handle.waitFor();
   await properties.getByRole('button', { name: 'Finish editing Screen UI', exact: true }).click();
   const toolbar = page.locator('.viewport-panel .toolbar');
   const drawer = page.locator('.mobile-dock-resize');

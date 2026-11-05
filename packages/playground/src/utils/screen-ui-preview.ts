@@ -1,6 +1,9 @@
-import type { ScreenUIControl, ScreenUIEditing, ScreenUIPositionPreview, ScreenUISnapshot } from 'dino-ge';
+import type { ScreenUIControl, ScreenUIEditing, ScreenUIPositionPreview, ScreenUIPropertyChanges, ScreenUISnapshot } from 'dino-ge';
 
 export type ScreenUIBounds = { x: number; y: number; width: number; height: number };
+export const screenUIArrowOffsets: Record<string, [number, number]> = {
+  ArrowLeft: [-1, 0], ArrowRight: [1, 0], ArrowUp: [0, -1], ArrowDown: [0, 1],
+};
 type ScreenUIFrame = Pick<ScreenUISnapshot, 'width' | 'height' | 'controls'>;
 
 const controlKinds = new Set(['panel', 'label', 'image', 'button', 'progressBar']);
@@ -19,6 +22,9 @@ export function isScreenUIFrame(value: unknown): value is ScreenUIFrame {
     typeof height === 'number' && Number.isFinite(height) && height > 0 &&
     Array.isArray(controls) && controls.length <= 250 && controls.every((control: ScreenUIControl) =>
       controlKinds.has(control?.kind) && isScreenUIBounds(control) &&
+      (control.painted === undefined || isScreenUIBounds(control.painted)) &&
+      (control.reversedX === undefined || typeof control.reversedX === 'boolean') &&
+      (control.reversedY === undefined || typeof control.reversedY === 'boolean') &&
       stringFields.every(key => control[key] === undefined ||
         (typeof control[key] === 'string' && control[key].length <= 500)) &&
       (control.enabled === undefined || typeof control.enabled === 'boolean') &&
@@ -52,13 +58,37 @@ type ScreenUIView = {
 };
 
 const emptyView: ScreenUIView = { editing: false, wasPaused: false, moves: [] };
+const dimensionKeys = ['width', 'height'] as const;
+const propertyKeys = ['text', 'colour', 'background', 'font', 'enabled'] as const;
+const limit = 65_536;
+const clampOffset = (value: number) => Math.max(-limit, Math.min(limit, value));
+
+export function getScreenUIBounds(control: ScreenUIControl, move?: ScreenUIMove): ScreenUIBounds {
+  const { x, y, width, height } = control;
+  if (!move) return { x, y, width, height };
+  const widthChange = move.properties?.width;
+  const heightChange = move.properties?.height;
+  const nextWidth = widthChange === undefined ? width : Math.max(1, width + widthChange);
+  const nextHeight = heightChange === undefined ? height : Math.max(1, height + heightChange);
+  if (control.kind === 'label' && control.painted &&
+      (move.properties?.text !== undefined || move.properties?.font !== undefined)) {
+    return { ...control.painted, x: control.painted.x + move.x, y: control.painted.y + move.y };
+  }
+  return {
+    x: x + move.x - (control.reversedX ? nextWidth - width : 0),
+    y: y + move.y - (control.reversedY ? nextHeight - height : 0),
+    width: nextWidth,
+    height: nextHeight,
+  };
+}
 
 function matchesControl(left: ScreenUIControl, right: ScreenUIControl) {
   return left.kind === right.kind && (left.id || right.id
     ? left.id === right.id
     : left.text === right.text && left.font === right.font && left.colour === right.colour &&
       left.background === right.background && left.x === right.x && left.y === right.y &&
-      left.width === right.width && left.height === right.height);
+      left.width === right.width && left.height === right.height &&
+      left.reversedX === right.reversedX && left.reversedY === right.reversedY);
 }
 
 function followControl(previous: ScreenUIFrame | undefined, previousIndex: number | undefined, controls: readonly ScreenUIControl[]) {
@@ -87,6 +117,34 @@ export function createScreenUIPreview() {
     listeners.forEach(listener => listener());
   };
   const hasPendingMoves = () => view.moves.some(move => !move.applied);
+  const selectedMove = () => view.moves.find(move => move.index === view.selected);
+  const changeSelected = (x: number, y: number, changes?: ScreenUIPropertyChanges) => {
+    const { selected, frame, editing, moves } = view;
+    if (!editing || selected === undefined || !frame || !Number.isFinite(x) || !Number.isFinite(y)) return;
+    const current = selectedMove();
+    if (current?.applied) return;
+    const control = frame.controls[selected];
+    const properties = { ...current?.properties, ...changes };
+    for (const key of dimensionKeys) {
+      const amount = properties[key];
+      if (!amount || !Number.isFinite(amount)) delete properties[key];
+      else properties[key] = clampOffset(Math.max(1 - control[key], amount));
+    }
+    for (const key of propertyKeys) {
+      if (properties[key] === undefined || properties[key] === control[key]) delete properties[key];
+    }
+    x = clampOffset(x);
+    y = clampOffset(y);
+    const hasProperties = Object.keys(properties).length > 0;
+    if (current?.x === x && current.y === y &&
+        JSON.stringify(current.properties) === JSON.stringify(hasProperties ? properties : undefined)) return;
+    if (!current && !x && !y && !hasProperties) return;
+    const next = moves.filter(move => move !== current);
+    if (x || y || hasProperties) next.push({
+      index: selected, control, x, y, ...(hasProperties ? { properties } : {}),
+    });
+    update({ ...view, moves: next });
+  };
 
   return {
     subscribe(listener: () => void) {
@@ -107,17 +165,14 @@ export function createScreenUIPreview() {
       return true;
     },
     move(x: number, y: number) {
-      const { selected, frame, editing, moves } = view;
-      if (!editing || selected === undefined || !frame || !Number.isFinite(x) || !Number.isFinite(y)) return;
-      const current = moves.find(move => move.index === selected);
-      if (current?.applied || (current?.x === x && current.y === y) || (!current && !x && !y)) return;
-      const next = moves.filter(move => move !== current);
-      const limit = 65_536;
-      if (x || y) next.push({
-        index: selected, control: frame.controls[selected],
-        x: Math.max(-limit, Math.min(limit, x)), y: Math.max(-limit, Math.min(limit, y)),
-      });
-      update({ ...view, moves: next });
+      changeSelected(x, y);
+    },
+    setProperties(changes: ScreenUIPropertyChanges) {
+      const current = selectedMove();
+      changeSelected(current?.x ?? 0, current?.y ?? 0, changes);
+    },
+    resize(x: number, y: number, width: number, height: number) {
+      changeSelected(x, y, { width, height });
     },
     discardMove() {
       const moves = view.moves.filter(move => move.index !== view.selected || move.applied);

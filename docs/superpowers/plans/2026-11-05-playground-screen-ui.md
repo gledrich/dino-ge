@@ -42,6 +42,6 @@
 
 ## Change 3 — Edit Screen UI properties
 
-- [ ] Add browser coverage for a rectangular resize and kind-specific Inspector edits, including a field driven by game state. Observe the failure before implementing.
-- [ ] Extend the pending-edit path for rectangular dimensions, label or button text, and relevant visual properties. Keep callbacks and computed game state under game control.
-- [ ] Verify property edits across both Playground versions and rerun the scene-edit, browser and unit suites. Present the property editing change separately.
+- [x] Add browser coverage for a rectangular resize and kind-specific Inspector edits, including a field driven by game state. Observe the failure before implementing.
+- [x] Extend the pending-edit path for rectangular dimensions, label or button text, and relevant visual properties. Keep callbacks and computed game state under game control.
+- [x] Verify property edits across both Playground versions and rerun the scene-edit, browser and unit suites. Present the property editing change separately.
