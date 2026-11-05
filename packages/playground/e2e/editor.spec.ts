@@ -417,15 +417,31 @@ new Engine({ onLoad() {
   await expect(platform).toHaveAccessibleDescription('Pending canvas changes');
   await expect.poll(async () => Number(await x.inputValue())).toBeCloseTo(398, 0);
 
+  const proportions = page.getByRole('button', { name: 'Keep proportions', exact: true });
+  await expect(proportions).toHaveAttribute('aria-pressed', 'false');
+  await proportions.click();
+  await expect(proportions).toHaveAttribute('aria-pressed', 'true');
   const corner = { ...screen(462, 268), pointerType: 'pen' as const };
   await session.send('Input.dispatchMouseEvent', { type: 'mousePressed', ...corner, button: 'left', buttons: 1, clickCount: 1 });
-  await session.send('Input.dispatchMouseEvent', { type: 'mouseMoved', ...screen(478, 284), pointerType: 'pen', buttons: 1 });
-  await expect(readout).toContainText('Resize');
+  await session.send('Input.dispatchMouseEvent', { type: 'mouseMoved', ...screen(487, 268), pointerType: 'pen', buttons: 1 });
+  await expect(readout).toContainText('Resize proportionally');
   const widthField = page.getByRole('spinbutton', { name: 'Width', exact: true });
+  const heightField = page.getByRole('spinbutton', { name: 'Height', exact: true });
   await expect.poll(async () => Number(await widthField.inputValue())).toBeCloseTo(80, 0);
+  await expect.poll(async () => Number(await heightField.inputValue())).toBeCloseTo(60, 0);
   await session.send('Input.dispatchMouseEvent', {
-    type: 'mouseReleased', ...screen(478, 284), pointerType: 'pen', button: 'left', buttons: 0, clickCount: 1,
+    type: 'mouseReleased', ...screen(487, 268), pointerType: 'pen', button: 'left', buttons: 0, clickCount: 1,
   });
+  await expect(readout).toHaveCount(0);
+
+  const snapRotation = page.getByRole('button', { name: 'Snap rotation to 15°', exact: true });
+  await expect(snapRotation).toHaveAttribute('aria-pressed', 'false');
+  await snapRotation.press('Space');
+  await expect(snapRotation).toHaveAttribute('aria-pressed', 'true');
+  await session.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [screen(438, 200)] });
+  await session.send('Input.dispatchTouchEvent', { type: 'touchMove', touchPoints: [screen(440, 270)] });
+  await expect(readout).toHaveText('Rotate · 75°');
+  await session.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
   await expect(readout).toHaveCount(0);
   await page.getByRole('button', { name: 'Apply placement to code' }).click();
   await expect(page.getByRole('status').filter({ hasText: 'Applied to code' })).toBeVisible();

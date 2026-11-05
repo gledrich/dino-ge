@@ -70,18 +70,16 @@
   gap: 6px;
 }
 
-.scene-history-actions button { pointer-events: auto; }
+.scene-object-options .scene-control { pointer-events: auto; }
 .scene-grid-size {
-  pointer-events: auto;
   color-scheme: dark;
 }
-.scene-grid-toggle[aria-pressed='true'] {
-  color: var(--text-primary);
+.scene-object-options .scene-control[aria-pressed='true'] {
+  color: var(--accent-primary);
   background: var(--bg-tertiary);
   border-color: var(--accent-primary);
 }
 .scene-panning canvas { cursor: grabbing !important; }
-.scene-edit-label { margin-inline-end: 4px; font-weight: 600; }
 .scene-edit-hint { color: var(--text-secondary); font-size: 11px; line-height: 1.45; }
 .scene-review-changes { justify-self: start; pointer-events: auto; }
 

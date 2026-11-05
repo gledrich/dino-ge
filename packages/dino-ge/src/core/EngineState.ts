@@ -24,6 +24,8 @@ export interface EngineState {
   debugCollisions: { manifold: CollisionManifold, timestamp: number }[];
   showDebugHud: boolean;
   debugPositionGridSize: number;
+  debugKeepProportions: boolean;
+  debugSnapRotation: boolean;
   showPhysicsVectors: boolean;
   showCollisionLines: boolean;
   zOrderDirty: boolean;

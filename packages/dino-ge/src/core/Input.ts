@@ -160,7 +160,7 @@ export default class Input {
     const resizesSprite = sprite && sprite.frameWidth > 0 && sprite.frameHeight > 0;
     const shape = resizesSprite ? undefined : obj.getComponent(ShapeComponent);
     const isCircle = shape?.type === 'circle';
-    const proportional = shiftKey && !isCircle;
+    const proportional = (shiftKey || Engine.debugKeepProportions) && !isCircle;
     const step = Engine.debugPositionGridSize;
     const x = this.mouseX - gesture.offset.x;
     const y = this.mouseY - gesture.offset.y;
@@ -260,7 +260,8 @@ export default class Input {
         const delta = angle - gesture.pointerAngle;
         gesture.rotation += Math.atan2(Math.sin(delta), Math.cos(delta));
         gesture.pointerAngle = angle;
-        transform.rotation = event.shiftKey ? snapToGrid(gesture.rotation, Math.PI / 12) : gesture.rotation;
+        const snapRotation = event.shiftKey || Engine.debugSnapRotation;
+        transform.rotation = snapRotation ? snapToGrid(gesture.rotation, Math.PI / 12) : gesture.rotation;
         this.publishPreview(gesture);
         return;
       }

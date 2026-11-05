@@ -62,6 +62,8 @@ const createInitialState = (): EngineState => ({
   debugCollisions: [],
   showDebugHud: true,
   debugPositionGridSize: 0,
+  debugKeepProportions: false,
+  debugSnapRotation: false,
   showPhysicsVectors: false,
   showCollisionLines: false,
   zOrderDirty: true,
@@ -126,6 +128,14 @@ export default class Engine {
   public static set debugPositionGridSize(val: number) {
     this._state.debugPositionGridSize = Number.isFinite(val) && val > 0 ? val : 0;
   }
+
+  /** Whether debug resizing preserves the object's proportions by default. */
+  public static get debugKeepProportions(): boolean { return this._state.debugKeepProportions ?? false; }
+  public static set debugKeepProportions(val: boolean) { this._state.debugKeepProportions = val; }
+
+  /** Whether debug rotation snaps to 15° by default. */
+  public static get debugSnapRotation(): boolean { return this._state.debugSnapRotation ?? false; }
+  public static set debugSnapRotation(val: boolean) { this._state.debugSnapRotation = val; }
 
   /**
    * Whether to show velocity/acceleration vectors in debug mode.

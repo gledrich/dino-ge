@@ -92,6 +92,8 @@ const Viewport: React.FC = () => {
   const [isPanning, setIsPanning] = useState(false);
   const [isGridSnapping, setIsGridSnapping] = useState(false);
   const [sceneGridSize, setSceneGridSize] = useState(16);
+  const [keepProportions, setKeepProportions] = useState(false);
+  const [snapRotation, setSnapRotation] = useState(false);
   const placementStep = isGridSnapping ? sceneGridSize : 1;
   const [placementStatus, setPlacementStatus] = useState<{ message: string; error?: boolean; pending?: boolean }>();
   const importingImage = useRef(false);
@@ -118,6 +120,18 @@ const Viewport: React.FC = () => {
     Engine.debugPositionGridSize = sceneGridSize;
     return () => { Engine.debugPositionGridSize = previous; };
   }, [isEditingScene, isGridSnapping, sceneGridSize]);
+
+  useEffect(() => {
+    if (!isEditingScene) return;
+    const previousProportions = Engine.debugKeepProportions;
+    const previousSnapRotation = Engine.debugSnapRotation;
+    Engine.debugKeepProportions = keepProportions;
+    Engine.debugSnapRotation = snapRotation;
+    return () => {
+      Engine.debugKeepProportions = previousProportions;
+      Engine.debugSnapRotation = previousSnapRotation;
+    };
+  }, [isEditingScene, keepProportions, snapRotation]);
 
   useEffect(() => {
     if (!isEditingScene) return;
@@ -620,20 +634,28 @@ const Viewport: React.FC = () => {
         <div className="scene-edit-controls" role={isEditingScene ? 'group' : undefined}
           aria-label={isEditingScene ? 'Scene editing' : undefined}>
           {isEditingScene && <>
-            <div className="scene-object-options scene-history-actions" role="group" aria-label="Edit history">
-              <span className="scene-edit-label">Scene editing</span>
-              {(['undo', 'redo'] as const).map(action => (
-                <button key={action} type="button" className="scene-control" aria-label={`${action === 'undo' ? 'Undo' : 'Redo'} code edit`}
-                  onClick={() => window.dispatchEvent(new CustomEvent('playground-code-history', { detail: action }))}
-                ><i className={`fa-solid ${action === 'undo' ? 'fa-rotate-left' : 'fa-rotate-right'}`} aria-hidden="true" />
-                  {action === 'undo' ? 'Undo' : 'Redo'}</button>
-              ))}
+            <div className="scene-object-options">
+              <div className="scene-object-options" role="group" aria-label="Edit history">
+                {(['undo', 'redo'] as const).map(action => (
+                  <button key={action} type="button" className="scene-control" aria-label={`${action === 'undo' ? 'Undo' : 'Redo'} code edit`}
+                    onClick={() => window.dispatchEvent(new CustomEvent('playground-code-history', { detail: action }))}
+                  ><i className={`fa-solid ${action === 'undo' ? 'fa-rotate-left' : 'fa-rotate-right'}`} aria-hidden="true" />
+                    {action === 'undo' ? 'Undo' : 'Redo'}</button>
+                ))}
+              </div>
+              <div className="scene-object-options" role="group" aria-label="Resize and rotation options">
+                <button type="button" className="scene-control" aria-pressed={keepProportions}
+                  title="Keep the width and height in proportion when resizing"
+                  onClick={() => setKeepProportions(enabled => !enabled)}>Keep proportions</button>
+                <button type="button" className="scene-control" aria-pressed={snapRotation}
+                  onClick={() => setSnapRotation(enabled => !enabled)}>Snap rotation to 15°</button>
+              </div>
             </div>
-            <div className="scene-object-options scene-history-actions" role="group" aria-label="Scene camera and grid">
+            <div className="scene-object-options" role="group" aria-label="Scene camera and grid">
               <button type="button" className="scene-control" onClick={() => zoomView(1 / 1.25)}>Zoom out</button>
               <button type="button" className="scene-control" onClick={() => zoomView(1.25)}>Zoom in</button>
               <button type="button" className="scene-control" onClick={restoreCamera}>Reset view</button>
-              <button type="button" className="scene-control scene-grid-toggle"
+              <button type="button" className="scene-control"
                 aria-pressed={isGridSnapping} title={`Snap moves, resizes and drops to the ${sceneGridSize} px grid`}
                 onClick={() => setIsGridSnapping(enabled => !enabled)}>Snap to grid</button>
               <select className="scene-control scene-grid-size" aria-label="Grid cell size" value={sceneGridSize}
@@ -643,9 +665,8 @@ const Viewport: React.FC = () => {
             </div>
             {!keyboardPlacement && <span id="scene-keyboard-hint" className="scene-edit-hint">
               Middle drag pans · {isGridSnapping ? 'Arrows move 1 cell · Shift moves 10 cells' : 'Arrows move 1 px · Shift moves 10 px'}<br />
-              Drag the round handle to rotate · Hold Shift to snap to 15°<br />
-              Hold Shift while resizing to keep proportions<br />
-              Esc cancels the current edit
+              Round handle rotates · Square handle resizes<br />
+              Shift enables either option while dragging · Esc cancels
             </span>}
             {!isInspectorVisible && selectedObject && pendingCanvasPlacements.has(selectedObject) && (
               <button type="button" className="scene-control scene-review-changes" onClick={() => {
