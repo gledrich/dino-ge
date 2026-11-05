@@ -5,7 +5,7 @@ import fs from 'fs/promises';
 import { fileURLToPath } from 'url';
 import { createRequire } from 'module';
 import { constants, existsSync } from 'fs';
-import { ProjectError, ProjectStore } from './lib/projects.js';
+import { ProjectError, ProjectStore, spriteImageTypes } from './lib/projects.js';
 
 const require = createRequire(import.meta.url);
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -109,6 +109,16 @@ app.get('/files', async (req, res) => {
     res.json(await projects.list());
   } catch (err) {
     res.status(500).json({ error: err.message });
+  }
+});
+
+app.post('/api/scripts/:id/assets', express.raw({ type: spriteImageTypes, limit: '5mb' }), async (req, res) => {
+  try {
+    const type = req.get('content-type')?.split(';')[0].trim().toLowerCase();
+    const url = await projects.importSprite(req.params.id, req.query.name, type, req.body);
+    res.status(201).json({ url });
+  } catch (err) {
+    res.status(scriptErrorStatus(err)).json({ error: err.message });
   }
 });
 
