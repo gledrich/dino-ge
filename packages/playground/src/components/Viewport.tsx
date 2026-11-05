@@ -72,6 +72,22 @@ const Viewport: React.FC = () => {
     setPlacementStatus(`Added ${placement.tag}${scene ? ` to ${scene.className}` : ''}. Save the script to keep it.`);
   }, [currentScriptId]);
 
+  const placeLibraryObject = useCallback((kind: SceneObjectKind, x?: number, y?: number) => {
+    setIsPaused(true);
+    setIsDebug(true);
+    setIsInspectorVisible(true);
+    addObject(kind, x, y);
+  }, [addObject, setIsDebug, setIsInspectorVisible, setIsPaused]);
+
+  useEffect(() => {
+    const placeObject = (event: Event) => {
+      const kind = (event as CustomEvent<SceneObjectKind>).detail;
+      if (sceneObjectKinds.includes(kind)) placeLibraryObject(kind);
+    };
+    window.addEventListener('playground-place-object', placeObject);
+    return () => window.removeEventListener('playground-place-object', placeObject);
+  }, [placeLibraryObject]);
+
   useEffect(() => {
     const reportHistory = (event: Event) => setPlacementStatus((event as CustomEvent<string>).detail);
     window.addEventListener('playground-scene-history', reportHistory);
@@ -148,7 +164,8 @@ const Viewport: React.FC = () => {
         aria-describedby={isEditingScene ? 'scene-keyboard-hint' : undefined}
         tabIndex={isEditingScene ? 0 : -1}
         onDragOver={event => {
-          if (!isEditingScene || !event.dataTransfer.types.some(type => type === sceneObjectDragType || type === sceneAssetDragType) ||
+          const types = event.dataTransfer.types;
+          if ((!types.includes(sceneObjectDragType) && !(isEditingScene && types.includes(sceneAssetDragType))) ||
               !(event.target instanceof HTMLCanvasElement)) return;
           event.preventDefault();
           event.dataTransfer.dropEffect = 'copy';
@@ -158,8 +175,8 @@ const Viewport: React.FC = () => {
         onDragLeave={() => setDropGuide(undefined)}
         onDrop={event => {
           setDropGuide(undefined);
-          if (!isEditingScene || !(event.target instanceof HTMLCanvasElement)) return;
-          if (event.dataTransfer.types.includes(sceneAssetDragType)) {
+          if (!(event.target instanceof HTMLCanvasElement)) return;
+          if (isEditingScene && event.dataTransfer.types.includes(sceneAssetDragType)) {
             event.preventDefault();
             addObject('Sprite', event.clientX, event.clientY, event.dataTransfer.getData(sceneAssetDragType));
             return;
@@ -167,7 +184,7 @@ const Viewport: React.FC = () => {
           const kind = sceneObjectKinds.find(item => item === event.dataTransfer.getData(sceneObjectDragType));
           if (!kind) return;
           event.preventDefault();
-          addObject(kind, event.clientX, event.clientY);
+          placeLibraryObject(kind, event.clientX, event.clientY);
         }}
         onClickCapture={suppressGameActivation}
         onKeyDownCapture={event => {
@@ -182,20 +199,8 @@ const Viewport: React.FC = () => {
       />
       {isEditingScene && (
         <>
-          <div className="scene-object-palette" role="group" aria-label="Add game objects">
-            <span id="scene-keyboard-hint">Drag to add · Arrow keys move 1 unit · Shift moves 10</span>
-            <div className="scene-object-options">
-              {sceneObjectKinds.map(kind => (
-                <button key={kind} type="button" draggable aria-label={`Add ${kind.toLowerCase()}`}
-                  onClick={() => addObject(kind)}
-                  onDragStart={event => {
-                    event.dataTransfer.setData(sceneObjectDragType, kind);
-                    event.dataTransfer.effectAllowed = 'copy';
-                  }}
-                  onDragEnd={() => setDropGuide(undefined)}
-                >{kind}</button>
-              ))}
-            </div>
+          <div className="scene-object-palette" role="group" aria-label="Scene editing">
+            <span id="scene-keyboard-hint">Arrow keys move 1 unit · Shift moves 10</span>
             <div className="scene-object-options scene-history-actions" role="group" aria-label="Edit history">
               {(['undo', 'redo'] as const).map(action => (
                 <button key={action} type="button" aria-label={`${action === 'undo' ? 'Undo' : 'Redo'} code edit`}
@@ -205,10 +210,10 @@ const Viewport: React.FC = () => {
             </div>
             {placementStatus && <span role="status">{placementStatus}</span>}
           </div>
-          {dropGuide && <div className="scene-drop-guide" aria-hidden="true"
-            style={{ left: dropGuide.x, top: dropGuide.y }} />}
         </>
       )}
+      {dropGuide && <div className="scene-drop-guide" aria-hidden="true"
+        style={{ left: dropGuide.x, top: dropGuide.y }} />}
       <Logo visible={!isInspectorVisible && isViewportReady} />
       <Toolbar 
         isPaused={isPaused}

@@ -1,16 +1,18 @@
 import React, { useState } from 'react';
 import AssetPanel from './AssetPanel';
+import { sceneObjectDragType, type SceneObjectKind } from '../utils/scene-objects';
 import '../styles/sidebar.css';
 
 interface Snippet {
   icon: string;
   label: string;
   code: string;
+  kind?: SceneObjectKind;
 }
 
 const snippets: Snippet[] = [
   { icon: 'fa-arrows-up-down-left-right', label: 'Vector2', code: 'new Vector2(0, 0)' },
-  { icon: 'fa-font', label: 'Text', code: `new Text({
+  { icon: 'fa-font', label: 'Text', kind: 'Text', code: `new Text({
   tag: 'textObj',
   text: 'Hello World',
   fontSize: 30,
@@ -19,7 +21,7 @@ const snippets: Snippet[] = [
   width: 200,
   zIndex: 10
 });` },
-  { icon: 'fa-square', label: 'Rectangle', code: `new Rectangle({
+  { icon: 'fa-square', label: 'Rectangle', kind: 'Rectangle', code: `new Rectangle({
   tag: 'rectObj',
   position: new Vector2(100, 100),
   width: 50,
@@ -27,7 +29,7 @@ const snippets: Snippet[] = [
   colour: '#43aa8b',
   zIndex: 5
 });` },
-  { icon: 'fa-circle', label: 'Circle', code: `new Circle({
+  { icon: 'fa-circle', label: 'Circle', kind: 'Circle', code: `new Circle({
   tag: 'circleObj',
   position: new Vector2(100, 100),
   radius: 25,
@@ -74,10 +76,10 @@ floorPhys.isStatic = true;
 floor.addComponent(floorPhys);` }
 ];
 
-type TabType = 'snippets' | 'assets';
+type TabType = 'library' | 'assets';
 
 const Sidebar: React.FC = () => {
-  const [activeTab, setActiveTab] = useState<TabType>('snippets');
+  const [activeTab, setActiveTab] = useState<TabType>('library');
 
   const insertSnippet = (code: string) => {
     window.dispatchEvent(new CustomEvent('playground-insert-text', { detail: code }));
@@ -86,12 +88,12 @@ const Sidebar: React.FC = () => {
   return (
     <div className="sidebar">
       <div className="sidebar-tabs">
-        <button type="button" aria-pressed={activeTab === 'snippets'}
-          className={`sidebar-tab ${activeTab === 'snippets' ? 'active' : ''}`} 
-          onClick={() => setActiveTab('snippets')}
+        <button type="button" aria-pressed={activeTab === 'library'}
+          className={`sidebar-tab ${activeTab === 'library' ? 'active' : ''}`}
+          onClick={() => setActiveTab('library')}
         >
-          <i className="fa-solid fa-code" />
-          <span>Snippets</span>
+          <i className="fa-solid fa-cubes" />
+          <span>Object Library</span>
         </button>
         <button type="button" aria-pressed={activeTab === 'assets'}
           className={`sidebar-tab ${activeTab === 'assets' ? 'active' : ''}`} 
@@ -103,18 +105,35 @@ const Sidebar: React.FC = () => {
       </div>
       
       <div className="sidebar-content">
-        {activeTab === 'snippets' ? (
+        {activeTab === 'library' ? (
           <div className="snippets-grid">
-            {snippets.map((s, index) => (
-              <button 
-                key={index} 
-                className="snippet-btn" 
-                title={s.label}
-                onClick={() => insertSnippet(s.code)}
-              >
-                <i className={`fa-solid ${s.icon}`} />
-                <span>{s.label}</span>
-              </button>
+            <p className="library-hint">Drag an object onto the scene. Use the code button to insert a snippet.</p>
+            {snippets.map(({ label, icon, code, kind }) => (
+              <div className="library-row" key={label}>
+                <button type="button" className="snippet-btn" draggable={!!kind}
+                  aria-label={kind ? `Add ${label.toLowerCase()}` : label === 'Sprite' ? 'Choose sprite image' : undefined}
+                  title={kind ? `Drag ${label.toLowerCase()} onto the scene` : label}
+                  onDragStart={event => {
+                    if (!kind) return;
+                    event.dataTransfer.setData(sceneObjectDragType, kind);
+                    event.dataTransfer.effectAllowed = 'copy';
+                  }}
+                  onClick={() => {
+                    if (label === 'Sprite') setActiveTab('assets');
+                    else if (kind) window.dispatchEvent(new CustomEvent('playground-place-object', { detail: kind }));
+                    else insertSnippet(code);
+                  }}
+                >
+                  <i className={`fa-solid ${icon}`} aria-hidden="true" />
+                  <span>{label}</span>
+                </button>
+                {(kind || label === 'Sprite') && (
+                  <button type="button" className="snippet-btn library-code" aria-label={`Insert ${label.toLowerCase()} code`}
+                    title={`Insert ${label.toLowerCase()} code`} onClick={() => insertSnippet(code)}>
+                    <i className="fa-solid fa-code" aria-hidden="true" />
+                  </button>
+                )}
+              </div>
             ))}
           </div>
         ) : (activeTab === 'assets' && (

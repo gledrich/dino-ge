@@ -19,6 +19,9 @@ test('keeps unsaved edits across tabs and panel collapse, and retains hidden con
   await page.getByRole('button', { name: 'Collapse editor' }).click();
   await page.getByRole('button', { name: 'Expand editor' }).click();
   await expect(editor).toContainText('local draft');
+  await page.getByRole('button', { name: 'Insert rectangle code', exact: true }).click();
+  await expect(editor).toContainText('new Rectangle');
+  await expect(page.getByRole('button', { name: 'Edit scene', exact: true })).toHaveAttribute('aria-pressed', 'false');
 });
 
 test('selects an object in Explorer and writes an Inspector change back to the script', async ({ page }) => {
@@ -200,11 +203,12 @@ new Engine({ onLoad() {}, update() {} }, { containerId: 'playground-canvas-conta
   await expect(canvas).toBeVisible();
   const editor = page.locator('.monaco-editor');
   await expect(editor).toContainText('new Engine');
-  await page.getByRole('button', { name: 'Edit scene' }).click();
+  await expect(page.getByRole('button', { name: 'Object Library', exact: true })).toHaveAttribute('aria-pressed', 'true');
   await page.getByRole('button', { name: 'Add rectangle' }).dragTo(canvas, {
     targetPosition: { x: 180, y: 150 },
   });
   const rectangle = page.getByRole('button', { name: 'New rectangle', exact: true });
+  await expect(page.getByRole('button', { name: 'Edit scene', exact: true })).toHaveAttribute('aria-pressed', 'true');
   await expect(rectangle).toHaveAttribute('aria-pressed', 'true');
   await expect(page.getByRole('spinbutton', { name: 'X', exact: true })).toHaveValue('180.00');
   await expect(page.getByRole('spinbutton', { name: 'Y', exact: true })).toHaveValue('150.00');

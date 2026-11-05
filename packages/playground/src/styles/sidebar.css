@@ -58,6 +58,22 @@
   gap: 6px;
 }
 
+.library-hint {
+  margin: 0 0 4px;
+  color: var(--text-secondary);
+  font-size: 11px;
+  line-height: 1.4;
+}
+
+.library-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 4px;
+}
+
+.library-row .snippet-btn[draggable='true'] { cursor: grab; }
+.library-row .library-code { padding-inline: 9px; }
+
 .snippet-btn {
   display: flex;
   align-items: center;
