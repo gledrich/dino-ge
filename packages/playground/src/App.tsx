@@ -6,6 +6,7 @@ import Inspector from './components/Inspector';
 import SceneExplorer from './components/SceneExplorer';
 import Console from './components/Console';
 import Viewport from './components/Viewport';
+import CanvasChangesDialog from './components/CanvasChangesDialog';
 import { usePlayground } from './context/PlaygroundContext';
 import { usePlaygroundScripts } from './hooks/usePlaygroundScripts';
 import { captureConsole } from './utils/LogManager';
@@ -25,7 +26,7 @@ function App() {
     arePanelsMinimized,
   } = usePlayground();
 
-  const { handleSave } = usePlaygroundScripts();
+  const { handleSave, selectScript, pendingRunChange, cancelRunChange, confirmRunChange } = usePlaygroundScripts();
   useEffect(captureConsole, []);
 
   const explorerPanelRef = usePanelRef();
@@ -214,6 +215,7 @@ function App() {
                       <Editor 
                         currentScriptId={currentScriptId} 
                         onSave={handleSave}
+                        onSelectScript={selectScript}
                       />
                     </div>
                     <div className="editor-tab-panel" id="playground-panel-console" role="tabpanel"
@@ -280,6 +282,9 @@ function App() {
           </div>
         </Panel>
       </Group>
+      {pendingRunChange && (
+        <CanvasChangesDialog action={pendingRunChange.kind} onCancel={cancelRunChange} onConfirm={confirmRunChange} />
+      )}
     </div>
   );
 }

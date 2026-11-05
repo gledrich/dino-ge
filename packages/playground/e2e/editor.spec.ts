@@ -293,6 +293,7 @@ new Engine({ onLoad() {
   await rail.press('Shift+ArrowRight');
   await expect(rail).toHaveAccessibleDescription('Pending canvas changes');
   await page.getByRole('button', { name: 'Reset game', exact: true }).click();
+  await page.getByRole('button', { name: 'Reset and discard', exact: true }).click();
   await expect(rail).toHaveAccessibleDescription('');
   await expect(wall).toHaveAccessibleDescription('');
 });
@@ -348,6 +349,67 @@ new Engine({ onLoad() {
   await expect(edit).toHaveAttribute('aria-pressed', 'false');
   await platform.click();
   await expect(x).toHaveValue('310.00');
+});
+
+test('keeps pending edits until a reset or script switch is confirmed', async ({ page }) => {
+  const makeScript = (tag: string) => `import { Engine, Rectangle, Vector2 } from 'dino-ge';
+new Engine({ onLoad() {
+  new Rectangle({ tag: '${tag}', position: new Vector2(300, 220), width: 64, height: 48 });
+}, update() {} }, { containerId: 'playground-canvas-container' });`;
+  let writes = 0;
+  await page.route('**/files', route => route.fulfill({ json: ['script', 'level-two'] }));
+  await page.route('**/api/scripts/script', route => {
+    if (route.request().method() === 'PUT') {
+      writes++;
+      return route.fulfill({ json: { success: true } });
+    }
+    return route.fulfill({ json: makeScript('Platform') });
+  });
+  await page.route('**/api/scripts/level-two', route => route.fulfill({ json: makeScript('Exit') }));
+  await page.goto('/');
+  const platform = page.getByRole('button', { name: 'Platform', exact: true });
+  const edit = page.getByRole('button', { name: 'Edit scene', exact: true });
+  const reset = page.getByRole('button', { name: 'Reset game', exact: true });
+  const selector = page.getByRole('combobox', { name: 'Current script' });
+  const x = page.getByRole('spinbutton', { name: 'X', exact: true });
+  const dialog = page.getByRole('dialog', { name: 'Discard pending canvas changes?' });
+  const keepEditing = dialog.getByRole('button', { name: 'Keep editing', exact: true });
+  await expect(platform).toBeVisible();
+  await edit.click();
+  await platform.click();
+  await platform.press('Shift+ArrowRight');
+  await expect(x).toHaveValue('310.00');
+
+  await reset.press('Control+Enter');
+  await expect(dialog).toBeVisible();
+  await expect(keepEditing).toBeFocused();
+  await keepEditing.press('Escape');
+  await expect(dialog).toHaveCount(0);
+  await expect(reset).toBeFocused();
+  await expect(x).toHaveValue('310.00');
+  expect(writes).toBe(0);
+
+  await selector.selectOption('level-two');
+  await expect(dialog).toBeVisible();
+  await keepEditing.click();
+  await expect(selector).toHaveValue('script');
+  await expect(platform).toHaveAccessibleDescription('Pending canvas changes');
+  await expect(x).toHaveValue('310.00');
+
+  await reset.click();
+  await dialog.getByRole('button', { name: 'Reset and discard' }).click();
+  await expect(edit).toHaveAttribute('aria-pressed', 'false');
+  await expect(platform).toHaveAccessibleDescription('');
+  expect(writes).toBe(1);
+  await edit.click();
+  await platform.click();
+  await platform.press('ArrowRight');
+  await expect(x).toHaveValue('301.00');
+  await selector.selectOption('level-two');
+  await dialog.getByRole('button', { name: 'Switch and discard' }).click();
+  await expect(selector).toHaveValue('level-two');
+  await expect(page.getByRole('button', { name: 'Exit', exact: true })).toBeVisible();
+  await expect(platform).toHaveCount(0);
 });
 
 test('rotates a scene object by its handle and saves the angle', async ({ page }) => {

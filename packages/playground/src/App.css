@@ -84,6 +84,45 @@
 .scene-edit-label { margin-inline-end: 4px; font-weight: 600; }
 .scene-edit-hint { color: var(--text-secondary); font-size: 11px; line-height: 1.45; }
 .scene-review-changes { justify-self: start; pointer-events: auto; }
+
+.canvas-changes-dialog {
+  width: min(400px, calc(100% - 32px));
+  padding: 20px;
+  border: 1px solid var(--border-color);
+  border-radius: 10px;
+  background: var(--bg-secondary);
+  color: var(--text-primary);
+  box-shadow: 0 16px 48px rgb(0 0 0 / 45%);
+}
+
+.canvas-changes-dialog::backdrop { background: rgb(0 0 0 / 55%); }
+
+.canvas-changes-dialog h2 { margin: 0; font-size: 17px; }
+
+.canvas-changes-dialog p {
+  margin: 10px 0 18px;
+  color: var(--text-secondary);
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.canvas-changes-dialog-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.scene-control.canvas-changes-dialog-discard {
+  border-color: #673940;
+  background: #332329;
+  color: #ffb4b8;
+}
+
+.scene-control.canvas-changes-dialog-discard:hover {
+  border-color: #a95965;
+  background: #4a2a33;
+}
 .scene-edit-status { border-top: 1px solid var(--border-color); padding-top: 6px; }
 
 .scene-edit-controls:has(.scene-placement-error) {

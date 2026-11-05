@@ -2,7 +2,7 @@ import React, { useCallback, useEffect, useRef, useState } from 'react';
 import Editor from '@monaco-editor/react';
 import { typescript, type editor } from 'monaco-editor';
 import * as Dino from 'dino-ge';
-import { createScript, getScript, getFilesList, setCurrentScriptId, readGameFolder, importGameFolder, type GameFolder } from '../utils/helpers';
+import { createScript, getScript, getFilesList, readGameFolder, importGameFolder, type GameFolder } from '../utils/helpers';
 import { Edit, instrumentCode, getSourceMapping, getSceneObjectCreation, getSceneObjectDeletion, getSceneObjectDuplication, getSpriteImageReplacement } from '../utils/ast-utils';
 import { createSceneObject, duplicateSceneObject, isReplaceableSprite, restoreSceneTransform, type SceneObjectPlacement, type SceneTransformState } from '../utils/scene-objects';
 import { useMonacoEditor } from '../hooks/useMonacoEditor';
@@ -11,6 +11,7 @@ import '../styles/editor.css';
 interface EditorProps {
   currentScriptId: string;
   onSave: (value: string) => Promise<void>;
+  onSelectScript: (scriptId: string) => void;
 }
 
 interface SceneHistoryEntry {
@@ -25,7 +26,7 @@ interface SceneHistoryEntry {
   removed?: boolean;
 }
 
-const CodeEditor: React.FC<EditorProps> = ({ currentScriptId, onSave }) => {
+const CodeEditor: React.FC<EditorProps> = ({ currentScriptId, onSave, onSelectScript }) => {
   const [scripts, setScripts] = useState<string[]>([]);
   const [isSaving, setIsSaving] = useState(false);
   const [isFormatting, setIsFormatting] = useState(false);
@@ -491,9 +492,9 @@ const CodeEditor: React.FC<EditorProps> = ({ currentScriptId, onSave }) => {
     window.dispatchEvent(new CustomEvent('playground-scene-history', { detail }));
   };
 
-  const handleScriptChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
-    setCurrentScriptId(e.target.value);
-    window.dispatchEvent(new CustomEvent('playground-script-selected', { detail: e.target.value }));
+  const selectNewScript = (scriptId: string) => {
+    setScripts(previous => previous.includes(scriptId) ? previous : [...previous, scriptId]);
+    onSelectScript(scriptId);
   };
 
   const handleNewScript = async () => {
@@ -502,8 +503,7 @@ const CodeEditor: React.FC<EditorProps> = ({ currentScriptId, onSave }) => {
     setImportError('');
     try {
       await createScript(name);
-      setCurrentScriptId(name);
-      window.dispatchEvent(new CustomEvent('playground-script-selected', { detail: name }));
+      selectNewScript(name);
     } catch (error) {
       setImportError(String(error instanceof Error ? error.message : error));
     }
@@ -534,8 +534,7 @@ const CodeEditor: React.FC<EditorProps> = ({ currentScriptId, onSave }) => {
     try {
       const id = await importGameFolder(folder, entryFile);
       setFolder(undefined);
-      setCurrentScriptId(id);
-      window.dispatchEvent(new CustomEvent('playground-script-selected', { detail: id }));
+      selectNewScript(id);
     } catch (error) {
       setImportError(String(error instanceof Error ? error.message : error));
     } finally {
@@ -602,7 +601,7 @@ const CodeEditor: React.FC<EditorProps> = ({ currentScriptId, onSave }) => {
             className="script-selector" 
             aria-label="Current script"
             value={currentScriptId} 
-            onChange={handleScriptChange}
+            onChange={event => onSelectScript(event.target.value)}
           >
             {scripts.map(s => (
               <option key={s} value={s}>{s}</option>

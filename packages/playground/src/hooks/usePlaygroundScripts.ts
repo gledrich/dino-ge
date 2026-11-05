@@ -1,13 +1,16 @@
-import { useCallback, useEffect, useLayoutEffect, useRef } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import * as Dino from 'dino-ge';
-import { getScript, updateScript } from '../utils/helpers';
+import { getScript, setCurrentScriptId as rememberScriptId, updateScript } from '../utils/helpers';
 import { instrumentCode, rebaseModule } from '../utils/ast-utils';
 import { usePlayground } from '../context/PlaygroundContext';
 
 const { Engine, Loader } = Dino;
 
+type RunChange = { kind: 'reset' } | { kind: 'switch'; scriptId: string };
+
 export const usePlaygroundScripts = () => {
   const runId = useRef(0);
+  const [pendingRunChange, setPendingRunChange] = useState<RunChange>();
   const { 
     currentScriptId, 
     setCurrentScriptId, 
@@ -79,15 +82,6 @@ export const usePlaygroundScripts = () => {
   }, [updatePlayground]);
 
   useEffect(() => {
-    const handleScriptSelected = (e: Event) => {
-      const customEvent = e as CustomEvent<string>;
-      setCurrentScriptId(customEvent.detail);
-    };
-    window.addEventListener('playground-script-selected', handleScriptSelected);
-    return () => window.removeEventListener('playground-script-selected', handleScriptSelected);
-  }, [setCurrentScriptId]);
-
-  useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.ctrlKey && e.key === 'Enter') {
         window.dispatchEvent(new CustomEvent('playground-refresh'));
@@ -97,22 +91,46 @@ export const usePlaygroundScripts = () => {
     return () => document.removeEventListener('keydown', handleKeyDown);
   }, []);
 
-  useEffect(() => {
-    const refresh = () => {
-      let editorValue: string | undefined;
-      const capture = (event: Event) => { editorValue = (event as CustomEvent<string>).detail; };
-      window.addEventListener('playground-editor-value', capture);
-      window.dispatchEvent(new Event('playground-get-value'));
-      window.removeEventListener('playground-editor-value', capture);
+  const performRunChange = useCallback((change: RunChange) => {
+    if (change.kind === 'switch') {
+      ++runId.current;
+      rememberScriptId(change.scriptId);
+      setCurrentScriptId(change.scriptId);
+      window.dispatchEvent(new CustomEvent('playground-script-selected', { detail: change.scriptId }));
+      return;
+    }
 
-      const reset = editorValue === undefined
-        ? updatePlayground().then(() => setIsPaused(false))
-        : handleRefresh(editorValue);
-      reset.catch(error => console.error('Could not reset the game', error));
-    };
+    let editorValue: string | undefined;
+    const capture = (event: Event) => { editorValue = (event as CustomEvent<string>).detail; };
+    window.addEventListener('playground-editor-value', capture);
+    window.dispatchEvent(new Event('playground-get-value'));
+    window.removeEventListener('playground-editor-value', capture);
+
+    const reset = editorValue === undefined
+      ? updatePlayground().then(() => setIsPaused(false))
+      : handleRefresh(editorValue);
+    reset.catch(error => console.error('Could not reset the game', error));
+  }, [handleRefresh, setCurrentScriptId, setIsPaused, updatePlayground]);
+
+  const requestRunChange = useCallback((change: RunChange) => {
+    if (pendingRunChange || (change.kind === 'switch' && change.scriptId === currentScriptId)) return;
+    if (pendingCanvasPlacements.size) setPendingRunChange(change);
+    else performRunChange(change);
+  }, [currentScriptId, pendingCanvasPlacements.size, pendingRunChange, performRunChange]);
+
+  const selectScript = (scriptId: string) => requestRunChange({ kind: 'switch', scriptId });
+  const cancelRunChange = () => setPendingRunChange(undefined);
+  const confirmRunChange = () => {
+    if (!pendingRunChange) return;
+    setPendingRunChange(undefined);
+    performRunChange(pendingRunChange);
+  };
+
+  useEffect(() => {
+    const refresh = () => requestRunChange({ kind: 'reset' });
     window.addEventListener('playground-refresh', refresh);
     return () => window.removeEventListener('playground-refresh', refresh);
-  }, [handleRefresh, setIsPaused, updatePlayground]);
+  }, [requestRunChange]);
 
-  return { handleSave, updatePlayground };
+  return { handleSave, selectScript, pendingRunChange, cancelRunChange, confirmRunChange };
 };
