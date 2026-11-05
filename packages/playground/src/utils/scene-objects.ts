@@ -3,7 +3,7 @@ import * as Dino from 'dino-ge';
 export const sceneObjectKinds = ['Rectangle', 'Circle', 'Text', 'Line'] as const;
 export type SceneObjectKind = typeof sceneObjectKinds[number];
 export const sceneObjectDragType = 'application/x-dino-scene-object';
-export const sceneObjectPointerDragEvent = 'playground-pointer-drag-object';
+export const scenePointerDragEvent = 'playground-pointer-drag-scene-item';
 export const sceneAssetDragType = 'application/x-dino-scene-asset';
 export const sceneSourceKey = '__dinoPlaygroundSceneSource';
 
@@ -26,11 +26,12 @@ export function isReplaceableSprite(object: Dino.GameObject | null): object is D
 
 export interface ScenePoint { x: number; y: number }
 
-export interface SceneObjectPointerDrag {
-  kind: SceneObjectKind;
+export type ScenePointerDragItem = { kind: SceneObjectKind } | { asset: SceneImageAsset };
+
+export type ScenePointerDrag = ScenePointerDragItem & {
   phase: 'preview' | 'drop';
   point: ScenePoint;
-}
+};
 
 export type CanvasPlacement = ReadonlyMap<Dino.ObjectManipulationPreview['kind'], ScenePoint>;
 

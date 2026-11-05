@@ -24,7 +24,7 @@
   text-align: left;
 }
 
-.asset-item:not(:disabled) { cursor: grab; }
+.asset-item:not(:disabled) { cursor: grab; touch-action: pan-y; }
 .asset-item:disabled { opacity: 0.7; cursor: default; }
 .asset-replace:disabled { opacity: 0.7; cursor: default; }
 

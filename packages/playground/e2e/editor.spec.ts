@@ -255,6 +255,74 @@ new Engine({ onLoad() {}, update() {} }, { containerId: 'playground-canvas-conta
   expect(source).toContain('new DinoPlaceLine');
 });
 
+test('previews and places sprite images from Assets with touch and pen', async ({ page, browserName }) => {
+  test.skip(browserName !== 'chromium', 'Native touch and pen input in this test use Chromium’s DevTools protocol.');
+  await page.route('**/files', route => route.fulfill({ json: ['script'] }));
+  await page.route('**/api/scripts/script', route => route.fulfill({ json: `
+import { Engine, Loader } from 'dino-ge';
+new Engine({ async onLoad() {
+  Loader.queueImage('gem', '/gem.svg');
+  await Loader.loadAll();
+}, update() {} }, { containerId: 'playground-canvas-container' });` }));
+  await page.route('**/gem.svg', route => route.fulfill({
+    contentType: 'image/svg+xml',
+    body: '<svg xmlns="http://www.w3.org/2000/svg" width="48" height="32"><rect width="48" height="32" fill="orange"/></svg>',
+  }));
+  await page.goto('/');
+  await page.getByRole('button', { name: 'Assets', exact: true }).click();
+  const asset = page.getByRole('button', { name: 'Add gem as sprite', exact: true });
+  const edit = page.getByRole('button', { name: 'Edit scene', exact: true });
+  await expect(asset).toBeDisabled();
+  await edit.click();
+  await expect(asset).toBeEnabled();
+  await page.getByRole('button', { name: 'Snap to grid' }).click();
+  const canvas = page.locator('#canvas');
+  const box = (await canvas.boundingBox())!;
+  const size = await canvas.evaluate((element: HTMLCanvasElement) => ({ width: element.width, height: element.height }));
+  const screen = (x: number, y: number) => ({
+    x: box.x + x * box.width / size.width, y: box.y + y * box.height / size.height,
+  });
+  const startPoint = async () => {
+    const rect = (await asset.boundingBox())!;
+    return { x: rect.x + rect.width / 2, y: rect.y + rect.height / 2 };
+  };
+  const session = await page.context().newCDPSession(page);
+  const preview = page.locator('.scene-drop-preview');
+  const sprite = page.getByRole('button', { name: 'gem sprite', exact: true });
+  const start = await startPoint();
+  await session.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [start] });
+  await session.send('Input.dispatchTouchEvent', { type: 'touchMove', touchPoints: [{ ...start, x: start.x + 48 }] });
+  await session.send('Input.dispatchTouchEvent', { type: 'touchMove', touchPoints: [screen(310, 210)] });
+  await expect(preview).toContainText('gem · X 304 · Y 208');
+  await expect(preview.locator('img')).toHaveAttribute('src', /\/gem\.svg$/);
+  await expect.poll(async () => (await preview.locator('.scene-drop-outline').boundingBox())?.width ?? 0)
+    .toBeCloseTo(48 * box.width / size.width, 0);
+  await edit.press('Enter');
+  await expect(preview).toHaveCount(0);
+  await session.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
+  await expect(sprite).toHaveCount(0);
+  await edit.click();
+  await expect(asset).toBeEnabled();
+
+  const end = screen(410, 258);
+  await session.send('Input.dispatchMouseEvent', {
+    type: 'mousePressed', ...await startPoint(), pointerType: 'pen', button: 'left', buttons: 1, clickCount: 1,
+  });
+  await session.send('Input.dispatchMouseEvent', { type: 'mouseMoved', ...end, pointerType: 'pen', buttons: 1 });
+  await expect(preview).toContainText('gem · X 416 · Y 256');
+  await session.send('Input.dispatchMouseEvent', {
+    type: 'mouseReleased', ...end, pointerType: 'pen', button: 'left', buttons: 0, clickCount: 1,
+  });
+  await expect(sprite).toHaveAttribute('aria-pressed', 'true');
+  await expect(page.getByRole('spinbutton', { name: 'X', exact: true })).toHaveValue('416.00');
+  await expect(page.getByRole('spinbutton', { name: 'Width', exact: true })).toHaveValue('48.00');
+  await expect(preview).toHaveCount(0);
+  await expect.poll(() => page.evaluate(() => {
+    const { monaco } = window as typeof window & { monaco: Monaco };
+    return monaco.editor.getEditors()[0].getValue();
+  })).toContain('src: "/gem.svg"');
+});
+
 test('edits canvas objects with touch and pen and rolls back cancelled contact', async ({ page, browserName }) => {
   test.skip(browserName !== 'chromium', 'Native touch and pen input in this test use Chromium’s DevTools protocol.');
   await page.route('**/files', route => route.fulfill({ json: ['script'] }));

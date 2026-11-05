@@ -3,7 +3,7 @@ import { Engine, SpriteComponent, snapToGrid, type ObjectManipulationPreview } f
 import { usePlayground } from '../context/PlaygroundContext';
 import Toolbar from './Toolbar';
 import Logo from './Logo';
-import { getAssetSource, getSceneAssetPreviewType, getSceneSource, getSceneSpriteScale, isReplaceableSprite, nudgeSceneSelection, sceneAssetDragType, sceneObjectDefaults, sceneObjectDragType, sceneObjectKinds, sceneObjectPointerDragEvent, type SceneImageAsset, type SceneObjectKind, type SceneObjectPlacement, type SceneObjectPointerDrag, type ScenePoint } from '../utils/scene-objects';
+import { getAssetSource, getSceneAssetPreviewType, getSceneSource, getSceneSpriteScale, isReplaceableSprite, nudgeSceneSelection, sceneAssetDragType, sceneObjectDefaults, sceneObjectDragType, sceneObjectKinds, scenePointerDragEvent, type SceneImageAsset, type SceneObjectKind, type SceneObjectPlacement, type ScenePointerDrag, type ScenePoint } from '../utils/scene-objects';
 import { maxSpriteImageBytes, spriteImageTypes, storeSpriteImage } from '../utils/helpers';
 
 const shapePreviewDimensions: Partial<Record<SceneObjectKind, { width: number; height: number }>> = {
@@ -196,31 +196,34 @@ const Viewport: React.FC = () => {
       asset: asset && { tag: asset.tag, src: asset.image.src } });
   }, [placementStep]);
 
+  const placeLoadedImage = useCallback((asset: SceneImageAsset, x?: number, y?: number) => {
+    addObject('Sprite', getPlacementPoint(x, y), asset);
+  }, [addObject, getPlacementPoint]);
+
   useEffect(() => {
     const updatePointerDrag = (event: Event) => {
-      const { detail } = event as CustomEvent<SceneObjectPointerDrag | null>;
-      if (!detail) {
+      const { detail } = event as CustomEvent<ScenePointerDrag | null>;
+      if (!detail || ('asset' in detail && !isEditingScene)) {
         setDropGuide(undefined);
         return;
       }
-      const { kind, phase, point: { x, y } } = detail;
+      const { phase, point: { x, y } } = detail;
       const target = document.elementFromPoint(x, y);
       const isOverCanvas = target instanceof HTMLCanvasElement && target.id === 'canvas' &&
         viewportContainerRef.current?.contains(target);
       if (isOverCanvas && phase === 'preview') {
-        showDropGuide(target, x, y, { kind });
+        showDropGuide(target, x, y, detail);
       } else {
         setDropGuide(undefined);
-        if (isOverCanvas && phase === 'drop') placeLibraryObject(kind, x, y);
+        if (isOverCanvas && phase === 'drop') {
+          if ('asset' in detail) placeLoadedImage(detail.asset, x, y);
+          else placeLibraryObject(detail.kind, x, y);
+        }
       }
     };
-    window.addEventListener(sceneObjectPointerDragEvent, updatePointerDrag);
-    return () => window.removeEventListener(sceneObjectPointerDragEvent, updatePointerDrag);
-  }, [placeLibraryObject, showDropGuide]);
-
-  const placeLoadedImage = useCallback((asset: SceneImageAsset, x?: number, y?: number) => {
-    addObject('Sprite', getPlacementPoint(x, y), asset);
-  }, [addObject, getPlacementPoint]);
+    window.addEventListener(scenePointerDragEvent, updatePointerDrag);
+    return () => window.removeEventListener(scenePointerDragEvent, updatePointerDrag);
+  }, [isEditingScene, placeLibraryObject, placeLoadedImage, showDropGuide]);
 
   const placeImageFile = useCallback(async (files: File[], x?: number, y?: number) => {
     const reject = (message: string) => setPlacementStatus({ message, error: true });

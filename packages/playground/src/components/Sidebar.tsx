@@ -1,6 +1,7 @@
-import React, { useCallback, useEffect, useRef, useState } from 'react';
+import React, { useState } from 'react';
 import AssetPanel from './AssetPanel';
-import { sceneObjectDragType, sceneObjectPointerDragEvent, type SceneObjectKind, type SceneObjectPointerDrag, type ScenePoint } from '../utils/scene-objects';
+import { sceneObjectDragType, type SceneObjectKind } from '../utils/scene-objects';
+import { useScenePointerDrag } from '../hooks/useScenePointerDrag';
 import '../styles/sidebar.css';
 
 interface Snippet {
@@ -78,40 +79,9 @@ floor.addComponent(floorPhys);` }
 
 type TabType = 'library' | 'assets';
 
-function reportPointerDrag(detail: SceneObjectPointerDrag | null) {
-  window.dispatchEvent(new CustomEvent(sceneObjectPointerDragEvent, { detail }));
-}
-
 const Sidebar: React.FC = () => {
   const [activeTab, setActiveTab] = useState<TabType>('library');
-  const pointerDrag = useRef<{
-    id: number; kind: SceneObjectKind; button: HTMLButtonElement; startX: number; dragging: boolean;
-  } | null>(null);
-  const suppressClick = useRef(false);
-
-  const finishPointerDrag = useCallback((point?: ScenePoint) => {
-    const drag = pointerDrag.current;
-    if (!drag) return;
-    pointerDrag.current = null;
-    if (drag.dragging) reportPointerDrag(point ? { kind: drag.kind, phase: 'drop', point } : null);
-    if (drag.button.hasPointerCapture(drag.id)) drag.button.releasePointerCapture(drag.id);
-  }, []);
-
-  useEffect(() => {
-    const cancel = () => finishPointerDrag();
-    const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') cancel();
-    };
-    window.addEventListener('blur', cancel);
-    window.addEventListener('playground-before-run', cancel);
-    window.addEventListener('keydown', onKeyDown);
-    return () => {
-      window.removeEventListener('blur', cancel);
-      window.removeEventListener('playground-before-run', cancel);
-      window.removeEventListener('keydown', onKeyDown);
-      cancel();
-    };
-  }, [finishPointerDrag]);
+  const pointerDrag = useScenePointerDrag(activeTab === 'library');
 
   const insertSnippet = (code: string) => {
     window.dispatchEvent(new CustomEvent('playground-insert-text', { detail: code }));
@@ -149,33 +119,9 @@ const Sidebar: React.FC = () => {
                   <button type="button" className="scene-control snippet-btn" draggable={!!kind}
                     aria-label={kind ? `Add ${label.toLowerCase()}` : 'Choose sprite image'}
                     title={kind ? `Drag ${label.toLowerCase()} onto the scene or click to add at the centre` : 'Choose an image in Assets'}
-                    onPointerDown={event => {
-                      if (!event.isPrimary || event.button !== 0 || pointerDrag.current) return;
-                      suppressClick.current = false;
-                      if (!kind || (event.pointerType !== 'touch' && event.pointerType !== 'pen')) return;
-                      const { pointerId, currentTarget, clientX } = event;
-                      currentTarget.setPointerCapture(pointerId);
-                      pointerDrag.current = { id: pointerId, kind, button: currentTarget, startX: clientX, dragging: false };
-                    }}
-                    onPointerMove={event => {
-                      const drag = pointerDrag.current;
-                      if (!drag || drag.id !== event.pointerId) return;
-                      if (!drag.dragging && Math.abs(event.clientX - drag.startX) < 8) return;
-                      drag.dragging = true;
-                      suppressClick.current = true;
-                      reportPointerDrag({ kind: drag.kind, phase: 'preview', point: { x: event.clientX, y: event.clientY } });
-                    }}
-                    onPointerUp={event => {
-                      if (pointerDrag.current?.id === event.pointerId) finishPointerDrag({ x: event.clientX, y: event.clientY });
-                    }}
-                    onPointerCancel={event => {
-                      if (pointerDrag.current?.id === event.pointerId) finishPointerDrag();
-                    }}
-                    onLostPointerCapture={event => {
-                      if (pointerDrag.current?.id === event.pointerId) finishPointerDrag();
-                    }}
+                    {...pointerDrag.forItem(kind ? { kind } : undefined)}
                     onDragStart={event => {
-                      if (pointerDrag.current) {
+                      if (pointerDrag.isActive()) {
                         event.preventDefault();
                         return;
                       }
@@ -185,10 +131,7 @@ const Sidebar: React.FC = () => {
                       event.dataTransfer.effectAllowed = 'copy';
                     }}
                     onClick={event => {
-                      if (suppressClick.current && event.detail > 0) {
-                        suppressClick.current = false;
-                        return;
-                      }
+                      if (pointerDrag.consumeClick(event)) return;
                       if (kind) window.dispatchEvent(new CustomEvent('playground-place-object', { detail: kind }));
                       else setActiveTab('assets');
                     }}
