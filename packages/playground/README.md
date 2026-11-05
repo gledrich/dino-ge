@@ -36,6 +36,12 @@ Once running, access the editor and inspector at `http://localhost:3000`.
 - **Play/Pause Controls:** Pause the game and engine audio, then resume from the same point.
 - **Auto-Formatting:** Integrated Prettier support for clean, consistent code.
 
+### Mobile workspace
+
+On narrow screens, Explorer, Editor, Inspector and Console share a single dock below the canvas. Drag the divider to resize the dock. In the Library, drag an object's grip up to the canvas to place it.
+
+<img src="https://raw.githubusercontent.com/gledrich/dino-ge/main/packages/playground/assets/mobile.png" alt="Amber Ruins running above the mobile bottom dock, with the Editor tab selected" width="390">
+
 ### Script Storage
 
 The playground automatically creates and manages a `scripts/` directory in the folder where the command is executed. All your JavaScript game scripts are stored here.
