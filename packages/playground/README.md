@@ -38,9 +38,9 @@ Once running, access the editor and inspector at `http://localhost:3000`.
 
 ### Mobile workspace
 
-On narrow screens, Explorer, Editor, Inspector and Console share a single dock below the canvas. Drag the divider to resize the dock. In the Library, drag an object's grip up to the canvas to place it.
+On narrow screens, Explorer, Editor, Inspector and Console share a drawer over the bottom of the game. Drag the handle to change how much of the game the drawer covers. The game keeps its full window size. In the Library, drag an object's grip up to the exposed canvas to place it.
 
-<img src="https://raw.githubusercontent.com/gledrich/dino-ge/main/packages/playground/assets/mobile.png" alt="Amber Ruins running above the mobile bottom dock, with the Editor tab selected" width="390">
+<img src="https://raw.githubusercontent.com/gledrich/dino-ge/main/packages/playground/assets/mobile.png" alt="The mobile Editor drawer over the lower part of Amber Ruins" width="390">
 
 ### Script Storage
 
