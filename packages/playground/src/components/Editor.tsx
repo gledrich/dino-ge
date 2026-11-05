@@ -4,7 +4,7 @@ import { typescript, type editor } from 'monaco-editor';
 import * as Dino from 'dino-ge';
 import { createScript, getScript, getFilesList, readGameFolder, importGameFolder, type GameFolder } from '../utils/helpers';
 import { Edit, instrumentCode, getSourceMapping, getSceneObjectCreation, getSceneObjectDeletion, getSceneObjectDuplication, getSpriteImageReplacement, type CanvasPlacementTransaction } from '../utils/ast-utils';
-import { createSceneObject, duplicateSceneObject, isReplaceableSprite, restoreSceneTransform, type CanvasTransformChange, type SceneObjectPlacement } from '../utils/scene-objects';
+import { createSceneObject, duplicateSceneObject, isReplaceableSprite, restoreSceneTransform, sceneObjectCodeEvent, type CanvasTransformChange, type SceneObjectPlacement } from '../utils/scene-objects';
 import { useMonacoEditor } from '../hooks/useMonacoEditor';
 import '../styles/editor.css';
 
@@ -249,6 +249,7 @@ const CodeEditor: React.FC<EditorProps> = ({ currentScriptId, onSave, onSelectSc
       if (applySourceEdits(creation.edits)) {
         placement.tag = creation.tag;
         placement.sourceId = creation.sourceId;
+        if (event.type === sceneObjectCodeEvent) return;
         const scene = Dino.Engine.currentScene;
         const object = createSceneObject(placement);
         const after = model.getAlternativeVersionId();
@@ -415,6 +416,7 @@ const CodeEditor: React.FC<EditorProps> = ({ currentScriptId, onSave, onSelectSc
     window.addEventListener('playground-apply-placement', applyPlacement);
     window.addEventListener('playground-update-sprite-image', replaceSpriteImage);
     window.addEventListener('playground-add-scene-object', addSceneObject);
+    window.addEventListener(sceneObjectCodeEvent, addSceneObject);
     window.addEventListener('playground-remove-scene-object', editSceneObject);
     window.addEventListener('playground-duplicate-scene-object', editSceneObject);
     const clearSceneHistory = () => { sceneHistory.current = []; };
@@ -438,6 +440,7 @@ const CodeEditor: React.FC<EditorProps> = ({ currentScriptId, onSave, onSelectSc
       window.removeEventListener('playground-apply-placement', applyPlacement);
       window.removeEventListener('playground-update-sprite-image', replaceSpriteImage);
       window.removeEventListener('playground-add-scene-object', addSceneObject);
+      window.removeEventListener(sceneObjectCodeEvent, addSceneObject);
       window.removeEventListener('playground-remove-scene-object', editSceneObject);
       window.removeEventListener('playground-duplicate-scene-object', editSceneObject);
       window.removeEventListener('playground-before-run', clearSceneHistory);

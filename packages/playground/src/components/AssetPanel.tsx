@@ -2,7 +2,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import { Engine, Loader } from 'dino-ge';
 import { usePlayground } from '../context/PlaygroundContext';
 import { useScenePlacementSource } from '../hooks/useScenePlacementSource';
-import { getSceneAssetPreviewType, isReplaceableSprite, sceneAssetDragType, type SceneImageAsset } from '../utils/scene-objects';
+import { getSceneAssetPreviewType, getSceneSource, getSceneSpritePlacement, isReplaceableSprite, sceneAssetDragType, sceneObjectCodeEvent, type SceneImageAsset, type SceneObjectPlacement } from '../utils/scene-objects';
 import { listSpriteImages, spriteImageTypes, type StoredSpriteImage } from '../utils/helpers';
 import '../styles/asset-panel.css';
 
@@ -12,11 +12,12 @@ interface AssetEntry {
   image?: HTMLImageElement;
 }
 
-function AssetTile({ asset, isEditing, canReplace, placementSource }: {
+function AssetTile({ asset, isEditing, canReplace, placementSource, onInsert }: {
   asset: AssetEntry;
   isEditing: boolean;
   canReplace: boolean;
   placementSource: ReturnType<typeof useScenePlacementSource>;
+  onInsert: (asset: SceneImageAsset) => void;
 }) {
   const [thumbnail, setThumbnail] = useState<HTMLImageElement>();
   const [unavailable, setUnavailable] = useState(false);
@@ -61,17 +62,24 @@ function AssetTile({ asset, isEditing, canReplace, placementSource }: {
           </span>
         </div>
       </button>
-      {canReplace && (
-        <button type="button" className="scene-control asset-replace" disabled={!image}
-          aria-label={`Replace selected sprite with ${asset.tag}`} title="Replace the selected sprite’s image"
-          onClick={() => {
-            if (image) window.dispatchEvent(new CustomEvent<SceneImageAsset>('playground-replace-sprite-image', {
-              detail: { tag: asset.tag, image },
-            }));
-          }}>
-          <i className="fa-solid fa-right-left" aria-hidden="true" />
+      <div className="asset-actions">
+        <button type="button" className="scene-control" disabled={!image}
+          aria-label={`Insert ${asset.tag} sprite code`} title={`Insert sprite code for ${asset.tag}`}
+          onClick={() => { if (image) onInsert({ tag: asset.tag, image }); }}>
+          Insert
         </button>
-      )}
+        {canReplace && (
+          <button type="button" className="scene-control" disabled={!image}
+            aria-label={`Replace selected sprite with ${asset.tag}`} title="Replace the selected sprite’s image"
+            onClick={() => {
+              if (image) window.dispatchEvent(new CustomEvent<SceneImageAsset>('playground-replace-sprite-image', {
+                detail: { tag: asset.tag, image },
+              }));
+            }}>
+            <i className="fa-solid fa-right-left" aria-hidden="true" />
+          </button>
+        )}
+      </div>
     </div>
   );
 }
@@ -80,15 +88,19 @@ const AssetPanel: React.FC = () => {
   const [loadedImages, setLoadedImages] = useState<SceneImageAsset[]>([]);
   const [selected, setSelected] = useState(Engine.selectedObject);
   const [catalogue, setCatalogue] = useState<{ scriptId: string; images: StoredSpriteImage[]; error?: string }>();
+  const [feedback, setFeedback] = useState<{ message: string; error?: boolean }>();
   const filePicker = useRef<HTMLInputElement>(null);
-  const { currentScriptId, isPaused, isDebug } = usePlayground();
+  const { currentScriptId, isPaused, isDebug, setActiveTab, setIsEditorVisible } = usePlayground();
   const isEditing = isPaused && isDebug;
   const placementSource = useScenePlacementSource(isEditing);
   const canReplace = isEditing && isReplaceableSprite(selected);
 
   useEffect(() => {
     const updateAssets = () => setLoadedImages(Loader.getLoadedAssets());
-    const clearAssets = () => setLoadedImages([]);
+    const clearAssets = () => {
+      setLoadedImages([]);
+      setFeedback(undefined);
+    };
     const updateSelection = () => setSelected(Engine.selectedObject);
     updateAssets();
     Engine.on('selectedObjectChanged', updateSelection);
@@ -138,6 +150,19 @@ const AssetPanel: React.FC = () => {
     assets.push({ tag, url });
   }
 
+  const insertSpriteCode = (asset: SceneImageAsset) => {
+    const reject = (message: string) => setFeedback({ message, error: true });
+    const scene = Engine.currentScene ? getSceneSource(Engine.currentScene) : undefined;
+    if (Engine.currentScene && !scene) return reject('Insert sprite code in a named scene class declared in the open script.');
+    const placement = getSceneSpritePlacement(asset, { x: 100, y: 100 }, currentScriptId, scene);
+    if (!placement) return reject('This image needs a reusable URL before it can be added to the script.');
+    window.dispatchEvent(new CustomEvent<SceneObjectPlacement>(sceneObjectCodeEvent, { detail: placement }));
+    if (!placement.sourceId) return reject(placement.error ?? 'Wait for the open script to start before inserting sprite code.');
+    setActiveTab('editor');
+    setIsEditorVisible(true);
+    setFeedback({ message: `Inserted ${placement.tag}. Reset game to preview it.` });
+  };
+
   return (
     <div className="asset-panel">
       <button type="button" className="scene-control" onClick={() => filePicker.current?.click()}>
@@ -152,14 +177,16 @@ const AssetPanel: React.FC = () => {
       <p className="asset-help">Import an image or drop it onto the canvas to place a sprite.</p>
       {assets.length > 0 && (
         <p className="asset-help">
-          {isEditing ? 'Drag or click an image to place it. Shift+Enter positions with keys.' : 'Enter Edit scene to place listed images.'}
+          {isEditing ? 'Drag or click an image to place it. Shift+Enter positions with keys.' : 'Enter Edit scene to place listed images.'} Use Insert to add sprite code.
         </p>
       )}
+      {feedback && <p className={`asset-feedback${feedback.error ? ' asset-feedback-error' : ''}`}
+        role={feedback.error ? 'alert' : 'status'}>{feedback.message}</p>}
       {workspace?.error && <p className="asset-help" role="status">{workspace.error}</p>}
       {canReplace && <p className="asset-help">Use the swap button to change the selected sprite’s image.</p>}
       <div className="asset-list">
         {assets.map(asset => <AssetTile key={`${asset.tag}:${asset.url}`} asset={asset} isEditing={isEditing}
-          canReplace={canReplace} placementSource={placementSource} />)}
+          canReplace={canReplace} placementSource={placementSource} onInsert={insertSpriteCode} />)}
         {!assets.length && !workspace?.error && (
           <div className="no-assets">{workspace ? 'Imported images and images loaded by the game appear here.' : 'Loading workspace images…'}</div>
         )}

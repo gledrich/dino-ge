@@ -3,7 +3,7 @@ import { Engine, Input, SpriteComponent, getViewportAlignment, snapToGrid, type 
 import { usePlayground } from '../context/PlaygroundContext';
 import Toolbar from './Toolbar';
 import Logo from './Logo';
-import { getAssetSource, getDefaultSceneObjectTag, getSceneArrowMovement, getSceneAssetPreviewType, getSceneSelectionBounds, getSceneSource, getSceneSpriteScale, isReplaceableSprite, nudgeSceneSelection, sceneAssetDragType, sceneKeyboardPlacementEvent, sceneObjectDefaults, sceneObjectDragType, sceneObjectKinds, scenePointerDragEvent, type SceneImageAsset, type SceneKeyboardPlacementRequest, type SceneObjectKind, type SceneObjectPlacement, type ScenePointerDrag, type ScenePoint } from '../utils/scene-objects';
+import { getAssetSource, getDefaultSceneObjectTag, getSceneArrowMovement, getSceneAssetPreviewType, getSceneSelectionBounds, getSceneSource, getSceneSpritePlacement, getSceneSpriteScale, isReplaceableSprite, nudgeSceneSelection, sceneAssetDragType, sceneKeyboardPlacementEvent, sceneObjectDefaults, sceneObjectDragType, sceneObjectKinds, scenePointerDragEvent, type SceneImageAsset, type SceneKeyboardPlacementRequest, type SceneObjectKind, type SceneObjectPlacement, type ScenePointerDrag, type ScenePoint } from '../utils/scene-objects';
 import { maxSpriteImageBytes, spriteImageTypes, storeSpriteImage } from '../utils/helpers';
 
 const shapePreviewDimensions: Record<SceneObjectKind, { width: number; height: number }> = {
@@ -285,22 +285,10 @@ const Viewport: React.FC = () => {
     if (Engine.currentScene && !scene) {
       return rejectPlacement('Add objects in a named scene class declared in the open script.');
     }
-    const options = {
-      tag: getDefaultSceneObjectTag(kind), scene,
-      x: point.x, y: point.y,
-    };
-    let placement: SceneObjectPlacement;
-    if (kind === 'Sprite') {
-      const source = asset && getAssetSource(asset.image.src, currentScriptId);
-      if (!asset || !source) {
-        return rejectPlacement('This image needs a reusable URL before it can be added to the script.');
-      }
-      const { image, tag } = asset;
-      const scale = getSceneSpriteScale(image);
-      placement = { ...options, kind, tag: `${tag} sprite`, asset: { image, source, scale } };
-    } else {
-      placement = { ...options, kind };
-    }
+    const placement: SceneObjectPlacement | undefined = kind === 'Sprite'
+      ? asset && getSceneSpritePlacement(asset, point, currentScriptId, scene)
+      : { kind, tag: getDefaultSceneObjectTag(kind), x: point.x, y: point.y, scene };
+    if (!placement) return rejectPlacement('This image needs a reusable URL before it can be added to the script.');
     window.dispatchEvent(new CustomEvent('playground-add-scene-object', { detail: placement }));
     if (!placement.sourceId) {
       return rejectPlacement(placement.error ?? 'Open the game script in the editor before adding objects.');

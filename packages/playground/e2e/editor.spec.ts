@@ -2714,6 +2714,60 @@ new Engine({
   await expect(page.getByRole('spinbutton', { name: 'Height', exact: true })).toHaveValue('40.00');
 });
 
+test('inserts a sprite from its project asset with the same scale as a canvas drop', async ({ page }) => {
+  const id = 'sprite-code/scenes/main';
+  let source = `import { Engine, Loader } from 'dino-ge';
+new Engine({ async onLoad() {
+  Loader.queueImage('gem', new URL('../assets/gem.svg', import.meta.url).href);
+  await Loader.loadAll();
+}, update() {} }, { containerId: 'playground-canvas-container' });`;
+  await page.route('**/files', route => route.fulfill({ json: ['script', id] }));
+  await page.route('**/api/scripts/script', route => route.fulfill({ json: '' }));
+  await page.route(`**/api/scripts/${encodeURIComponent(id)}`, route => {
+    if (route.request().method() === 'PUT') {
+      source = route.request().postDataJSON().data;
+      return route.fulfill({ json: { success: true } });
+    }
+    return route.fulfill({ json: source });
+  });
+  await page.route('**/project-runs/*/sprite-code/assets/gem.svg', route => route.fulfill({
+    contentType: 'image/svg+xml',
+    body: '<svg xmlns="http://www.w3.org/2000/svg" width="256" height="128"><rect width="256" height="128" fill="orange"/></svg>',
+  }));
+  await page.goto('/');
+  await page.locator('.script-selector').selectOption(id);
+  await page.getByRole('button', { name: 'Choose sprite image', exact: true }).press('Enter');
+  await expect(page.getByRole('button', { name: 'Assets', exact: true })).toHaveAttribute('aria-pressed', 'true');
+  await page.getByRole('tab', { name: 'Console' }).click();
+  const asset = page.getByRole('button', { name: 'Add gem as sprite', exact: true });
+  const insert = page.getByRole('button', { name: 'Insert gem sprite code', exact: true });
+  await expect(asset).toBeDisabled();
+  await expect(insert).toBeEnabled({ timeout: 3000 });
+  await insert.click();
+  await expect(page.getByRole('tab', { name: 'Editor' })).toHaveAttribute('aria-selected', 'true');
+  await expect(page.getByRole('status').filter({ hasText: 'Inserted gem sprite' })).toBeVisible();
+  const sprite = page.getByRole('button', { name: 'gem sprite', exact: true });
+  await expect(sprite).toHaveCount(0);
+
+  await page.getByRole('button', { name: 'Reset game', exact: true }).click();
+  await expect(sprite).toBeVisible();
+  expect(source).toMatch(/src: new URL\(["']\.\.\/assets\/gem\.svg["'], import\.meta\.url\)\.href/);
+  await page.getByRole('button', { name: 'Edit scene', exact: true }).click();
+  await sprite.click();
+  const x = page.getByRole('spinbutton', { name: 'X', exact: true });
+  const scale = page.getByRole('spinbutton', { name: 'Scale X', exact: true });
+  const width = page.getByRole('spinbutton', { name: 'Width', exact: true });
+  await expect(x).toHaveValue('100.00');
+  await expect(scale).toHaveValue('0.50');
+  await expect(width).toHaveValue('256.00');
+
+  await asset.dragTo(page.locator('#canvas'), { targetPosition: { x: 360, y: 225 } });
+  await expect(page.getByRole('button', { name: 'gem sprite 2', exact: true })).toHaveAttribute('aria-pressed', 'true');
+  await expect(x).toHaveValue('360.00');
+  await expect(scale).toHaveValue('0.50');
+  await expect(width).toHaveValue('256.00');
+});
+
 test('keyboard format and save act on the selected script after switching files', async ({ page }) => {
   await page.route('**/files', route => route.fulfill({ json: ['script', 'second'] }));
   await page.route('**/api/scripts/*', route => {

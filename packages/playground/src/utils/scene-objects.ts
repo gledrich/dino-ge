@@ -5,6 +5,7 @@ export type SceneObjectKind = typeof sceneObjectKinds[number];
 export const sceneObjectDragType = 'application/x-dino-scene-object';
 export const scenePointerDragEvent = 'playground-pointer-drag-scene-item';
 export const sceneKeyboardPlacementEvent = 'playground-position-scene-item';
+export const sceneObjectCodeEvent = 'playground-insert-scene-object-code';
 export const sceneAssetDragType = 'application/x-dino-scene-asset';
 export const sceneSourceKey = '__dinoPlaygroundSceneSource';
 
@@ -198,7 +199,7 @@ export const sceneObjectDefaults = {
   Line: { length: 96, strokeWidth: 4 },
 };
 
-export function getDefaultSceneObjectTag(kind: SceneObjectKind | 'Sprite') {
+export function getDefaultSceneObjectTag(kind: SceneObjectKind) {
   return `New ${kind.toLowerCase()}`;
 }
 
@@ -245,6 +246,13 @@ export function getAssetSource(src: string, scriptId: string): string | undefine
     return `new URL(${JSON.stringify(relative)}, import.meta.url).href`;
   }
   return JSON.stringify(`${workspacePath}${url.search}${url.hash}`);
+}
+
+export function getSceneSpritePlacement({ tag, image }: SceneImageAsset, { x, y }: ScenePoint,
+  scriptId: string, scene?: SceneSource): SceneObjectPlacement | undefined {
+  const source = getAssetSource(image.src, scriptId);
+  if (!source) return;
+  return { kind: 'Sprite', tag: `${tag} sprite`, x, y, scene, asset: { image, source, scale: getSceneSpriteScale(image) } };
 }
 
 export function createSceneObject(placement: SceneObjectPlacement) {
