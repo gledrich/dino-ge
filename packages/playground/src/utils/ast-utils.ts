@@ -318,16 +318,26 @@ export function rebaseModule(code: string, moduleUrl: URL, runtimeUrl: string, r
   const ast = acorn.parse(code, { ecmaVersion: 'latest', sourceType: 'module' });
   const replacements: Edit[] = [];
   const identifiers = new Set<string>();
-  const dynamicImports: { start: number; end: number }[] = [];
+  const wrappers: { start: number; end: number; method: 'dynamicSpecifier' | 'resume' }[] = [];
+  const moduleErrorHandlers: number[] = [];
+  const destructuringCatches: acorn.CatchClause[] = [];
   const pathSpecifier = /^(?:\.{1,2}\/|\/)/;
   const base = JSON.stringify(moduleUrl.href);
-  const visit = (node: any) => {
+  const visit = (node: any, inFunction = false) => {
     if (node.type === 'Identifier') identifiers.add(node.name);
+    if (!inFunction) {
+      if (node.type === 'AwaitExpression') wrappers.push({ start: node.start, end: node.end, method: 'resume' });
+      if (node.type === 'CatchClause') {
+        if (node.param && node.param.type !== 'Identifier') destructuringCatches.push(node);
+        else moduleErrorHandlers.push(node.body.start + 1);
+      }
+      if (node.type === 'TryStatement' && node.finalizer) moduleErrorHandlers.push(node.finalizer.start + 1);
+    }
     if (['ImportDeclaration', 'ExportNamedDeclaration', 'ExportAllDeclaration', 'ImportExpression'].includes(node.type)) {
       const source = node.source;
       if (node.type === 'ImportExpression' && source &&
           (typeof source.value !== 'string' || pathSpecifier.test(source.value))) {
-        dynamicImports.push(source);
+        wrappers.push({ start: source.start, end: source.end, method: 'dynamicSpecifier' });
       } else if (typeof source?.value === 'string' && pathSpecifier.test(source.value)) {
         replacements.push({
           start: source.start, end: source.end,
@@ -335,19 +345,38 @@ export function rebaseModule(code: string, moduleUrl: URL, runtimeUrl: string, r
         });
       }
     }
+    const inFunctionBody = inFunction || ['ArrowFunctionExpression', 'FunctionDeclaration', 'FunctionExpression'].includes(node.type);
     for (const child of Object.values(node)) {
       for (const item of Array.isArray(child) ? child : [child]) {
-        if (item && typeof item === 'object' && 'type' in item) visit(item);
+        if (item && typeof item === 'object' && 'type' in item) visit(item, inFunctionBody);
       }
     }
   };
   visit(ast);
   let runtime = '__dinoModuleRuntime';
   while (identifiers.has(runtime)) runtime += '_';
-  for (const { start, end } of dynamicImports) {
-    // Wrap only the expression so nested imports can still be rewritten.
-    replacements.push({ start, end: start, newText: `${runtime}.dynamicSpecifier((` },
-      { start: end, end, newText: `), ${base})` });
+  // Nested wrappers can share an offset. The edits are applied from right to left.
+  for (const { end, method } of wrappers) {
+    const newText = method === 'dynamicSpecifier' ? `), ${base})` : `, ${run})`;
+    replacements.push({ start: end, end, newText });
+  }
+  for (const { start, method } of wrappers.reverse()) {
+    const newText = method === 'dynamicSpecifier' ? `${runtime}.dynamicSpecifier((` : `${runtime}.resume(`;
+    replacements.push({ start, end: start, newText });
+  }
+  if (wrappers.some(({ method }) => method === 'resume')) {
+    // A rejected await or the resume guard can jump to an entry's catch or finally block.
+    const guard = `${runtime}.assertActiveRun(${run}); `;
+    for (const start of moduleErrorHandlers) {
+      replacements.push({ start, end: start, newText: guard });
+    }
+    // Catch patterns can execute user code before the catch body starts.
+    let caught = `${runtime}Caught`;
+    while (identifiers.has(caught)) caught += '_';
+    for (const { start, end } of destructuringCatches) {
+      replacements.push({ start, end: start, newText: `catch (${caught}) { ${guard}try { throw ${caught}; } ` },
+        { start: end, end, newText: ' }' });
+    }
   }
   for (const edit of replacements.sort((a, b) => b.start - a.start || b.end - a.end)) {
     code = code.slice(0, edit.start) + edit.newText + code.slice(edit.end);

@@ -84,15 +84,19 @@ const __dinoModuleRuntime = globalThis;
 const meta = import.meta;
 const specifier = './fixture-game-module.mjs';
 let evaluated = false;
-const { label: dynamicLabel } = await import((evaluated = true, specifier));
+const { label: dynamicLabel } = await await import(await (evaluated = true, Promise.resolve(specifier)));
 const invalidSpecifier = await import(Symbol()).catch(error => error instanceof TypeError);
 const malformedPath = await import('//[').catch(error => error instanceof TypeError);
+let handled = false;
+try { await Promise.reject({ message: 'level missing' }); }
+catch ({ message }) { handled = message === 'level missing'; }
+finally {await Promise.resolve();}
 if (meta.url !== location.href || meta.resolve(specifier) !== new URL(specifier, location.href).href) {
   throw new Error('Entry module metadata changed');
 }
 const output = document.createElement('p');
 output.dataset.playgroundGame = '';
-output.textContent = evaluated && invalidSpecifier && malformedPath && label === dynamicLabel
+output.textContent = evaluated && invalidSpecifier && malformedPath && handled && label === dynamicLabel
   ? label : 'Unexpected dynamic import';
 document.getElementById('playground-canvas-container').append(output);`;
   await page.getByRole('button', { name: 'Reset game' }).click();
@@ -142,6 +146,52 @@ new Engine({ onLoad() {
   expect(await page.locator('body').getAttribute('data-stale-game-started')).toBeNull();
   await expect(page.getByRole('alert').filter({ hasText: 'Previous game failed' })).toHaveCount(0);
 });
+
+for (const settlement of ['resolves', 'rejects'] as const) {
+  test(`a replaced entry cannot start a game after its top-level await ${settlement}`, async ({ page }) => {
+    await page.route('**/files', route => route.fulfill({ json: ['script', 'next'] }));
+    await page.route('**/api/scripts/script', route => route.fulfill({ json: `
+import { Engine, Rectangle, Vector2 } from 'dino-ge';
+try {
+  await new Promise((resolve, reject) => {
+    window.addEventListener('resume-previous-game', () => ${settlement === 'resolves' ? 'resolve()' : 'reject({})'}, { once: true });
+    document.body.dataset.previousGameWaiting = 'true';
+  });
+} catch ({ fallback = (document.body.dataset.previousGameFallback = 'true') }) {
+  document.body.dataset.previousGameHandled = 'true';
+} finally {
+  document.body.dataset.previousGameFinished = 'true';
+}
+document.body.dataset.previousGameResumed = 'true';
+new Engine({ onLoad() {
+  new Rectangle({ tag: 'Previous game', position: new Vector2(60, 60), width: 40, height: 30 });
+} }, { containerId: 'playground-canvas-container' });` }));
+    await page.route('**/api/scripts/next', route => route.fulfill({ json: `
+import { Engine, Rectangle, Vector2 } from 'dino-ge';
+new Engine({ onLoad() {
+  new Rectangle({ tag: 'Current game', position: new Vector2(60, 60), width: 40, height: 30 });
+} }, { containerId: 'playground-canvas-container' });` }));
+
+    await page.goto('/');
+    const body = page.locator('body');
+    await expect(body).toHaveAttribute('data-previous-game-waiting', 'true');
+    await page.getByRole('combobox', { name: 'Current script' }).selectOption('next');
+    const currentGame = page.getByRole('button', { name: 'Current game', exact: true });
+    await expect(currentGame).toBeVisible();
+
+    await page.evaluate(async () => {
+      window.dispatchEvent(new Event('resume-previous-game'));
+      await new Promise(requestAnimationFrame);
+    });
+    expect(await body.getAttribute('data-previous-game-fallback')).toBeNull();
+    expect(await body.getAttribute('data-previous-game-handled')).toBeNull();
+    expect(await body.getAttribute('data-previous-game-finished')).toBeNull();
+    expect(await body.getAttribute('data-previous-game-resumed')).toBeNull();
+    await expect(currentGame).toBeVisible();
+    await expect(page.locator('#playground-canvas-container canvas')).toHaveCount(1);
+    await expect(page.getByRole('alert').filter({ hasText: 'Game script failed to run' })).toHaveCount(0);
+  });
+}
 
 test('keeps unsaved edits across tabs and panel collapse, and retains hidden console messages', async ({ page }) => {
   await page.route('**/files', route => route.fulfill({ json: ['script'] }));
