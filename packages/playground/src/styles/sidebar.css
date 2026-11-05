@@ -1,4 +1,5 @@
 .sidebar {
+  container-type: inline-size;
   display: flex;
   flex-direction: column;
   background: transparent;
@@ -100,6 +101,7 @@
 }
 
 .library-row .snippet-btn {
+  justify-content: flex-start;
   gap: 5px;
   padding-inline: 7px;
 }
@@ -135,4 +137,14 @@
 .snippet-btn .library-affordance {
   margin-inline-start: auto;
   color: var(--text-secondary);
+}
+
+@container (max-width: 174px) {
+  .sidebar-tab i,
+  .library-row .snippet-btn i { display: none; }
+
+  .sidebar-tabs,
+  .sidebar-content { padding-inline: 8px; }
+
+  .library-row .scene-control { padding-inline: 5px; }
 }

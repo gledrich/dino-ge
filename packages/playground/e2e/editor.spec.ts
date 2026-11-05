@@ -934,6 +934,25 @@ new Engine({
   await expect(page.getByText('Click an object to inspect.')).toBeVisible();
 });
 
+test('keeps Library labels readable in a narrow sidebar', async ({ page }) => {
+  await page.setViewportSize({ width: 768, height: 800 });
+  await page.route('**/files', route => route.fulfill({ json: ['script'] }));
+  await page.route('**/api/scripts/script', route => route.fulfill({ json: `
+import { Engine } from 'dino-ge';
+new Engine({ onLoad() {} }, { containerId: 'playground-canvas-container' });` }));
+  await page.goto('/');
+  for (const name of ['Library', 'Assets', 'Rectangle']) {
+    const label = page.locator('.sidebar').getByText(name, { exact: true });
+    await expect(label).toBeVisible();
+    expect(await label.evaluate(element => element.scrollWidth <= element.clientWidth), `${name} fits`).toBe(true);
+  }
+  const editor = page.locator('.monaco-editor');
+  await expect(editor).toContainText('new Engine');
+  const insert = page.getByRole('button', { name: 'Insert rectangle code' });
+  await insert.click();
+  await expect(editor).toContainText('new Rectangle');
+});
+
 test('places a palette object at the drop point and restores it from the saved script', async ({ page }) => {
   let source = `import { Engine } from 'dino-ge';
 new Engine({ onLoad() {}, update() {} }, { containerId: 'playground-canvas-container' });`;
