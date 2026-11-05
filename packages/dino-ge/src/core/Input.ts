@@ -20,6 +20,17 @@ export default class Input {
     kind: 'drag' | 'resize'; object: GameObject; offset: Vector2; initial?: Vector2;
   } | null = null;
 
+  private static updateMousePosition(event: MouseEvent, canvas: HTMLCanvasElement | null) {
+    const rect = typeof canvas?.getBoundingClientRect === 'function' ? canvas.getBoundingClientRect() : undefined;
+    if (!canvas || !rect) {
+      this.mousePosition.set(event.clientX, event.clientY);
+      return;
+    }
+    const scaleX = rect.width > 0 && canvas.width > 0 ? canvas.width / rect.width : 1;
+    const scaleY = rect.height > 0 && canvas.height > 0 ? canvas.height / rect.height : 1;
+    this.mousePosition.set((event.clientX - rect.left) * scaleX, (event.clientY - rect.top) * scaleY);
+  }
+
   private static getGestureValue(object: GameObject, kind: 'drag' | 'resize'): Vector2 {
     if (kind === 'drag') {
       const position = object.transform.position;
@@ -46,15 +57,8 @@ export default class Input {
     this.isinitialised = true;
 
     document.addEventListener('mousemove', (event: MouseEvent) => {
-      const canvas = document.getElementById('canvas') as HTMLCanvasElement;
-      if (canvas && typeof canvas.getBoundingClientRect === 'function') {
-        const rect = canvas.getBoundingClientRect();
-        this.mousePosition.x = event.clientX - rect.left;
-        this.mousePosition.y = event.clientY - rect.top;
-      } else {
-        this.mousePosition.x = event.clientX;
-        this.mousePosition.y = event.clientY;
-      }
+      const canvas = document.getElementById('canvas') as HTMLCanvasElement | null;
+      this.updateMousePosition(event, canvas);
 
       if (this.gesture && (!Engine.debug || this.gesture.object !== Engine.selectedObject)) {
         this.gesture = null;
@@ -133,7 +137,11 @@ export default class Input {
     });
 
     document.addEventListener('mousedown', (event: MouseEvent) => {
-      if ((event.target as HTMLElement).tagName !== 'CANVAS') return;
+      const target = event.target as HTMLCanvasElement | null;
+      if (target?.tagName !== 'CANVAS') return;
+      const canvas = document.getElementById('canvas');
+      if (canvas instanceof HTMLCanvasElement && target !== canvas) return;
+      if (Number.isFinite(event.clientX) && Number.isFinite(event.clientY)) this.updateMousePosition(event, target);
       this.keys.add(`mouse${event.button}`);
 
       const worldPos = new Vector2(this.mouseX, this.mouseY);

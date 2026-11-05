@@ -78,6 +78,11 @@ new Engine({
   await expect(edit).toHaveAttribute('aria-pressed', 'true');
   await expect(page.getByRole('button', { name: 'Play', exact: true })).toBeVisible();
   const canvas = page.locator('#canvas');
+  // Keep this exact-coordinate test at 1:1 scale. The overlap test covers CSS scaling.
+  await canvas.evaluate((element: HTMLCanvasElement) => {
+    element.style.width = `${element.width}px`;
+    element.style.height = `${element.height}px`;
+  });
   const box = (await canvas.boundingBox())!;
   await page.mouse.click(box.x + 135, box.y + 125);
   await canvas.press('Enter');
@@ -306,6 +311,19 @@ new Engine({ onLoad() {
   await canvas.click({ position: { x: 162, y: 142 } });
   await expect(page.getByRole('button', { name: 'backing', exact: true })).toHaveAttribute('aria-pressed', 'true');
   await expect(page.getByRole('button', { name: 'hidden cover', exact: true })).toBeVisible();
+
+  await canvas.evaluate(element => {
+    element.style.transformOrigin = 'top left';
+    element.style.transform = 'scale(0.75)';
+  });
+  const box = (await canvas.boundingBox())!;
+  await page.mouse.move(box.x + 185 * 0.75, box.y + 165 * 0.75);
+  await page.mouse.down();
+  await expect(circle).toHaveAttribute('aria-pressed', 'true');
+  await page.mouse.move(box.x + 205 * 0.75, box.y + 177 * 0.75);
+  await page.mouse.up();
+  await expect.poll(async () => Number(await page.getByRole('spinbutton', { name: 'X', exact: true }).inputValue())).toBeCloseTo(180, 0);
+  await expect.poll(async () => Number(await page.getByRole('spinbutton', { name: 'Y', exact: true }).inputValue())).toBeCloseTo(152, 0);
 });
 
 test('navigates the editing camera, places in world coordinates and restores the gameplay view', async ({ page }) => {

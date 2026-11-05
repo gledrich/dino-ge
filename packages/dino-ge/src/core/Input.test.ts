@@ -140,6 +140,24 @@ describe('Input', () => {
     expect(Input.mouseX).toBe(75);
   });
 
+  it('reads a press from the scaled game canvas and ignores unrelated canvases', () => {
+    const canvas = document.createElement('canvas');
+    canvas.width = 800;
+    canvas.height = 600;
+    jest.spyOn(canvas, 'getBoundingClientRect').mockReturnValue({ left: 20, top: 30, width: 400, height: 300 } as DOMRect);
+    jest.spyOn(document, 'getElementById').mockReturnValue(canvas);
+    const click = jest.fn();
+    Input.addClickListener(click);
+    Input.init();
+
+    capturedListeners.mousedown({ target: document.createElement('canvas'), button: 0, clientX: 70, clientY: 80 });
+    expect(click).not.toHaveBeenCalled();
+    capturedListeners.mousedown({ target: canvas, button: 0, clientX: 70, clientY: 80 });
+    expect(click).toHaveBeenCalledWith(new Vector2(100, 100));
+    capturedListeners.mousemove({ clientX: 90, clientY: 120 });
+    expect([Input.mouseX, Input.mouseY]).toEqual([140, 180]);
+  });
+
   it('prevents multiple initialisations', () => {
     Input.init();
     const firstCount = Object.keys(capturedListeners).length;
