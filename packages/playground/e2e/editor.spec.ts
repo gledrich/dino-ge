@@ -1940,6 +1940,11 @@ new Engine({ onLoad() { Engine.camera.position.set(40, 32); }, update() {} },
   const dataTransfer = await dragToEdge();
   const inside = { dataTransfer, clientX: box.x + box.width / 2, clientY: box.y + 224 };
   await canvas.dispatchEvent('dragover', inside);
+  const guide = preview.locator('.scene-drop-guide');
+  await expect.poll(async () => {
+    const bounds = await guide.boundingBox();
+    return bounds ? Math.abs(bounds.x + bounds.width / 2 - inside.clientX) : Infinity;
+  }).toBeLessThan(10);
   const previewX = Number((await preview.innerText()).match(/X (\d+)/)?.[1]);
   expect(previewX % 16).toBe(0);
   const pannedX = await cameraX();
