@@ -46,8 +46,12 @@ const defaultProps = {
  * A basic circle shape that can be drawn to the screen.
  */
 export default class Circle extends GameObject {
+  private readonly shape: ShapeComponent;
+
   /** Radius of the circle in local space. */
-  public radius: number;
+  public get radius(): number { return this.shape.width; }
+  public set radius(value: number) { this.shape.width = value; }
+
   /** Fill colour (CSS colour string). */
   public colour: string;
 
@@ -55,15 +59,19 @@ export default class Circle extends GameObject {
    * The centre point of the circle in world space.
    */
   public get centre(): Vector2 {
-    const r = this.radius * this.transform.worldScale.x;
-    return this.transform.worldPosition.add(new Vector2(r, r));
+    const { worldPosition, worldScale, worldRotation } = this.transform;
+    const x = this.radius * worldScale.x;
+    const y = this.radius * worldScale.y;
+    const cos = Math.cos(worldRotation);
+    const sin = Math.sin(worldRotation);
+    return new Vector2(worldPosition.x + x * cos - y * sin, worldPosition.y + x * sin + y * cos);
   }
 
   /**
    * The radius of the circle in world space (accounting for scale).
    */
   public get worldRadius(): number {
-    return this.radius * this.transform.worldScale.x;
+    return Math.abs(this.radius * this.transform.worldScale.x);
   }
 
   /**
@@ -89,12 +97,12 @@ export default class Circle extends GameObject {
     this.metadata.tag = defaultedProps.tag;
     this.transform.position = defaultedProps.position;
     this.transform.rotation = defaultedProps.rotation ?? 0;
-    this.radius = defaultedProps.radius;
     this.colour = defaultedProps.colour;
     this.metadata.zIndex = defaultedProps.zIndex;
 
     // ShapeComponent will automatically create the BoundsComponent (radius * 2) via onAttach
-    this.addComponent(new ShapeComponent('circle', this.colour, this.radius, this.radius));
+    this.shape = new ShapeComponent('circle', this.colour, defaultedProps.radius, defaultedProps.radius);
+    this.addComponent(this.shape);
 
     this.addComponent(new VisibilityComponent(props.visible ?? true));
 

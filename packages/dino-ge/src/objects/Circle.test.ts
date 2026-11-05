@@ -39,6 +39,24 @@ describe('Circle', () => {
     expect(circle.hasComponent(ShapeComponent)).toBe(true);
   });
 
+  it('keeps the public radius and transformed centre in sync with edited bounds', () => {
+    const circle = new Circle({ position: new Vector2(20, 30), radius: 10, rotation: Math.PI / 2 });
+    circle.transform.scale.set(-2, 3);
+    const shape = circle.getComponent(ShapeComponent)!;
+
+    shape.width = 15;
+    expect(circle.radius).toBe(15);
+    expect(circle.worldRadius).toBe(30);
+    expect(circle.centre.x).toBeCloseTo(-25);
+    expect(circle.centre.y).toBeCloseTo(0);
+    expect(circle.transform.worldPosition).toEqual(new Vector2(20, 30));
+
+    circle.radius = 20;
+    expect(shape.width).toBe(20);
+    expect(circle.bounds).toMatchObject({ width: 40, height: 40 });
+    expect(circle.worldRadius).toBe(40);
+  });
+
   it('throws error if position is not a Vector2', () => {
     expect(() => {
       new Circle({
