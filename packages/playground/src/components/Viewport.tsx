@@ -1,9 +1,10 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { Engine, Loader, SpriteComponent, snapToGrid, type ObjectManipulationPreview } from 'dino-ge';
+import { Engine, SpriteComponent, snapToGrid, type ObjectManipulationPreview } from 'dino-ge';
 import { usePlayground } from '../context/PlaygroundContext';
 import Toolbar from './Toolbar';
 import Logo from './Logo';
-import { getAssetSource, getSceneAssetPreviewType, getSceneSource, getSceneSpriteScale, nudgeSceneSelection, sceneAssetDragType, sceneObjectDefaults, sceneObjectDragType, sceneObjectKinds, type SceneObjectKind, type SceneObjectPlacement } from '../utils/scene-objects';
+import { getAssetSource, getSceneAssetPreviewType, getSceneAssets, getSceneSource, getSceneSpriteScale, nudgeSceneSelection, sceneAssetDragType, sceneObjectDefaults, sceneObjectDragType, sceneObjectKinds, type SceneObjectKind, type SceneObjectPlacement, type ScenePoint } from '../utils/scene-objects';
+import { maxSpriteImageBytes, spriteImageTypes, storeSpriteImage } from '../utils/helpers';
 
 const shapePreviewDimensions: Partial<Record<SceneObjectKind, { width: number; height: number }>> = {
   Rectangle: sceneObjectDefaults.Rectangle,
@@ -12,6 +13,7 @@ const shapePreviewDimensions: Partial<Record<SceneObjectKind, { width: number; h
   Text: sceneObjectDefaults.Text,
 };
 const sceneGridSizes = [8, 16, 32, 64];
+type PlacementImage = { tag: string; image: HTMLImageElement };
 
 function TextDropPreview() {
   const { width, height, text, colour, backgroundColour, fontSize, font } = sceneObjectDefaults.Text;
@@ -62,12 +64,14 @@ const Viewport: React.FC = () => {
   const [isGridSnapping, setIsGridSnapping] = useState(false);
   const [sceneGridSize, setSceneGridSize] = useState(16);
   const placementStep = isGridSnapping ? sceneGridSize : 1;
-  const [placementStatus, setPlacementStatus] = useState<{ message: string; error?: boolean }>();
+  const [placementStatus, setPlacementStatus] = useState<{ message: string; error?: boolean; pending?: boolean }>();
+  const importingImage = useRef(false);
   const [manipulationReadout, setManipulationReadout] = useState('');
   const [dropGuide, setDropGuide] = useState<{
     x: number; y: number; left: number; top: number; kind?: SceneObjectKind;
     width?: number; height?: number;
     asset?: { tag: string; src: string };
+    importingImage?: boolean;
   }>();
 
   useEffect(() => {
@@ -114,13 +118,16 @@ const Viewport: React.FC = () => {
     };
   }, [isEditingScene]);
 
-  const addObject = useCallback((kind: SceneObjectKind | 'Sprite', clientX?: number, clientY?: number, assetTag?: string) => {
+  const getPlacementPoint = useCallback((clientX?: number, clientY?: number) => {
+    const canvas = viewportContainerRef.current?.querySelector<HTMLCanvasElement>('canvas#canvas');
+    return canvas ? getCanvasPlacement(canvas, placementStep, clientX, clientY) : undefined;
+  }, [placementStep]);
+
+  const addObject = useCallback((kind: SceneObjectKind | 'Sprite', point?: ScenePoint, asset?: PlacementImage) => {
     const rejectPlacement = (message: string) => {
       setPlacementStatus({ message, error: true });
       return false;
     };
-    const canvas = viewportContainerRef.current?.querySelector<HTMLCanvasElement>('canvas#canvas');
-    const point = canvas && getCanvasPlacement(canvas, placementStep, clientX, clientY);
     if (!point) return rejectPlacement('Run the Dino GE script before adding objects.');
     const runningScript = document.querySelector<HTMLElement>('[data-playground-script]')?.dataset.playgroundScript;
     if (runningScript !== currentScriptId) {
@@ -136,13 +143,13 @@ const Viewport: React.FC = () => {
     };
     let placement: SceneObjectPlacement;
     if (kind === 'Sprite') {
-      const image = Loader.getLoadedAssets().find(asset => asset.tag === assetTag)?.image;
-      const source = image && getAssetSource(image.src, currentScriptId);
-      if (!image || !source) {
+      const source = asset && getAssetSource(asset.image.src, currentScriptId);
+      if (!asset || !source) {
         return rejectPlacement('This image needs a reusable URL before it can be added to the script.');
       }
+      const { image, tag } = asset;
       const scale = getSceneSpriteScale(image);
-      placement = { ...options, kind, tag: `${assetTag} sprite`, asset: { image, source, scale } };
+      placement = { ...options, kind, tag: `${tag} sprite`, asset: { image, source, scale } };
     } else {
       placement = { ...options, kind };
     }
@@ -152,14 +159,65 @@ const Viewport: React.FC = () => {
     }
     setPlacementStatus({ message: `Added ${placement.tag}${scene ? ` to ${scene.className}` : ''}. Save the script to keep it.` });
     return true;
-  }, [currentScriptId, placementStep]);
+  }, [currentScriptId]);
 
-  const placeLibraryObject = useCallback((kind: SceneObjectKind, x?: number, y?: number) => {
-    if (!addObject(kind, x, y)) return;
+  const enterSceneEditing = useCallback(() => {
     setIsPaused(true);
     setIsDebug(true);
     setIsInspectorVisible(true);
-  }, [addObject, setIsDebug, setIsInspectorVisible, setIsPaused]);
+  }, [setIsDebug, setIsInspectorVisible, setIsPaused]);
+
+  const placeLibraryObject = useCallback((kind: SceneObjectKind, x?: number, y?: number) => {
+    if (addObject(kind, getPlacementPoint(x, y))) enterSceneEditing();
+  }, [addObject, enterSceneEditing, getPlacementPoint]);
+
+  const placeLoadedImage = useCallback((tag: string, x?: number, y?: number) => {
+    const asset = getSceneAssets().find(item => item.tag === tag);
+    addObject('Sprite', getPlacementPoint(x, y), asset);
+  }, [addObject, getPlacementPoint]);
+
+  const placeImageFile = useCallback(async (files: File[], x?: number, y?: number) => {
+    const reject = (message: string) => setPlacementStatus({ message, error: true });
+    if (importingImage.current) return reject('Wait for the current image to finish importing.');
+    if (files.length !== 1) return reject('Choose one image at a time.');
+    const [file] = files;
+    if (!spriteImageTypes.includes(file.type)) return reject('Choose a PNG, JPEG, GIF or WebP image.');
+    if (file.size > maxSpriteImageBytes) return reject('Sprite images can be up to 5 MiB.');
+    const point = getPlacementPoint(x, y);
+    const run = document.querySelector<HTMLElement>('script[data-playground-script]');
+    if (!point || run?.dataset.playgroundScript !== currentScriptId) {
+      return reject('Run the open Dino GE script before importing an image.');
+    }
+    const scene = Engine.currentScene;
+    importingImage.current = true;
+    setPlacementStatus({ message: `Importing ${file.name}…`, pending: true });
+    const previewUrl = URL.createObjectURL(file);
+    try {
+      const image = new Image();
+      image.src = previewUrl;
+      await image.decode();
+      if (!run.isConnected) return;
+      image.src = await storeSpriteImage(file, currentScriptId);
+      await image.decode();
+      if (!run.isConnected) return;
+      if (scene !== Engine.currentScene) return reject('The active scene changed. Drop the image again to place it there.');
+      const tag = file.name.replace(/\.[^.]*$/, '').trim() || 'Imported';
+      if (addObject('Sprite', point, { tag, image })) enterSceneEditing();
+    } catch (error) {
+      if (run.isConnected) {
+        reject(error instanceof Error && !(error instanceof DOMException) ? error.message : 'The image could not be opened.');
+      }
+    } finally {
+      URL.revokeObjectURL(previewUrl);
+      importingImage.current = false;
+    }
+  }, [addObject, currentScriptId, enterSceneEditing, getPlacementPoint]);
+
+  useEffect(() => {
+    const importImage = (event: Event) => void placeImageFile((event as CustomEvent<File[]>).detail);
+    window.addEventListener('playground-import-image', importImage);
+    return () => window.removeEventListener('playground-import-image', importImage);
+  }, [placeImageFile]);
 
   useEffect(() => {
     const placeObject = (event: Event) => {
@@ -183,10 +241,10 @@ const Viewport: React.FC = () => {
 
   useEffect(() => {
     if (!isEditingScene) return;
-    const placeAsset = (event: Event) => addObject('Sprite', undefined, undefined, (event as CustomEvent<string>).detail);
+    const placeAsset = (event: Event) => placeLoadedImage((event as CustomEvent<string>).detail);
     window.addEventListener('playground-place-asset', placeAsset);
     return () => window.removeEventListener('playground-place-asset', placeAsset);
-  }, [addObject, isEditingScene]);
+  }, [placeLoadedImage, isEditingScene]);
 
   const toggleSceneEditing = () => {
     const editing = !isEditingScene;
@@ -319,7 +377,8 @@ const Viewport: React.FC = () => {
         }}
         onDragOver={event => {
           const types = event.dataTransfer.types;
-          if ((!types.includes(sceneObjectDragType) && !(isEditingScene && types.includes(sceneAssetDragType))) ||
+          const importingImage = types.includes('Files');
+          if ((!importingImage && !types.includes(sceneObjectDragType) && !(isEditingScene && types.includes(sceneAssetDragType))) ||
               !(event.target instanceof HTMLCanvasElement)) return;
           event.preventDefault();
           event.dataTransfer.dropEffect = 'copy';
@@ -328,22 +387,28 @@ const Viewport: React.FC = () => {
           const rect = event.currentTarget.getBoundingClientRect();
           const kind = sceneObjectKinds.find(item => types.includes(`${sceneObjectDragType}-${item.toLowerCase()}`));
           const asset = types.includes(sceneAssetDragType)
-            ? Loader.getLoadedAssets().find(item => types.includes(getSceneAssetPreviewType(item.tag))) : undefined;
+            ? getSceneAssets().find(item => types.includes(getSceneAssetPreviewType(item.tag))) : undefined;
           const dimensions = kind && shapePreviewDimensions[kind];
           const spriteScale = asset ? getSceneSpriteScale(asset.image) : 1;
           const width = asset ? asset.image.naturalWidth * spriteScale : dimensions?.width;
           const height = asset ? asset.image.naturalHeight * spriteScale : dimensions?.height;
           setDropGuide({ x: point.x, y: point.y, left: point.left - rect.left, top: point.top - rect.top, kind,
             width: width && width * point.scaleX, height: height && height * point.scaleY,
+            importingImage,
             asset: asset && { tag: asset.tag, src: asset.image.src } });
         }}
         onDragLeave={() => setDropGuide(undefined)}
         onDrop={event => {
           setDropGuide(undefined);
           if (!(event.target instanceof HTMLCanvasElement)) return;
+          if (event.dataTransfer.types.includes('Files')) {
+            event.preventDefault();
+            void placeImageFile(Array.from(event.dataTransfer.files), event.clientX, event.clientY);
+            return;
+          }
           if (isEditingScene && event.dataTransfer.types.includes(sceneAssetDragType)) {
             event.preventDefault();
-            addObject('Sprite', event.clientX, event.clientY, event.dataTransfer.getData(sceneAssetDragType));
+            placeLoadedImage(event.dataTransfer.getData(sceneAssetDragType), event.clientX, event.clientY);
             return;
           }
           const kind = sceneObjectKinds.find(item => item === event.dataTransfer.getData(sceneObjectDragType));
@@ -362,7 +427,7 @@ const Viewport: React.FC = () => {
           if (event.key === 'Enter' || event.key === ' ') suppressGameActivation(event);
         }}
       />
-      {(isEditingScene || placementStatus?.error) && (
+      {(isEditingScene || placementStatus?.error || placementStatus?.pending) && (
         <div className="scene-edit-controls" role={isEditingScene ? 'group' : undefined}
           aria-label={isEditingScene ? 'Scene editing' : undefined}>
           {isEditingScene && <>
@@ -414,7 +479,9 @@ const Viewport: React.FC = () => {
           {dropGuide.kind === 'Text' && <TextDropPreview />}
         </div>}
         <div className="scene-drop-guide" style={{ left: dropGuide.left, top: dropGuide.top }} />
-        <div className="scene-drop-position">{dropGuide.asset?.tag ?? dropGuide.kind ?? 'Drop position'} · X {dropGuide.x} · Y {dropGuide.y}</div>
+        <div className="scene-drop-position">
+          {dropGuide.asset?.tag ?? dropGuide.kind ?? (dropGuide.importingImage ? 'Import image' : 'Drop position')} · X {dropGuide.x} · Y {dropGuide.y}
+        </div>
       </div>}
       {isEditingScene && manipulationReadout && (
         <div className="scene-manipulation-readout" role="group" aria-label="Current scene gesture">{manipulationReadout}</div>

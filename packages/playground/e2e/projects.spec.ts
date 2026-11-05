@@ -176,6 +176,80 @@ export const run = window.gameRuns;`);
   }
 });
 
+test('imports a dropped image beside the project script and restores its sprite after reload', async ({ page }) => {
+  const workspace = await mkdtemp(join(tmpdir(), 'dino-ge-sprite-import-'));
+  const scripts = join(workspace, 'scripts');
+  const entry = join(scripts, 'demo/src/index.js');
+  await mkdir(join(scripts, 'demo/src'), { recursive: true });
+  await writeFile(join(scripts, 'demo/.dino-ge-project.json'), JSON.stringify({ entry: 'src/index.js' }));
+  await writeFile(entry, `import { Engine } from 'dino-ge';
+new Engine({ onLoad() {}, update() {} }, { containerId: 'playground-canvas-container' });`);
+  const server = spawn(process.execPath, [fileURLToPath(new URL('../server.js', import.meta.url))], {
+    cwd: workspace, env: { ...process.env, PORT: '0', ENVIRONMENT: 'prod' }, stdio: ['ignore', 'pipe', 'inherit'],
+  });
+
+  try {
+    const url = await new Promise<string>((resolve, reject) => {
+      server.once('error', reject);
+      server.once('exit', code => reject(new Error(`Playground exited with code ${code}`)));
+      server.stdout.on('data', chunk => {
+        const match = String(chunk).match(/http:\/\/127\.0\.0\.1:\d+/);
+        if (match) resolve(match[0]);
+      });
+    });
+    const rejected = await page.request.post(`${url}/api/scripts/demo%2Fsrc%2Findex/assets?name=invalid.png`, {
+      headers: { 'Content-Type': 'image/png' }, data: Buffer.from('not a PNG'),
+    });
+    expect(rejected.status()).toBe(415);
+    await page.route('**/api/scripts/script', route => route.fulfill({ json: '' }));
+    await page.goto(url);
+    await page.getByRole('combobox', { name: 'Current script' }).selectOption('demo/src/index');
+    await expect(page.locator('.monaco-editor')).toContainText('new Engine');
+    const canvas = page.locator('#canvas');
+    await expect(canvas).toBeVisible();
+    const box = (await canvas.boundingBox())!;
+    const transfer = await page.evaluateHandle(async () => {
+      const image = document.createElement('canvas');
+      image.width = image.height = 16;
+      const context = image.getContext('2d')!;
+      context.fillStyle = '#f94144';
+      context.fillRect(0, 0, 16, 16);
+      const blob = await new Promise<Blob>(resolve => image.toBlob(value => resolve(value!), 'image/png'));
+      const data = new DataTransfer();
+      data.items.add(new File([blob], 'gem.png', { type: 'image/png' }));
+      return data;
+    });
+    const point = { clientX: box.x + 240, clientY: box.y + 170 };
+    await canvas.dispatchEvent('dragover', { dataTransfer: transfer, ...point });
+    await expect(page.locator('.scene-drop-position')).toHaveText('Import image · X 240 · Y 170');
+    await canvas.dispatchEvent('drop', { dataTransfer: transfer, ...point });
+    const sprite = page.getByRole('button', { name: 'gem sprite', exact: true });
+    await expect(sprite).toHaveAttribute('aria-pressed', 'true');
+    await expect(page.getByRole('spinbutton', { name: 'X', exact: true })).toHaveValue('240.00');
+    const saved = page.waitForResponse(response => response.request().method() === 'PUT' &&
+      response.url().endsWith('/api/scripts/demo%2Fsrc%2Findex'));
+    await page.getByRole('button', { name: 'Save script', exact: true }).click();
+    expect((await saved).ok()).toBe(true);
+    expect(await readFile(entry, 'utf8')).toMatch(/new URL\("\.\/_dino-assets\/gem-[a-f0-9]+\.png", import\.meta\.url\)/);
+
+    await page.reload();
+    await page.getByRole('combobox', { name: 'Current script' }).selectOption('demo/src/index');
+    await expect(sprite).toBeVisible();
+    await expect.poll(() => canvas.evaluate((element: HTMLCanvasElement) =>
+      Array.from(element.getContext('2d')!.getImageData(247, 177, 1, 1).data))).toEqual([249, 65, 68, 255]);
+    await page.getByRole('button', { name: 'Choose sprite image', exact: true }).click();
+    await page.getByRole('button', { name: 'Edit scene', exact: true }).click();
+    await page.getByRole('button', { name: 'Add gem as sprite', exact: true }).click();
+    await expect(page.getByRole('button', { name: 'gem sprite 2', exact: true })).toHaveAttribute('aria-pressed', 'true');
+  } finally {
+    if (server.exitCode === null) {
+      server.kill();
+      await once(server, 'exit');
+    }
+    await rm(workspace, { recursive: true, force: true });
+  }
+});
+
 test('folder import preserves relative files and rejects unsafe or duplicate projects', async () => {
   const { ProjectStore } = await import('../lib/projects.js');
   const workspace = await mkdtemp(join(tmpdir(), 'dino-ge-projects-'));

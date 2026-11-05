@@ -9,6 +9,23 @@ export const getCurrentScriptId = () => currentScriptId;
 
 export type GameFolder = { name: string; files: { path: string; file: File }[] };
 
+export const spriteImageTypes = ['image/png', 'image/jpeg', 'image/gif', 'image/webp'];
+export const maxSpriteImageBytes = 5 * 1024 * 1024;
+
+export async function storeSpriteImage(file: File, id: string): Promise<string> {
+  const query = new URLSearchParams({ name: file.name });
+  const response = await fetch(`${scriptEndpoint(id)}/assets?${query}`, {
+    method: 'POST',
+    headers: { 'Content-Type': file.type },
+    body: file,
+  });
+  const result = await response.json().catch(() => ({}));
+  if (!response.ok || typeof result.url !== 'string') {
+    throw new Error(result.error || 'Could not save the image to this workspace.');
+  }
+  return result.url;
+}
+
 export function readGameFolder(selection: FileList): GameFolder {
   const [first] = Array.from(selection);
   const folder = first?.webkitRelativePath.split('/')[0] ?? '';

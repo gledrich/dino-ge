@@ -1,7 +1,8 @@
-import React, { useEffect, useState } from 'react';
-import { Loader } from 'dino-ge';
+import React, { useEffect, useRef, useState } from 'react';
+import { Engine } from 'dino-ge';
 import { usePlayground } from '../context/PlaygroundContext';
-import { getSceneAssetPreviewType, sceneAssetDragType } from '../utils/scene-objects';
+import { getSceneAssetPreviewType, getSceneAssets, sceneAssetDragType } from '../utils/scene-objects';
+import { spriteImageTypes } from '../utils/helpers';
 import '../styles/asset-panel.css';
 
 interface AssetEntry {
@@ -11,28 +12,43 @@ interface AssetEntry {
 
 const AssetPanel: React.FC = () => {
   const [assets, setAssets] = useState<AssetEntry[]>([]);
+  const filePicker = useRef<HTMLInputElement>(null);
   const { isPaused, isDebug } = usePlayground();
   const isEditing = isPaused && isDebug;
 
   useEffect(() => {
-    const updateAssets = () => setAssets(Loader.getLoadedAssets());
+    const updateAssets = () => setAssets(getSceneAssets());
 
     updateAssets();
-    // Poll for new assets
+    Engine.on('sceneHierarchyChanged', updateAssets);
+    // Images in a saved script can finish decoding after the scene changes.
     const interval = setInterval(updateAssets, 1000);
-    return () => clearInterval(interval);
+    return () => {
+      clearInterval(interval);
+      Engine.off('sceneHierarchyChanged', updateAssets);
+    };
   }, []);
 
   return (
     <div className="asset-panel">
+      <button type="button" className="scene-control" onClick={() => filePicker.current?.click()}>
+        <i className="fa-solid fa-upload" aria-hidden="true" /> Import image
+      </button>
+      <input type="file" ref={filePicker} hidden accept={spriteImageTypes.join(',')} aria-label="Choose sprite image"
+        onChange={event => {
+          const files = Array.from(event.currentTarget.files ?? []);
+          event.currentTarget.value = '';
+          if (files.length) window.dispatchEvent(new CustomEvent('playground-import-image', { detail: files }));
+        }} />
+      <p className="asset-help">Import an image or drop it onto the canvas to place a sprite.</p>
       {assets.length > 0 && (
         <p className="asset-help">
-          {isEditing ? 'Drag an image onto the scene or click to add a sprite.' : 'Enter Edit scene to place images as sprites.'}
+          {isEditing ? 'Drag a listed image onto the scene or click to place it.' : 'Enter Edit scene to place listed images.'}
         </p>
       )}
       <div className="asset-list">
         {assets.length === 0 ? (
-          <div className="no-assets">Images appear here when the game loads them.</div>
+          <div className="no-assets">Imported images and images loaded by the game appear here.</div>
         ) : (
           assets.map((asset) => (
             <button key={asset.tag} type="button" className="scene-control asset-item" title={asset.image.src}
