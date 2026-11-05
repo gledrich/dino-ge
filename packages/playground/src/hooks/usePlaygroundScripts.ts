@@ -13,6 +13,7 @@ export const usePlaygroundScripts = () => {
   const runId = useRef(0);
   const stopTrackingSources = useRef<() => void>(undefined);
   const [pendingRunChange, setPendingRunChange] = useState<RunChange>();
+  const [runtimeError, setRuntimeError] = useState<Dino.EngineRuntimeError>();
   const { 
     currentScriptId, 
     setCurrentScriptId, 
@@ -23,6 +24,11 @@ export const usePlaygroundScripts = () => {
     setIsPaused 
   } = usePlayground();
   const keepSceneOnSave = useRef(false);
+  useEffect(() => {
+    const reportError = ({ detail }: CustomEvent<Dino.EngineRuntimeError>) => setRuntimeError(detail);
+    Engine.on('gameRuntimeError', reportError);
+    return () => Engine.off('gameRuntimeError', reportError);
+  }, []);
   useEffect(() => () => {
     ++runId.current;
     stopTrackingSources.current?.();
@@ -45,6 +51,7 @@ export const usePlaygroundScripts = () => {
     stopTrackingSources.current = undefined;
     window.dispatchEvent(new CustomEvent('playground-before-run', { detail: { scriptId: currentScriptId, source: scriptText } }));
     Engine.terminateCurrent();
+    setRuntimeError(undefined);
     Engine.destroyAll();
     Engine.currentScene = null;
     Engine.destroyAll();
@@ -143,5 +150,5 @@ export const usePlaygroundScripts = () => {
     return () => window.removeEventListener('playground-refresh', refresh);
   }, [requestRunChange]);
 
-  return { handleSave, selectScript, pendingRunChange, cancelRunChange, confirmRunChange };
+  return { handleSave, selectScript, pendingRunChange, cancelRunChange, confirmRunChange, runtimeError };
 };

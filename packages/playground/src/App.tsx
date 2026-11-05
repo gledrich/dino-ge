@@ -26,7 +26,7 @@ function App() {
     arePanelsMinimized,
   } = usePlayground();
 
-  const { handleSave, selectScript, pendingRunChange, cancelRunChange, confirmRunChange } = usePlaygroundScripts();
+  const { handleSave, selectScript, pendingRunChange, cancelRunChange, confirmRunChange, runtimeError } = usePlaygroundScripts();
   useEffect(captureConsole, []);
 
   const explorerPanelRef = usePanelRef();
@@ -125,7 +125,11 @@ function App() {
           <Group orientation="vertical">
             {/* Top: Viewport */}
             <Panel defaultSize={60} minSize={50}>
-              <Viewport />
+              <Viewport runtimeError={runtimeError} onOpenConsole={() => {
+                setIsEditorVisible(true);
+                setActiveTab('console');
+                requestAnimationFrame(() => document.getElementById('playground-tab-console')?.focus());
+              }} />
             </Panel>
             
             {!isEditorVisible && (

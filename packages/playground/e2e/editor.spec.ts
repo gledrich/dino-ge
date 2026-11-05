@@ -1,6 +1,54 @@
 import { expect, test } from '@playwright/test';
 import type { Monaco } from '@monaco-editor/react';
 
+for (const failure of [
+  { name: 'synchronous setup', callback: "onLoad() { throw new Error('Missing level data'); }", heading: 'Game setup failed', message: 'Missing level data' },
+  { name: 'asynchronous setup', callback: "async onLoad() { await Promise.resolve(); throw new Error('Missing level data'); }", heading: 'Game setup failed', message: 'Missing level data' },
+  {
+    name: 'frame update',
+    callback: `async onLoad() { throw new Error('Missing optional level data'); },
+update() { throw Object.assign(new Error('Physics update failed'), { stack: [] }); }`,
+    heading: 'Game stopped running',
+    message: 'Physics update failed',
+  },
+]) {
+  test(`reports ${failure.name} failures in the viewport and recovers after reset`, async ({ page }) => {
+    let source = `import { Engine } from 'dino-ge';
+new Engine({ ${failure.callback} }, { containerId: 'playground-canvas-container' });`;
+    await page.route('**/files', route => route.fulfill({ json: ['script'] }));
+    await page.route('**/api/scripts/script', route => {
+      if (route.request().method() === 'PUT') {
+        source = route.request().postDataJSON().data;
+        return route.fulfill({ status: 204 });
+      }
+      return route.fulfill({ json: source });
+    });
+    await page.goto('/');
+
+    const alert = page.getByRole('alert').filter({ hasText: failure.heading });
+    await expect(alert).toContainText(failure.message);
+    await page.getByRole('button', { name: 'Collapse editor' }).click();
+    await page.getByRole('button', { name: 'Open Console', exact: true }).click();
+    const consoleTab = page.getByRole('tab', { name: 'Console' });
+    await expect(consoleTab).toHaveAttribute('aria-selected', 'true');
+    await expect(consoleTab).toBeFocused();
+    await expect(page.locator('.console-line.error').filter({ hasText: failure.message })).toHaveCount(1);
+
+    await page.getByRole('tab', { name: 'Editor' }).click();
+    await expect(page.locator('.monaco-editor')).toBeVisible();
+    await page.evaluate(() => {
+      const { monaco } = window as typeof window & { monaco: Monaco };
+      monaco.editor.getEditors()[0].setValue(`import { Engine, Rectangle, Vector2 } from 'dino-ge';
+new Engine({ onLoad() {
+  new Rectangle({ tag: 'Repaired level', position: new Vector2(60, 60), width: 40, height: 30 });
+} }, { containerId: 'playground-canvas-container' });`);
+    });
+    await page.getByRole('button', { name: 'Reset game' }).click();
+    await expect(page.getByRole('button', { name: 'Repaired level', exact: true })).toBeVisible();
+    await expect(alert).toHaveCount(0);
+  });
+}
+
 test('keeps unsaved edits across tabs and panel collapse, and retains hidden console messages', async ({ page }) => {
   await page.route('**/files', route => route.fulfill({ json: ['script'] }));
   await page.route('**/api/scripts/script', route => route.fulfill({ json: 'const initial = true;' }));

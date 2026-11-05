@@ -45,6 +45,12 @@ export interface EngineCallbacks {
   onDispose?: () => void;
 }
 
+/** Detail for the engine's `gameRuntimeError` event. */
+export interface EngineRuntimeError {
+  phase: 'startup' | 'frame';
+  error: unknown;
+}
+
 /**
  * Shared state for the engine to ensure singletons work across different module loads.
  */
@@ -366,11 +372,14 @@ export default class Engine {
 
     this.callbacks = {
       onLoad: () => {
-        const loading = callbacks.onLoad?.();
-        void Promise.resolve(loading).catch(error => {
-          if (!this._destroyed) console.error('Could not initialise the game', error);
-        });
-        this._onLoad();
+        try {
+          const loading = callbacks.onLoad?.();
+          void Promise.resolve(loading).catch(error => this._reportRuntimeError({ phase: 'startup', error }));
+          this._onLoad();
+        } catch (error) {
+          this._reportRuntimeError({ phase: 'startup', error });
+          throw error;
+        }
       },
       update: callbacks.update,
       fixedUpdate: callbacks.fixedUpdate,
@@ -466,6 +475,16 @@ export default class Engine {
     window.requestAnimationFrame(this._update.bind(this));
   }
 
+  private _reportRuntimeError(failure: EngineRuntimeError) {
+    if (this._destroyed) return;
+    Engine.emit('gameRuntimeError', failure);
+    try {
+      console.error(failure.phase === 'startup' ? 'Could not initialise the game' : 'Game frame failed', failure.error);
+    } catch {
+      // A custom Console handler must not replace the original game error.
+    }
+  }
+
   private _update(timestamp: number) {
     if (this._destroyed) return;
 
@@ -484,23 +503,22 @@ export default class Engine {
       this.frameTime = parseFloat((this._secondsPassed * 1000).toFixed(2));
     }
 
-    if (!Engine.paused) {
-      // Fixed update loop
-      this._accumulator += this._secondsPassed;
-      while (this._accumulator >= this._fixedDelta) {
-        this._fixedUpdate();
-        this._accumulator -= this._fixedDelta;
-      }
+    try {
+      if (!Engine.paused) {
+        // Fixed update loop
+        this._accumulator += this._secondsPassed;
+        while (this._accumulator >= this._fixedDelta) {
+          this._fixedUpdate();
+          this._accumulator -= this._fixedDelta;
+        }
 
-      if (Engine.currentScene) {
-        Engine.currentScene.update();
+        Engine.currentScene?.update();
+        this.callbacks.update?.();
       }
-
-      this.callbacks.update?.();
       this._draw();
-    } else {
-      // Still allow drawing in paused mode if debug is on or for initial frame
-      this._draw();
+    } catch (error) {
+      this._reportRuntimeError({ phase: 'frame', error });
+      throw error;
     }
 
     window.requestAnimationFrame(this._update.bind(this));

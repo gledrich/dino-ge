@@ -22,7 +22,12 @@ export class LogManager {
   add(level: LogLevel, ...args: unknown[]) {
     const message = args
       .map((arg) => {
-        if (arg instanceof Error) return arg.stack ?? arg.message;
+        if (arg instanceof Error) {
+          const summary = Error.prototype.toString.call(arg);
+          const stack = arg.stack;
+          if (typeof stack !== 'string' || !stack) return summary;
+          return stack.startsWith(summary) ? stack : `${summary}\n${stack}`;
+        }
         if (typeof arg === 'object' && arg !== null) {
           try {
             return JSON.stringify(arg, null, 2);

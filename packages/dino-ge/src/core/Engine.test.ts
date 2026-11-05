@@ -459,6 +459,37 @@ describe('Engine', () => {
     expect(delayed).not.toHaveBeenCalled();
   });
 
+  it('ignores a setup rejection after that game has been replaced', async () => {
+    const report = jest.fn();
+    const log = jest.spyOn(console, 'error').mockImplementation(() => {});
+    Engine.on('gameRuntimeError', report);
+
+    let rejectSetup!: (error: Error) => void;
+    const setup = new Promise<void>((_, reject) => { rejectSetup = reject; });
+    new Engine({ onLoad: () => setup });
+    jest.advanceTimersByTime(0);
+
+    const replacement = new Engine({});
+    rejectSetup(new Error('Old level failed'));
+    await setup.catch(() => {});
+
+    expect(report).not.toHaveBeenCalled();
+    expect(log).not.toHaveBeenCalled();
+    replacement.terminate();
+  });
+
+  it('reports and rethrows the original game failure when Console logging throws', () => {
+    const error = new Error('Level setup failed');
+    const report = jest.fn();
+    Engine.on('gameRuntimeError', report);
+    jest.spyOn(console, 'error').mockImplementation(() => { throw new Error('Logger failed'); });
+    const engine = new Engine({ onLoad: () => { throw error; } });
+
+    expect(() => jest.advanceTimersByTime(0)).toThrow(error);
+    expect(report.mock.calls[0][0].detail).toEqual({ phase: 'startup', error });
+    engine.terminate();
+  });
+
   it('handles currentScene setter branches', () => {
     const scene = new MockScene();
     Engine.currentScene = scene;

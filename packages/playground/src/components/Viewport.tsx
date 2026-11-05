@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { Engine, Input, SpriteComponent, getViewportAlignment, snapToGrid, type GameObject, type ObjectManipulationPreview } from 'dino-ge';
+import { Engine, Input, SpriteComponent, getViewportAlignment, snapToGrid, type EngineRuntimeError, type GameObject, type ObjectManipulationPreview } from 'dino-ge';
 import { usePlayground } from '../context/PlaygroundContext';
 import Toolbar from './Toolbar';
 import Logo from './Logo';
@@ -136,7 +136,7 @@ function getEdgePanDelta({ bounds, scaleX, scaleY }: CanvasProjection, x: number
   if (dx || dy) return { x: dx, y: dy };
 }
 
-const Viewport: React.FC = () => {
+const Viewport: React.FC<{ runtimeError?: EngineRuntimeError; onOpenConsole: () => void }> = ({ runtimeError, onOpenConsole }) => {
   const { 
     currentScriptId,
     isViewportReady, 
@@ -1090,6 +1090,18 @@ const Viewport: React.FC = () => {
         <div className="scene-manipulation-readout" role="group" aria-label="Current scene gesture">{manipulationReadout}</div>
       )}
       <Logo visible={!isInspectorVisible && isViewportReady && !isEditingScene} />
+      {runtimeError && <div className="game-runtime-error">
+        <div role="alert">
+          <strong>{runtimeError.phase === 'startup' ? 'Game setup failed' : 'Game stopped running'}</strong>
+          <div className="game-runtime-error-message">
+            {(runtimeError.error instanceof Error ? runtimeError.error.message
+              : typeof runtimeError.error === 'string' ? runtimeError.error : '') || 'See the Console for details.'}
+          </div>
+        </div>
+        <button type="button" className="scene-control" onClick={onOpenConsole}>
+          <i className="fa-solid fa-terminal" aria-hidden="true" /> Open Console
+        </button>
+      </div>}
       <Toolbar 
         isPaused={isPaused}
         isDebug={isDebug}

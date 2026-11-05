@@ -1,4 +1,4 @@
-export { default as Engine } from './core/Engine.js';
+export { default as Engine, type EngineRuntimeError } from './core/Engine.js';
 export { default as Scene } from './core/Scene.js';
 export { default as GameObject } from './core/GameObject.js';
 export { default as Group } from './core/Group.js';

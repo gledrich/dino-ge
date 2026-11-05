@@ -181,6 +181,36 @@
 
 .scene-placement-error button { pointer-events: auto; }
 
+.game-runtime-error {
+  position: absolute;
+  inset-inline-start: 12px;
+  bottom: 74px;
+  z-index: 11;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 12px;
+  width: max-content;
+  max-width: min(440px, calc(100% - 24px));
+  padding: 9px 10px;
+  border: 1px solid #673940;
+  border-inline-start: 2px solid var(--accent-secondary);
+  border-radius: var(--scene-control-radius);
+  background: #332329;
+  color: #ffb4b8;
+  font-size: 12px;
+  line-height: 1.4;
+}
+
+.game-runtime-error-message {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
+  overflow: hidden;
+  overflow-wrap: anywhere;
+  color: var(--text-primary);
+}
+
 .scene-drop-guide {
   position: absolute;
   z-index: 9;
