@@ -179,6 +179,71 @@ new Engine({
   await expect(page.locator('body')).toHaveAttribute('data-game-action', 'pressed');
 });
 
+test('rolls back interrupted canvas gestures while preserving earlier pending edits', async ({ page }) => {
+  await page.route('**/files', route => route.fulfill({ json: ['script'] }));
+  await page.route('**/api/scripts/script', route => route.fulfill({ json: `
+import { Engine, Rectangle, Vector2 } from 'dino-ge';
+new Engine({ onLoad() {
+  new Rectangle({ tag: 'Platform', position: new Vector2(350, 220), width: 64, height: 48 });
+  new Rectangle({ tag: 'Wall', position: new Vector2(520, 220), width: 25, height: 100 });
+}, update() {} }, { containerId: 'playground-canvas-container' });` }));
+  await page.goto('/');
+  const platform = page.getByRole('button', { name: 'Platform', exact: true });
+  const wall = page.getByRole('button', { name: 'Wall', exact: true });
+  await expect(platform).toBeVisible();
+  const edit = page.getByRole('button', { name: 'Edit scene', exact: true });
+  await edit.click();
+  await platform.click();
+  await platform.press('Shift+ArrowRight');
+  const x = page.getByRole('spinbutton', { name: 'X', exact: true });
+  await expect(x).toHaveValue('360.00');
+  const canvas = page.locator('#canvas');
+  await canvas.evaluate((element: HTMLCanvasElement) => {
+    element.style.width = `${element.width}px`;
+    element.style.height = `${element.height}px`;
+  });
+  const box = (await canvas.boundingBox())!;
+  const readout = page.getByRole('group', { name: 'Current scene gesture' });
+  const dragPlatform = async () => {
+    await page.mouse.move(box.x + 382, box.y + 243);
+    await page.mouse.down();
+    await page.mouse.move(box.x + 430, box.y + 243, { steps: 5 });
+    await expect(readout).toBeVisible();
+    await expect.poll(async () => Number(await x.inputValue())).toBeCloseTo(408, 0);
+  };
+  await dragPlatform();
+  await page.evaluate(() => window.dispatchEvent(new Event('blur')));
+  await expect(readout).toHaveCount(0);
+  await expect(x).toHaveValue('360.00');
+  await page.mouse.up();
+
+  await dragPlatform();
+  await wall.press('Enter');
+  await expect(readout).toHaveCount(0);
+  await platform.press('Enter');
+  await expect(x).toHaveValue('360.00');
+  await page.mouse.up();
+
+  await page.mouse.move(box.x + 424, box.y + 268);
+  await expect(canvas).toHaveCSS('cursor', 'se-resize');
+  await page.mouse.down();
+  await page.mouse.move(box.x + 440, box.y + 284, { steps: 5 });
+  const width = page.getByRole('spinbutton', { name: 'Width', exact: true });
+  await expect.poll(async () => Number(await width.inputValue())).toBeCloseTo(80, 0);
+  await page.getByRole('button', { name: 'Play', exact: true }).press('Enter');
+  await edit.press('Enter');
+  await expect(width).toHaveValue('64.00');
+  await expect(readout).toHaveCount(0);
+  await page.mouse.up();
+
+  await expect(platform).toHaveAccessibleDescription('Pending canvas changes');
+  await page.getByRole('button', { name: 'Apply placement to code' }).click();
+  await expect.poll(() => page.evaluate(() => {
+    const { monaco } = window as typeof window & { monaco: Monaco };
+    return monaco.editor.getEditors()[0].getValue();
+  })).toContain('new Vector2(360, 220)');
+});
+
 test('discards a selected object’s canvas changes without losing another object’s edits', async ({ page }) => {
   await page.route('**/files', route => route.fulfill({ json: ['script'] }));
   await page.route('**/api/scripts/script', route => route.fulfill({ json: `

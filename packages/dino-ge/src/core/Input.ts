@@ -17,6 +17,7 @@ export interface ObjectManipulationPreview {
 
 type ObjectGesture = {
   object: GameObject;
+  startedPaused: boolean;
   initial?: Vector2;
   previewValue?: Vector2;
 } & (
@@ -36,15 +37,42 @@ export default class Input {
 
   private static gesture: ObjectGesture | null = null;
 
-  private static clearGesture() {
+  private static isGestureActive(gesture: ObjectGesture) {
+    return Engine.debug && gesture.object === Engine.selectedObject && (!gesture.startedPaused || Engine.paused);
+  }
+
+  private static finishGesture(commit = false) {
     const gesture = this.gesture;
+    if (!gesture) return;
     this.gesture = null;
-    if (gesture?.kind === 'rotate' || gesture?.kind === 'p1' || gesture?.kind === 'p2') {
-      const canvas = document.getElementById('canvas');
-      if (canvas?.style.cursor === 'grabbing') canvas.style.cursor = 'default';
+    const { object, kind, initial, previewValue } = gesture;
+    if (!commit && initial && previewValue) {
+      if (kind === 'drag') {
+        if (object instanceof Line) object.setOrigin(initial.x, initial.y);
+        else object.transform.position.set(initial.x, initial.y);
+      } else if (kind === 'rotate') {
+        object.transform.rotation = initial.x;
+      } else if (kind === 'p1' || kind === 'p2') {
+        object.setEndpoint(kind, initial.x, initial.y);
+      } else if (kind === 'resize') {
+        const { initialBounds } = gesture;
+        if (object.getComponent(SpriteComponent)) object.transform.scale.set(initial.x, initial.y);
+        if (initialBounds && object.bounds &&
+            (object.bounds.width !== initialBounds.x || object.bounds.height !== initialBounds.y)) {
+          this.restoreObjectSize(object, initialBounds.x, initialBounds.y);
+        }
+      }
     }
-    if (gesture?.previewValue) Engine.emit('objectManipulationPreview', null);
-    return gesture;
+    const canvas = document.getElementById('canvas');
+    const gestureCursor = kind === 'resize' ? 'se-resize' : 'grabbing';
+    if (kind !== 'drag' && canvas?.style?.cursor === gestureCursor) canvas.style.cursor = 'default';
+    if (previewValue) Engine.emit('objectManipulationPreview', null);
+    if (commit && initial) {
+      const value = this.getGestureValue(object, kind);
+      if (value.x !== initial.x || value.y !== initial.y) {
+        Engine.emit('objectManipulated', { object, kind, initial });
+      }
+    }
   }
 
   private static publishPreview(gesture: ObjectGesture) {
@@ -121,22 +149,26 @@ export default class Input {
     if (this.isinitialised) return;
     this.isinitialised = true;
 
+    const cancelInactiveGesture = () => {
+      if (this.gesture && !this.isGestureActive(this.gesture)) this.finishGesture();
+    };
+    Engine.on('selectedObjectChanged', cancelInactiveGesture);
+    Engine.on('paused', cancelInactiveGesture);
+    Engine.on('debug', cancelInactiveGesture);
+
     document.addEventListener('mousemove', (event: MouseEvent) => {
       const canvas = document.getElementById('canvas') as HTMLCanvasElement | null;
       this.updateMousePosition(event, canvas);
 
-      if (this.gesture && (!Engine.debug || this.gesture.object !== Engine.selectedObject)) {
-        this.clearGesture();
+      if (this.gesture && typeof event.buttons === 'number' && !(event.buttons & 1)) {
+        this.keys.delete('mouse0');
+        this.finishGesture();
       }
+      cancelInactiveGesture();
       const gesture = this.gesture;
 
       if (gesture?.kind === 'p1' || gesture?.kind === 'p2') {
-        const { object, kind, offset, initial } = gesture;
-        if (!Engine.paused) {
-          if (initial) object.setEndpoint(kind, initial.x, initial.y);
-          this.clearGesture();
-          return;
-        }
+        const { object, kind, offset } = gesture;
         const geometry = getViewportGeometry(object);
         const step = Engine.debugPositionGridSize;
         const point = projectOntoObjectAxes(geometry,
@@ -149,11 +181,6 @@ export default class Input {
       }
 
       if (gesture?.kind === 'rotate') {
-        if (!Engine.paused) {
-          if (gesture.initial) gesture.object.transform.rotation = gesture.initial.x;
-          this.clearGesture();
-          return;
-        }
         const { transform } = gesture.object;
         const origin = transform.worldPosition;
         const dx = this.mouseX - origin.x;
@@ -256,12 +283,13 @@ export default class Input {
 
       // If debug mode is on, try to select/drag/resize an object
       if (Engine.debug && event.button === 0) {
-        this.clearGesture();
+        this.finishGesture();
         const selected = Engine.selectedObject;
+        const startedPaused = Engine.paused;
         if (selected && this.isOverRotationHandle(selected, worldPos.x, worldPos.y)) {
           const { rotation, worldPosition } = selected.transform;
           this.gesture = {
-            kind: 'rotate', object: selected, rotation,
+            kind: 'rotate', object: selected, rotation, startedPaused,
             pointerAngle: Math.atan2(worldPos.y - worldPosition.y, worldPos.x - worldPosition.x),
             initial: this.getGestureValue(selected, 'rotate'),
           };
@@ -274,6 +302,7 @@ export default class Input {
             this.gesture = {
               kind: endpoint.kind,
               object: selected,
+              startedPaused,
               offset: new Vector2(worldPos.x - endpoint.x, worldPos.y - endpoint.y),
               initial: this.getGestureValue(selected, endpoint.kind),
             };
@@ -286,6 +315,7 @@ export default class Input {
           this.gesture = {
             kind: 'resize',
             object: selected,
+            startedPaused,
             offset: new Vector2(worldPos.x - handle.cornerX, worldPos.y - handle.cornerY),
             initial: this.getGestureValue(selected, 'resize'),
             initialBounds: selected.bounds && new Vector2(selected.bounds.width, selected.bounds.height),
@@ -308,6 +338,7 @@ export default class Input {
             this.gesture = {
               kind: 'drag',
               object: obj,
+              startedPaused,
               offset: new Vector2(worldPos.x - geometry.origin.x, worldPos.y - geometry.origin.y),
               initial: this.getGestureValue(obj, 'drag'),
             };
@@ -329,13 +360,13 @@ export default class Input {
     document.addEventListener('mouseup', (event: MouseEvent) => {
       this.keys.delete(`mouse${event.button}`);
       if (event.button !== 0) return;
-      const gesture = this.clearGesture();
-      if (Engine.debug && gesture?.initial && gesture.object === Engine.selectedObject) {
-        const value = this.getGestureValue(gesture.object, gesture.kind);
-        if (value.x !== gesture.initial.x || value.y !== gesture.initial.y) {
-          Engine.emit('objectManipulated', { object: gesture.object, kind: gesture.kind, initial: gesture.initial });
-        }
-      }
+      if (this.gesture) this.finishGesture(this.isGestureActive(this.gesture));
+    });
+
+    document.addEventListener('pointercancel', event => {
+      if (event.pointerType !== 'mouse') return;
+      this.keys.delete('mouse0');
+      this.finishGesture();
     });
 
     document.addEventListener('keydown', (event: KeyboardEvent) => {
@@ -352,26 +383,8 @@ export default class Input {
       }
 
       const key = String(event.key).toLowerCase();
-      const gesture = this.gesture;
-      if (key === 'escape' && Engine.debug && gesture?.initial && gesture.object === Engine.selectedObject) {
-        const { object, kind, initial } = gesture;
-        this.clearGesture();
-        if (kind === 'drag') {
-          object.transform.position.set(initial.x, initial.y);
-        } else if (kind === 'rotate') {
-          object.transform.rotation = initial.x;
-        } else if (kind === 'p1' || kind === 'p2') {
-          object.setEndpoint(kind, initial.x, initial.y);
-        } else if (kind === 'resize') {
-          const { initialBounds } = gesture;
-          if (object.getComponent(SpriteComponent)) object.transform.scale.set(initial.x, initial.y);
-          if (initialBounds && object.bounds &&
-              (object.bounds.width !== initialBounds.x || object.bounds.height !== initialBounds.y)) {
-            this.restoreObjectSize(object, initialBounds.x, initialBounds.y);
-          }
-          const canvas = document.getElementById('canvas');
-          if (canvas?.style.cursor === 'se-resize') canvas.style.cursor = 'default';
-        }
+      if (key === 'escape' && this.gesture) {
+        this.finishGesture();
         event.preventDefault();
         return;
       }
@@ -392,9 +405,13 @@ export default class Input {
       this.keys.delete(String(event.key).toLowerCase());
     });
 
-    window.addEventListener('blur', () => {
+    const resetInput = () => {
       this.keys.clear();
-      this.clearGesture();
+      this.finishGesture();
+    };
+    window.addEventListener('blur', resetInput);
+    document.addEventListener('visibilitychange', () => {
+      if (document.hidden) resetInput();
     });
   }
 

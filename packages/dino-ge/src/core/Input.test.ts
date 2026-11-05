@@ -15,6 +15,7 @@ jest.mock('./Engine', () => ({
     paused: false,
     debug: false,
     emit: jest.fn(),
+    on: jest.fn(),
     objects: new Set(),
     currentScene: null,
     selectedObject: null
@@ -580,7 +581,7 @@ describe('Input', () => {
     expect(transform.position.y).toBeCloseTo(0);
   });
 
-  it('ends a viewport drag when selection changes or the window loses focus', () => {
+  it('rolls back a viewport drag when selection, focus or the pressed button is lost', () => {
     Engine.debug = true;
     const createObject = (x: number) => {
       const transform = new TransformComponent();
@@ -600,14 +601,28 @@ describe('Input', () => {
     };
 
     grabFirst();
+    capturedListeners.mousemove({ clientX: 50, clientY: 50 });
+    expect(first.transform.position).toMatchObject({ x: 40, y: 40 });
     Engine.selectedObject = second;
     capturedListeners.mousemove({ clientX: 70, clientY: 70 });
+    expect(first.transform.position).toMatchObject({ x: 10, y: 10 });
     expect(second.transform.position).toMatchObject({ x: 100, y: 10 });
 
     grabFirst();
+    capturedListeners.mousemove({ clientX: 50, clientY: 50 });
+    expect(first.transform.position).toMatchObject({ x: 40, y: 40 });
     window.dispatchEvent(new Event('blur'));
     capturedListeners.mousemove({ clientX: 70, clientY: 70 });
+    capturedListeners.mouseup({ button: 0 });
     expect(first.transform.position).toMatchObject({ x: 10, y: 10 });
+
+    grabFirst();
+    capturedListeners.mousemove({ clientX: 50, clientY: 50, buttons: 1 });
+    expect(first.transform.position).toMatchObject({ x: 40, y: 40 });
+    capturedListeners.mousemove({ clientX: 70, clientY: 70, buttons: 0 });
+    expect(first.transform.position).toMatchObject({ x: 10, y: 10 });
+    expect(Input.isKeyDown('mouse0')).toBe(false);
+    expect(Engine.emit).not.toHaveBeenCalledWith('objectManipulated', expect.anything());
   });
 
   it('does not trigger click listeners when paused', () => {
