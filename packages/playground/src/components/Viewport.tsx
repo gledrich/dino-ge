@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { Engine, Loader, SpriteComponent, type ObjectManipulationPreview } from 'dino-ge';
+import { Engine, Loader, SpriteComponent, snapToGrid, type ObjectManipulationPreview } from 'dino-ge';
 import { usePlayground } from '../context/PlaygroundContext';
 import Toolbar from './Toolbar';
 import Logo from './Logo';
@@ -11,6 +11,7 @@ const shapePreviewDimensions: Partial<Record<SceneObjectKind, { width: number; h
   Line: { width: sceneObjectDefaults.Line.length, height: sceneObjectDefaults.Line.strokeWidth },
   Text: sceneObjectDefaults.Text,
 };
+const sceneGridSize = 16;
 
 function TextDropPreview() {
   const { width, height, text, colour, backgroundColour, fontSize, font } = sceneObjectDefaults.Text;
@@ -23,14 +24,14 @@ function TextDropPreview() {
   );
 }
 
-function getCanvasPlacement(canvas: HTMLCanvasElement, clientX?: number, clientY?: number) {
+function getCanvasPlacement(canvas: HTMLCanvasElement, step: number, clientX?: number, clientY?: number) {
   const bounds = canvas.getBoundingClientRect();
   const { zoom, position } = Engine.camera;
   if (!bounds.width || !bounds.height || !canvas.width || !canvas.height || zoom <= 0) return;
   const scaleX = bounds.width / canvas.width * zoom;
   const scaleY = bounds.height / canvas.height * zoom;
-  const x = Math.round(((clientX ?? bounds.left + bounds.width / 2) - bounds.left) / scaleX + position.x);
-  const y = Math.round(((clientY ?? bounds.top + bounds.height / 2) - bounds.top) / scaleY + position.y);
+  const x = snapToGrid(((clientX ?? bounds.left + bounds.width / 2) - bounds.left) / scaleX + position.x, step);
+  const y = snapToGrid(((clientY ?? bounds.top + bounds.height / 2) - bounds.top) / scaleY + position.y, step);
   return { x, y, scaleX, scaleY, left: bounds.left + (x - position.x) * scaleX,
     top: bounds.top + (y - position.y) * scaleY };
 }
@@ -58,6 +59,8 @@ const Viewport: React.FC = () => {
     x: number; y: number; zoom: number } | null>(null);
   const pan = useRef<{ id: number; x: number; y: number } | null>(null);
   const [isPanning, setIsPanning] = useState(false);
+  const [isGridSnapping, setIsGridSnapping] = useState(false);
+  const placementStep = isGridSnapping ? sceneGridSize : 1;
   const [placementStatus, setPlacementStatus] = useState<{ message: string; error?: boolean }>();
   const [manipulationReadout, setManipulationReadout] = useState('');
   const [dropGuide, setDropGuide] = useState<{
@@ -72,6 +75,13 @@ const Viewport: React.FC = () => {
     Engine.showDebugHud = false;
     return () => { Engine.showDebugHud = previous; };
   }, [isEditingScene]);
+
+  useEffect(() => {
+    if (!isEditingScene || !isGridSnapping) return;
+    const previous = Engine.debugPositionGridSize;
+    Engine.debugPositionGridSize = sceneGridSize;
+    return () => { Engine.debugPositionGridSize = previous; };
+  }, [isEditingScene, isGridSnapping]);
 
   useEffect(() => {
     if (!isEditingScene) return;
@@ -109,7 +119,7 @@ const Viewport: React.FC = () => {
       return false;
     };
     const canvas = viewportContainerRef.current?.querySelector<HTMLCanvasElement>('canvas#canvas');
-    const point = canvas && getCanvasPlacement(canvas, clientX, clientY);
+    const point = canvas && getCanvasPlacement(canvas, placementStep, clientX, clientY);
     if (!point) return rejectPlacement('Run the Dino GE script before adding objects.');
     const runningScript = document.querySelector<HTMLElement>('[data-playground-script]')?.dataset.playgroundScript;
     if (runningScript !== currentScriptId) {
@@ -141,7 +151,7 @@ const Viewport: React.FC = () => {
     }
     setPlacementStatus({ message: `Added ${placement.tag}${scene ? ` to ${scene.className}` : ''}. Save the script to keep it.` });
     return true;
-  }, [currentScriptId]);
+  }, [currentScriptId, placementStep]);
 
   const placeLibraryObject = useCallback((kind: SceneObjectKind, x?: number, y?: number) => {
     if (!addObject(kind, x, y)) return;
@@ -312,7 +322,7 @@ const Viewport: React.FC = () => {
               !(event.target instanceof HTMLCanvasElement)) return;
           event.preventDefault();
           event.dataTransfer.dropEffect = 'copy';
-          const point = getCanvasPlacement(event.target, event.clientX, event.clientY);
+          const point = getCanvasPlacement(event.target, placementStep, event.clientX, event.clientY);
           if (!point) return;
           const rect = event.currentTarget.getBoundingClientRect();
           const kind = sceneObjectKinds.find(item => types.includes(`${sceneObjectDragType}-${item.toLowerCase()}`));
@@ -368,6 +378,9 @@ const Viewport: React.FC = () => {
               <button type="button" className="scene-control" onClick={() => zoomView(1 / 1.25)}>Zoom out</button>
               <button type="button" className="scene-control" onClick={() => zoomView(1.25)}>Zoom in</button>
               <button type="button" className="scene-control" onClick={restoreCamera}>Reset view</button>
+              <button type="button" className="scene-control scene-grid-toggle"
+                aria-pressed={isGridSnapping} title={`Snap pointer moves and drops to the ${sceneGridSize} px grid`}
+                onClick={() => setIsGridSnapping(enabled => !enabled)}>Snap to grid</button>
             </div>
             <span id="scene-keyboard-hint" className="scene-edit-hint">
               Middle drag pans · Arrows move selection · Shift moves 10<br />

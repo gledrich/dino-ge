@@ -71,6 +71,11 @@
 }
 
 .scene-history-actions button { pointer-events: auto; }
+.scene-grid-toggle[aria-pressed='true'] {
+  color: var(--text-primary);
+  background: var(--bg-tertiary);
+  border-color: var(--accent-primary);
+}
 .scene-panning canvas { cursor: grabbing !important; }
 .scene-edit-label { margin-inline-end: 4px; font-weight: 600; }
 .scene-edit-hint { color: var(--text-secondary); font-size: 11px; }
@@ -143,7 +148,7 @@
 .scene-manipulation-readout {
   position: absolute;
   inset-inline-end: 12px;
-  bottom: 12px;
+  bottom: 72px; /* Clear the floating playback toolbar. */
   padding: 6px 9px;
   border: 1px solid var(--accent-primary);
   border-radius: var(--scene-control-radius);
