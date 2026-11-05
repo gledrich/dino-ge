@@ -126,6 +126,25 @@ try {
   const iframe = await page.locator(previewFrame).elementHandle({ timeout: 15_000 });
   const game = await iframe.contentFrame();
   assert.ok(game);
+  const canvas = game.locator('#playground-canvas-container canvas');
+  await canvas.waitFor();
+  const toolbar = page.locator('.viewport-panel .toolbar');
+  const drawer = page.locator('.mobile-dock-resize');
+  const openToolbarBounds = await toolbar.boundingBox();
+  const gap = (await drawer.boundingBox()).y - (openToolbarBounds.y + openToolbarBounds.height);
+  assert.ok(gap >= 0 && gap <= 24, 'The toolbar should sit just above the open drawer. Gap: ' + gap);
+  const previewBounds = await iframe.boundingBox();
+  const canvasBounds = await canvas.boundingBox();
+  await page.getByRole('button', { name: 'Collapse bottom dock' }).click();
+  await game.getByRole('button', { name: 'Move right' }).waitFor();
+  const arrows = await game.locator('.touch-arrows').boundingBox();
+  const collapsedDrawer = await page.getByRole('button', { name: 'Expand bottom dock' }).boundingBox();
+  const arrowBottom = arrows.y + arrows.height;
+  assert.ok(arrowBottom <= collapsedDrawer.y, 'The collapsed drawer covers the touch arrows by ' + (arrowBottom - collapsedDrawer.y) + 'px.');
+  const toolbarBounds = await toolbar.boundingBox();
+  assert.ok(toolbarBounds.y + toolbarBounds.height <= arrows.y, 'The toolbar must clear the touch arrows.');
+  assert.deepEqual(await iframe.boundingBox(), previewBounds);
+  assert.deepEqual(await canvas.boundingBox(), canvasBounds);
   await verifyTouchMovement(page, game, '#playground-canvas-container', true);
 
   const standalonePage = await phone.newPage({ ...device, defaultBrowserType: undefined });

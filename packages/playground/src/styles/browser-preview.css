@@ -1,6 +1,8 @@
 @media (pointer: coarse) {
   .viewport-panel:has(.browser-game-preview) .toolbar {
-    bottom: 54px;
+    /* Clear the touch controls and bottom inset in website/preview/worker.js. */
+    --preview-touch-clearance: 118px;
+    bottom: var(--preview-touch-clearance);
     padding: 2px 8px;
     gap: 8px;
   }
@@ -11,6 +13,6 @@
 
   .mobile-workspace .viewport-panel:has(.browser-game-preview) .toolbar {
     /* Count the drawer's height towards the clearance for the game arrows. */
-    bottom: max(12px, calc(102px - (100cqh - 100%)));
+    bottom: max(12px, calc(var(--preview-touch-clearance) - (100cqh - 100%)));
   }
 }
