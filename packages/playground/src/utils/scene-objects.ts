@@ -36,6 +36,12 @@ export interface SceneTransformState {
   p2?: ScenePoint;
 }
 
+export interface CanvasTransformChange {
+  object: Dino.GameObject;
+  before: SceneTransformState;
+  after: SceneTransformState;
+}
+
 export function getCanvasPlacementBaseline(object: Dino.GameObject, placement: CanvasPlacement): SceneTransformState {
   const resize = placement.get('resize');
   const isSprite = object.hasComponent(Dino.SpriteComponent);

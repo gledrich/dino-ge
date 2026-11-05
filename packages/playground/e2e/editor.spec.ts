@@ -251,6 +251,63 @@ new Engine({ onLoad() {
   await expect.poll(readSource).toBe(original);
 });
 
+for (const computedPosition of [false, true]) {
+  test(`applies multiple canvas changes ${computedPosition ? 'only when every object is editable' : 'as one undo step'}`, async ({ page }) => {
+    await page.route('**/files', route => route.fulfill({ json: ['script'] }));
+    await page.route('**/api/scripts/script', route => route.fulfill({ json: `
+import { Engine, Rectangle, Vector2 } from 'dino-ge';
+const wallX = 500;
+new Engine({ onLoad() {
+  new Rectangle({ tag: 'Platform', position: new Vector2(300, 220), width: 64, height: 48 });
+  new Rectangle({ tag: 'Wall', position: new Vector2(${computedPosition ? 'wallX' : '500'}, 220), width: 25, height: 100 });
+}, update() {} }, { containerId: 'playground-canvas-container' });` }));
+    await page.goto('/');
+    const platform = page.getByRole('button', { name: 'Platform', exact: true });
+    const wall = page.getByRole('button', { name: 'Wall', exact: true });
+    await expect(platform).toBeVisible();
+    await page.getByRole('button', { name: 'Edit scene', exact: true }).click();
+    await platform.click();
+    await platform.press('Shift+ArrowRight');
+    await wall.click();
+    await wall.press('Shift+ArrowDown');
+    await expect(wall).toHaveAccessibleDescription('Pending canvas changes');
+
+    const readSource = () => page.evaluate(() => {
+      const { monaco } = window as typeof window & { monaco: Monaco };
+      return monaco.editor.getEditors()[0].getValue();
+    });
+    await expect(page.locator('.monaco-editor')).toContainText('new Rectangle');
+    const original = await readSource();
+    await page.getByRole('button', { name: 'Apply all canvas changes', exact: true }).click();
+    if (computedPosition) {
+      await expect(page.getByRole('status').filter({ hasText: 'Wall' })).toContainText('Use literal transform options');
+      await expect(platform).toHaveAccessibleDescription('Pending canvas changes');
+      await expect(wall).toHaveAccessibleDescription('Pending canvas changes');
+      await expect.poll(readSource).toBe(original);
+      return;
+    }
+
+    await expect(page.getByRole('status').filter({ hasText: 'Applied canvas changes for 2 objects' })).toBeVisible();
+    await expect(platform).toHaveAccessibleDescription('');
+    await expect(wall).toHaveAccessibleDescription('');
+    const applied = await readSource();
+    expect(applied).toContain('new Vector2(310, 220)');
+    expect(applied).toContain('new Vector2(500, 230)');
+    const x = page.getByRole('spinbutton', { name: 'X', exact: true });
+    const y = page.getByRole('spinbutton', { name: 'Y', exact: true });
+    await page.getByRole('button', { name: 'Undo code edit' }).click();
+    await expect.poll(readSource).toBe(original);
+    await expect(y).toHaveValue('220.00');
+    await platform.click();
+    await expect(x).toHaveValue('300.00');
+    await page.getByRole('button', { name: 'Redo code edit' }).click();
+    await expect.poll(readSource).toBe(applied);
+    await expect(x).toHaveValue('310.00');
+    await wall.click();
+    await expect(y).toHaveValue('230.00');
+  });
+}
+
 test('shows pending canvas changes on objects and their collapsed branches', async ({ page }) => {
   await page.route('**/files', route => route.fulfill({ json: ['script'] }));
   await page.route('**/api/scripts/script', route => route.fulfill({ json: `

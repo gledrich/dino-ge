@@ -1,6 +1,6 @@
 import * as acorn from 'acorn';
 import { Vector2 } from 'dino-ge';
-import { sceneObjectDefaults, sceneObjectKinds, sceneSourceKey, type SceneObjectPlacement, type ScenePoint } from './scene-objects';
+import { sceneObjectDefaults, sceneObjectKinds, sceneSourceKey, type CanvasTransformChange, type SceneObjectPlacement, type ScenePoint } from './scene-objects';
 
 export interface PropertyLocation {
   nodeStart: number;
@@ -255,6 +255,11 @@ export interface Edit {
   start: number;
   end: number;
   newText: string;
+}
+
+export interface CanvasPlacementTransaction {
+  edits: Edit[];
+  transforms: CanvasTransformChange[];
 }
 
 /** Find a standalone constructor written by the visual editor. */

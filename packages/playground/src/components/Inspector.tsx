@@ -1,9 +1,9 @@
 import React, { useEffect, useState } from 'react';
 import * as Dino from 'dino-ge';
 import InspectorRow, { InspectableObject, PropertyRowDef, resolveComponentPath } from './InspectorRow';
-import { getLineOriginEdit, getSurgicalEdit, getSourceMapping, Edit } from '../utils/ast-utils';
+import { getLineOriginEdit, getSurgicalEdit, getSourceMapping, type CanvasPlacementTransaction, type Edit } from '../utils/ast-utils';
 import { usePlayground } from '../context/PlaygroundContext';
-import { getCanvasPlacementBaseline, isCanvasTransformProperty, restoreSceneTransform, type SceneTransformState } from '../utils/scene-objects';
+import { getCanvasPlacementBaseline, isCanvasTransformProperty, restoreSceneTransform, type CanvasPlacement, type SceneTransformState } from '../utils/scene-objects';
 import '../styles/inspector.css';
 
 const { Engine } = Dino;
@@ -80,6 +80,86 @@ const getInspectorSections = (object: InspectableObject) => Object.entries(SECTI
     return object.hasComponent(component);
   });
 
+function prepareCanvasPlacement(object: Dino.GameObject, placement: CanvasPlacement,
+  objects: ReadonlySet<Dino.GameObject>) {
+  const sourceId = object.metadata.sourceId;
+  if (!sourceId || Array.from(objects).filter(member => member.metadata.sourceId === sourceId).length !== 1) {
+    return 'This object needs its own constructor in the open script.';
+  }
+
+  const mapping = getSourceMapping()[sourceId];
+  const sourceGroup = sourceId.slice(0, sourceId.lastIndexOf('-') + 1);
+  const sameGroup = Object.keys(getSourceMapping()).filter(id => id.startsWith(sourceGroup) &&
+    /^\d+$/.test(id.slice(sourceGroup.length)));
+  if (sameGroup.length !== 1) {
+    return 'Give this object a unique tag in the open script.';
+  }
+  const properties = mapping?.properties;
+  const needsLineOrigin = mapping?.type === 'Line' && !properties?.position &&
+    (placement.has('drag') || placement.has('p1'));
+  const shape = object.getComponent(Dino.ShapeComponent);
+  const paths: string[] = [];
+  if (placement.has('drag') && !needsLineOrigin) paths.push('position.x', 'position.y');
+  if (placement.has('rotate')) paths.push('rotation');
+  const endpoints = (['p1', 'p2'] as const).filter(endpoint => placement.has(endpoint));
+  for (const endpoint of endpoints) paths.push(`${endpoint}.x`, `${endpoint}.y`);
+  if (placement.has('resize')) {
+    if (mapping?.type === 'Sprite') paths.push('scale.x', 'scale.y');
+    else if (mapping?.type === 'Circle') paths.push('radius');
+    else if (mapping?.type === 'Rectangle' || mapping?.type === 'Text') paths.push('width', 'height');
+  }
+  // Preserve computed options. A missing line origin is handled separately.
+  const valueAt = (path: string): unknown => {
+    if (path === 'radius') return shape?.width;
+    const resolved = resolveComponentPath(object, path);
+    return resolved?.target?.[resolved.prop];
+  };
+  const edits: Edit[] = [];
+  for (const path of paths) {
+    const [option, axis] = path.split('.');
+    const property = properties?.[option];
+    const literal = axis ? property?.args?.[axis === 'x' ? 0 : 1] : property;
+    const value = valueAt(path);
+    if ((!literal?.numeric && !(path === 'rotation' && !property)) ||
+        typeof value !== 'number' || !Number.isFinite(value)) break;
+    const edit = getSurgicalEdit(sourceId, path, Number(value.toFixed(6)), valueAt);
+    if (!edit) break;
+    edits.push(edit);
+  }
+  if ((!paths.length && !needsLineOrigin) || edits.length !== paths.length ||
+      (placement.has('resize') && !['Sprite', 'Circle', 'Rectangle', 'Text'].includes(mapping?.type))) {
+    return 'Use literal transform options in the script to apply this edit.';
+  }
+  if (needsLineOrigin) {
+    const origin = getLineOriginEdit(sourceId, object.transform.position);
+    if (!origin) {
+      return 'Give the line an explicit position in the script before applying this edit.';
+    }
+    edits.push(origin);
+  }
+  const before = getCanvasPlacementBaseline(object, placement);
+  const after: SceneTransformState = {};
+  if (object instanceof Dino.Line) {
+    for (const endpoint of endpoints) {
+      after[endpoint] = endpoint === 'p1'
+        ? { x: object.x1, y: object.y1 }
+        : { x: object.x2, y: object.y2 };
+    }
+  }
+  if (before.position) {
+    const { x, y } = object.transform.position;
+    after.position = { x, y };
+  }
+  if (before.rotation !== undefined) after.rotation = object.transform.rotation;
+  if (before.scale) {
+    const { x, y } = object.transform.scale;
+    after.scale = { x, y };
+  } else if (before.size && object.bounds) {
+    after.size = { x: object.bounds.width, y: object.bounds.height };
+  }
+  return { edits, transform: { object, before, after } };
+}
+
 const Inspector: React.FC<InspectorProps> = ({ visible }) => {
   const { isDebug, isPaused, selectedObject, pendingCanvasPlacements } = usePlayground();
   const placement = selectedObject ? pendingCanvasPlacements.get(selectedObject) : undefined;
@@ -87,6 +167,9 @@ const Inspector: React.FC<InspectorProps> = ({ visible }) => {
   const [syntaxError, setSyntaxError] = useState<string | null>(null);
   const [, setTick] = useState(0);
   const [placementStatus, setPlacementStatus] = useState('');
+  const activeObjects = Engine.currentScene?.objects ?? Engine.objects;
+  const pendingCount = Array.from(pendingCanvasPlacements.keys()).filter(object => activeObjects.has(object)).length;
+  const hasPendingCanvasChanges = pendingCanvasPlacements.size > 0;
   const baseline = selectedObject && placement ? getCanvasPlacementBaseline(selectedObject, placement) : undefined;
   const canEditPaletteObject = isPaused && !syntaxError && selectedObject?.metadata.sourceId?.startsWith('DinoPlace');
 
@@ -139,108 +222,47 @@ const Inspector: React.FC<InspectorProps> = ({ visible }) => {
     };
   }, []);
 
-  const finishPlacement = (object: Dino.GameObject, state: SceneTransformState, message: string) => {
-    window.dispatchEvent(new CustomEvent('playground-placement-history', { detail: { object, state } }));
-    setPlacementStatus(message);
-  };
+  useEffect(() => {
+    if (!hasPendingCanvasChanges) return;
+    const updateScene = () => setTick(tick => tick + 1);
+    Engine.on('sceneHierarchyChanged', updateScene);
+    return () => { Engine.off('sceneHierarchyChanged', updateScene); };
+  }, [hasPendingCanvasChanges]);
 
   const discardPlacement = () => {
     if (!selectedObject || !baseline || Engine.selectedObject !== selectedObject) return;
     restoreSceneTransform(selectedObject, baseline);
-    finishPlacement(selectedObject, baseline, 'Discarded canvas changes.');
+    window.dispatchEvent(new CustomEvent('playground-placement-history', {
+      detail: { object: selectedObject, state: baseline },
+    }));
+    setPlacementStatus('Discarded canvas changes.');
   };
 
-  const applyPlacement = () => {
-    if (!selectedObject || !placement || !baseline) return;
-    const sourceId = selectedObject.metadata.sourceId;
+  const applyPlacements = (all: boolean) => {
     const objects = Engine.currentScene?.objects ?? Engine.objects;
-    if (!sourceId || Array.from(objects).filter(object => object.metadata.sourceId === sourceId).length !== 1) {
-      setPlacementStatus('This object needs its own constructor in the open script.');
-      return;
-    }
+    const entries = all ? Array.from(pendingCanvasPlacements).filter(([object]) => objects.has(object))
+      : selectedObject && placement ? [[selectedObject, placement] as const] : [];
+    if (!entries.length) return;
 
     window.dispatchEvent(new Event('playground-sync-source-mapping'));
-    const mapping = getSourceMapping()[sourceId];
-    const sourceGroup = sourceId.slice(0, sourceId.lastIndexOf('-') + 1);
-    const sameGroup = Object.keys(getSourceMapping()).filter(id => id.startsWith(sourceGroup) &&
-      /^\d+$/.test(id.slice(sourceGroup.length)));
-    if (sameGroup.length !== 1) {
-      setPlacementStatus('Give this object a unique tag in the open script.');
-      return;
-    }
-    const properties = mapping?.properties;
-    const needsLineOrigin = mapping?.type === 'Line' && !properties?.position &&
-      (placement.has('drag') || placement.has('p1'));
-    const shape = selectedObject.getComponent(Dino.ShapeComponent);
-    const paths: string[] = [];
-    if (placement.has('drag') && !needsLineOrigin) paths.push('position.x', 'position.y');
-    if (placement.has('rotate')) paths.push('rotation');
-    const endpoints = (['p1', 'p2'] as const).filter(endpoint => placement.has(endpoint));
-    for (const endpoint of endpoints) paths.push(`${endpoint}.x`, `${endpoint}.y`);
-    if (placement.has('resize')) {
-      if (mapping?.type === 'Sprite') paths.push('scale.x', 'scale.y');
-      else if (mapping?.type === 'Circle') paths.push('radius');
-      else if (mapping?.type === 'Rectangle' || mapping?.type === 'Text') paths.push('width', 'height');
-    }
-    // Preserve computed options. A missing line origin is handled separately.
-    const valueAt = (path: string): unknown => {
-      if (path === 'radius') return shape?.width;
-      const resolved = resolveComponentPath(selectedObject, path);
-      return resolved?.target?.[resolved.prop];
-    };
-    const edits: Edit[] = [];
-    for (const path of paths) {
-      const [option, axis] = path.split('.');
-      const property = properties?.[option];
-      const literal = axis ? property?.args?.[axis === 'x' ? 0 : 1] : property;
-      const value = valueAt(path);
-      if ((!literal?.numeric && !(path === 'rotation' && !property)) ||
-          typeof value !== 'number' || !Number.isFinite(value)) break;
-      const edit = getSurgicalEdit(sourceId, path, Number(value.toFixed(6)), valueAt);
-      if (!edit) break;
-      edits.push(edit);
-    }
-    if ((!paths.length && !needsLineOrigin) || edits.length !== paths.length ||
-        (placement.has('resize') && !['Sprite', 'Circle', 'Rectangle', 'Text'].includes(mapping?.type))) {
-      setPlacementStatus('Use literal transform options in the script to apply this edit.');
-      return;
-    }
-    if (needsLineOrigin) {
-      const origin = getLineOriginEdit(sourceId, selectedObject.transform.position);
-      if (!origin) {
-        setPlacementStatus('Give the line an explicit position in the script before applying this edit.');
+    const transaction: CanvasPlacementTransaction = { edits: [], transforms: [] };
+    for (const [object, changes] of entries) {
+      const result = prepareCanvasPlacement(object, changes, objects);
+      if (typeof result === 'string') {
+        setPlacementStatus(all ? `${object.metadata.tag || 'GameObject'}: ${result}` : result);
         return;
       }
-      edits.push(origin);
+      transaction.edits.push(...result.edits);
+      transaction.transforms.push(result.transform);
     }
-    const before = baseline;
-    const after: SceneTransformState = {};
-    if (selectedObject instanceof Dino.Line) {
-      for (const endpoint of endpoints) {
-        after[endpoint] = endpoint === 'p1'
-          ? { x: selectedObject.x1, y: selectedObject.y1 }
-          : { x: selectedObject.x2, y: selectedObject.y2 };
-      }
-    }
-    if (before.position) {
-      const { x, y } = selectedObject.transform.position;
-      after.position = { x, y };
-    }
-    if (before.rotation !== undefined) after.rotation = selectedObject.transform.rotation;
-    if (before.scale) {
-      const { x, y } = selectedObject.transform.scale;
-      after.scale = { x, y };
-    } else if (before.size && selectedObject.bounds) {
-      after.size = { x: selectedObject.bounds.width, y: selectedObject.bounds.height };
-    }
-    const applied = !window.dispatchEvent(new CustomEvent('playground-apply-placement', {
-      detail: { edits, object: selectedObject, before, after }, cancelable: true,
+    const applied = !window.dispatchEvent(new CustomEvent<CanvasPlacementTransaction>('playground-apply-placement', {
+      detail: transaction, cancelable: true,
     }));
     if (!applied) {
       setPlacementStatus('The open script could not be updated.');
       return;
     }
-    finishPlacement(selectedObject, after, 'Applied to code.');
+    setPlacementStatus(all ? `Applied canvas changes for ${entries.length} objects.` : 'Applied to code.');
   };
 
   const handleApplyToCode = () => {
@@ -311,16 +333,29 @@ const Inspector: React.FC<InspectorProps> = ({ visible }) => {
           <div className="no-selection">Toggle Debug Mode to inspect objects.</div>
         ) : (
           <div className="inspector-form" style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-            {placement && (
+            {(placement || pendingCount > 1) && (
               <section id="canvas-changes" className="inspector-section" aria-labelledby="canvas-changes-title" tabIndex={-1}>
                 <h3 id="canvas-changes-title">Canvas changes</h3>
-                <p className="inspector-section-description">Apply these changes before saving the script.</p>
-                <button type="button" className="scene-control inspector-apply" onClick={applyPlacement}>
-                  <i className="fa-solid fa-code" aria-hidden="true" /> Apply placement to code
-                </button>
-                <button type="button" className="scene-control" onClick={discardPlacement}>
-                  <i className="fa-solid fa-rotate-left" aria-hidden="true" /> Discard canvas changes
-                </button>
+                {pendingCount > 1 && (
+                  <>
+                    <p className="inspector-section-description">{pendingCount} objects in this scene have pending changes.</p>
+                    <button type="button" className="scene-control inspector-apply" onClick={() => applyPlacements(true)}>
+                      <i className="fa-solid fa-code" aria-hidden="true" /> Apply all canvas changes
+                    </button>
+                  </>
+                )}
+                {placement && (
+                  <>
+                    {pendingCount <= 1 && <p className="inspector-section-description">Apply these changes before saving the script.</p>}
+                    <button type="button" className={`scene-control${pendingCount <= 1 ? ' inspector-apply' : ''}`}
+                      onClick={() => applyPlacements(false)}>
+                      <i className="fa-solid fa-code" aria-hidden="true" /> Apply placement to code
+                    </button>
+                    <button type="button" className="scene-control" onClick={discardPlacement}>
+                      <i className="fa-solid fa-rotate-left" aria-hidden="true" /> Discard canvas changes
+                    </button>
+                  </>
+                )}
               </section>
             )}
             {placementStatus && <span className="inspector-action-status" role="status">{placementStatus}</span>}

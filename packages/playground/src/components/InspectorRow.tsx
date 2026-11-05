@@ -1,6 +1,6 @@
 import React, { useEffect, useId, useRef } from 'react';
 import * as Dino from 'dino-ge';
-import { getSurgicalEdit } from '../utils/ast-utils';
+import { getSurgicalEdit, type CanvasPlacementTransaction } from '../utils/ast-utils';
 import { isCanvasTransformProperty, type SceneTransformState } from '../utils/scene-objects';
 
 export interface PropertyRowDef {
@@ -197,17 +197,16 @@ const InspectorRow: React.FC<{
 
     if (edit) {
       if (isRotation) {
-        const accepted = !window.dispatchEvent(new CustomEvent('playground-apply-placement', {
+        if (typeof val !== 'number') return;
+        const accepted = !window.dispatchEvent(new CustomEvent<CanvasPlacementTransaction>('playground-apply-placement', {
           cancelable: true,
           detail: {
-            edits: [edit], object: selectedObject,
-            before: { rotation: lastSyncedValue }, after: { rotation: val },
+            edits: [edit], transforms: [{
+              object: selectedObject, before: { rotation: lastSyncedValue }, after: { rotation: val },
+            }],
           },
         }));
         if (!accepted) return;
-        window.dispatchEvent(new CustomEvent('playground-placement-history', {
-          detail: { object: selectedObject, state: { rotation: val } },
-        }));
       } else {
         window.dispatchEvent(new CustomEvent('playground-apply-edit', { detail: edit }));
       }

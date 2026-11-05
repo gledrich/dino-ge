@@ -3,8 +3,8 @@ import Editor from '@monaco-editor/react';
 import { typescript, type editor } from 'monaco-editor';
 import * as Dino from 'dino-ge';
 import { createScript, getScript, getFilesList, readGameFolder, importGameFolder, type GameFolder } from '../utils/helpers';
-import { Edit, instrumentCode, getSourceMapping, getSceneObjectCreation, getSceneObjectDeletion, getSceneObjectDuplication, getSpriteImageReplacement } from '../utils/ast-utils';
-import { createSceneObject, duplicateSceneObject, isReplaceableSprite, restoreSceneTransform, type SceneObjectPlacement, type SceneTransformState } from '../utils/scene-objects';
+import { Edit, instrumentCode, getSourceMapping, getSceneObjectCreation, getSceneObjectDeletion, getSceneObjectDuplication, getSpriteImageReplacement, type CanvasPlacementTransaction } from '../utils/ast-utils';
+import { createSceneObject, duplicateSceneObject, isReplaceableSprite, restoreSceneTransform, type CanvasTransformChange, type SceneObjectPlacement } from '../utils/scene-objects';
 import { useMonacoEditor } from '../hooks/useMonacoEditor';
 import '../styles/editor.css';
 
@@ -14,17 +14,16 @@ interface EditorProps {
   onSelectScript: (scriptId: string) => void;
 }
 
-interface SceneHistoryEntry {
+type SceneHistoryEntry = {
   model: editor.ITextModel;
   run: HTMLElement;
   scene: Dino.Scene | null;
-  object: Dino.GameObject;
   before: number;
   after: number;
-  transform?: { before: SceneTransformState; after: SceneTransformState };
-  spriteImage?: { before: HTMLImageElement; after: HTMLImageElement };
-  removed?: boolean;
-}
+} & (
+  | { transforms: CanvasTransformChange[] }
+  | { object: Dino.GameObject; spriteImage?: { before: HTMLImageElement; after: HTMLImageElement }; removed?: boolean }
+);
 
 const CodeEditor: React.FC<EditorProps> = ({ currentScriptId, onSave, onSelectScript }) => {
   const [scripts, setScripts] = useState<string[]>([]);
@@ -208,23 +207,24 @@ const CodeEditor: React.FC<EditorProps> = ({ currentScriptId, onSave, onSelectSc
     };
 
     const applyPlacement = (event: Event) => {
-      const { edits, object, before, after } = (event as CustomEvent<{
-        edits: Edit[]; object: Dino.GameObject; before: SceneTransformState; after: SceneTransformState;
-      }>).detail;
+      const { edits, transforms } = (event as CustomEvent<CanvasPlacementTransaction>).detail;
       const model: editor.ITextModel | null = monacoEditorRef.current?.getModel();
       const run = document.querySelector<HTMLElement>('script[data-playground-script]');
       const scene = Dino.Engine.currentScene;
       const objects = scene?.objects ?? Dino.Engine.objects;
-      if (!model || run?.dataset.playgroundScript !== currentScriptId ||
-          !objects.has(object)) return;
-      if (after.rotation !== undefined && (!object.metadata.sourceId ||
-          Array.from(objects).filter(item => item.metadata.sourceId === object.metadata.sourceId).length !== 1)) return;
+      if (!model || run?.dataset.playgroundScript !== currentScriptId || !transforms.length) return;
+      for (const { object, after } of transforms) {
+        if (!objects.has(object) || (after.rotation !== undefined && (!object.metadata.sourceId ||
+            Array.from(objects).filter(item => item.metadata.sourceId === object.metadata.sourceId).length !== 1))) return;
+      }
       const previousRevision = model.getAlternativeVersionId();
       if (!applySourceEdits(edits)) return;
       const revision = model.getAlternativeVersionId();
       if (revision !== previousRevision) {
-        recordSceneHistory({ model, run, scene, object, before: previousRevision, after: revision,
-          transform: { before, after } });
+        recordSceneHistory({ model, run, scene, transforms, before: previousRevision, after: revision });
+      }
+      for (const { object, after } of transforms) {
+        window.dispatchEvent(new CustomEvent('playground-placement-history', { detail: { object, state: after } }));
       }
       event.preventDefault();
     };
@@ -454,25 +454,33 @@ const CodeEditor: React.FC<EditorProps> = ({ currentScriptId, onSave, onSelectSc
       revision === (event.isUndoing ? item.before : item.after));
     if (!entry) return;
 
-    const { object, scene, transform, spriteImage, removed } = entry;
+    const { scene } = entry;
     const active = scene === Dino.Engine.currentScene;
     const objects = scene?.objects ?? Dino.Engine.objects;
+    if ('transforms' in entry) {
+      const changes = entry.transforms.filter(({ object }) => objects.has(object));
+      if (!changes.length) return;
+      for (const { object, before, after } of changes) {
+        const state = event.isUndoing ? before : after;
+        restoreSceneTransform(object, state);
+        window.dispatchEvent(new CustomEvent('playground-placement-history', { detail: { object, state } }));
+      }
+      const [{ object, before, after }] = changes;
+      const state = event.isUndoing ? before : after;
+      const change = state.rotation === undefined ? 'placement' : 'rotation';
+      const detail = changes.length > 1
+        ? `${event.isUndoing ? 'Undid' : 'Restored'} canvas changes for ${changes.length} objects.`
+        : `${event.isUndoing ? 'Undid' : 'Restored'} ${change} for ${object.metadata.tag}.`;
+      window.dispatchEvent(new CustomEvent('playground-scene-history', { detail }));
+      return;
+    }
+    const { object, spriteImage, removed } = entry;
     if (spriteImage) {
       if (object instanceof Dino.Sprite && objects.has(object)) {
         object.img = event.isUndoing ? spriteImage.before : spriteImage.after;
         const detail = `${event.isUndoing ? 'Restored the previous' : 'Restored the replacement'} image for ${object.metadata.tag}.`;
         window.dispatchEvent(new CustomEvent('playground-scene-history', { detail }));
       }
-      return;
-    }
-    if (transform) {
-      if (!objects.has(object)) return;
-      const state = event.isUndoing ? transform.before : transform.after;
-      restoreSceneTransform(object, state);
-      window.dispatchEvent(new CustomEvent('playground-placement-history', { detail: { object, state } }));
-      const change = state.rotation === undefined ? 'placement' : 'rotation';
-      const detail = `${event.isUndoing ? 'Undid' : 'Restored'} ${change} for ${object.metadata.tag}.`;
-      window.dispatchEvent(new CustomEvent('playground-scene-history', { detail }));
       return;
     }
     const remove = removed ? event.isRedoing : event.isUndoing;
