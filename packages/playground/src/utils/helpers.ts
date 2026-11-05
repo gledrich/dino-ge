@@ -1,24 +1,36 @@
 let currentScriptId = 'script';
 const scriptEndpoint = (id: string) => `/api/scripts/${encodeURIComponent(id)}`;
+const moduleRevisionHeader = 'X-Dino-Module-Revision';
 
-async function projectModuleRequest<T>(id: string, path?: string, options?: RequestInit): Promise<T> {
+export class ProjectModuleConflict extends Error {}
+
+async function projectModuleRequest<T>(id: string, path?: string, options?: RequestInit): Promise<{ value: T; revision: string | null }> {
   const query = path ? `?${new URLSearchParams({ path })}` : '';
   const response = await fetch(`${scriptEndpoint(id)}/modules${query}`, options);
   const result = await response.json().catch(() => null);
+  if (response.status === 409 && options?.method === 'PUT') {
+    throw new ProjectModuleConflict(result?.error || 'This module changed since you opened it.');
+  }
   if (!response.ok) throw new Error(result?.error || 'Could not access the project files.');
-  return result;
+  return { value: result, revision: response.headers.get(moduleRevisionHeader) };
 }
 
-export const listProjectModules = (id: string, signal: AbortSignal) =>
-  projectModuleRequest<string[]>(id, undefined, { signal });
+export const listProjectModules = async (id: string, signal: AbortSignal) =>
+  (await projectModuleRequest<string[]>(id, undefined, { signal })).value;
 
-export const readProjectModule = (id: string, path: string, signal: AbortSignal) =>
-  projectModuleRequest<string>(id, path, { signal });
+export async function readProjectModule(id: string, path: string, signal: AbortSignal) {
+  const { value, revision } = await projectModuleRequest<string>(id, path, { signal, cache: 'no-store' });
+  if (!revision) throw new Error('Could not read the module revision.');
+  return { value, revision };
+}
 
-export const saveProjectModule = (id: string, path: string, data: string) =>
-  projectModuleRequest(id, path, {
-    method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ data }),
+export async function saveProjectModule(id: string, path: string, data: string, expectedRevision: string) {
+  const { revision } = await projectModuleRequest(id, path, {
+    method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ data, revision: expectedRevision }),
   });
+  if (!revision) throw new Error('The server did not return the saved module revision.');
+  return revision;
+}
 
 export const setCurrentScriptId = (id: string) => {
   currentScriptId = id;

@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import Editor from '@monaco-editor/react';
 import type { editor } from 'monaco-editor';
-import { listProjectModules, readProjectModule, saveProjectModule } from '../utils/helpers';
+import { listProjectModules, ProjectModuleConflict, readProjectModule, saveProjectModule } from '../utils/helpers';
 import { getProjectObjectLocation, markProjectModuleEdited, recordProjectPlacementSave, type ProjectObjectSource, type ProjectObjectSourceRequest, type ProjectPlacementDraft } from '../utils/project-object-source';
 
 export default function ProjectFilesDialog({ scriptId, initialSource, prepareDraft, onClose }: {
@@ -10,13 +10,15 @@ export default function ProjectFilesDialog({ scriptId, initialSource, prepareDra
   const dialog = useRef<HTMLDialogElement>(null);
   const [modules, setModules] = useState<string[]>();
   const [path, setPath] = useState('');
-  const [loaded, setLoaded] = useState<{ path: string; value: string }>();
+  const [loaded, setLoaded] = useState<{ path: string; value: string; revision: string }>();
+  const [reload, setReload] = useState(0);
   const [draft, setDraft] = useState('');
   const [placementDraft, setPlacementDraft] = useState<ProjectPlacementDraft>();
   const prepareInitialDraft = useRef(prepareDraft);
   const [saving, setSaving] = useState(false);
   const [status, setStatus] = useState('');
   const [error, setError] = useState('');
+  const [conflict, setConflict] = useState(false);
   const ready = loaded?.path === path && !!path;
   const dirty = ready && draft !== loaded?.value;
   const sourceLocation = ready && initialSource?.path === path
@@ -44,9 +46,9 @@ export default function ProjectFilesDialog({ scriptId, initialSource, prepareDra
   useEffect(() => {
     if (!path) return;
     const controller = new AbortController();
-    void readProjectModule(scriptId, path, controller.signal).then(value => {
+    void readProjectModule(scriptId, path, controller.signal).then(({ value, revision }) => {
       if (controller.signal.aborted) return;
-      setLoaded({ path, value });
+      setLoaded({ path, value, revision });
       setDraft(value);
       if (path !== initialSource?.path || !prepareInitialDraft.current) return;
       const proposed = prepareInitialDraft.current(value);
@@ -58,26 +60,30 @@ export default function ProjectFilesDialog({ scriptId, initialSource, prepareDra
       }
     }).catch(error => { if (!controller.signal.aborted) setError(error.message); });
     return () => controller.abort();
-  }, [path, scriptId, initialSource]);
+  }, [path, scriptId, initialSource, reload]);
 
   const save = async () => {
-    if (!dirty || saving) return;
+    if (!loaded || !dirty || saving || conflict) return;
     setSaving(true);
     setError('');
     setStatus('');
     try {
       const value = placementDraft?.value ?? draft;
-      await saveProjectModule(scriptId, path, value);
-      const canContinue = initialSource && placementDraft && loaded
+      const revision = await saveProjectModule(scriptId, path, value, loaded.revision);
+      const canContinue = initialSource && placementDraft
         ? recordProjectPlacementSave(initialSource, loaded.value, placementDraft) : false;
       placementDraft?.onSaved();
       setPlacementDraft(undefined);
       if (!canContinue) markProjectModuleEdited(scriptId, path);
-      setLoaded({ path, value });
+      setLoaded({ path, value, revision });
       setDraft(value);
       setStatus(canContinue ? 'Saved. You can keep editing the scene.' : 'Saved. Reset the game to run the updated module.');
     } catch (error) {
-      setError(error instanceof Error ? error.message : 'Could not save the module.');
+      if (error instanceof ProjectModuleConflict) {
+        markProjectModuleEdited(scriptId, path);
+        setConflict(true);
+        setError(`${error.message} Copy any draft text you want to keep, then discard and reload.`);
+      } else setError(error instanceof Error ? error.message : 'Could not save the module.');
     } finally {
       setSaving(false);
     }
@@ -106,7 +112,7 @@ export default function ProjectFilesDialog({ scriptId, initialSource, prepareDra
       {!!modules?.length && (
         <label className="project-module-label">
           JavaScript module
-          <select className="scene-control" value={path} disabled={dirty || saving} onChange={event => {
+          <select className="scene-control" value={path} disabled={dirty || saving || conflict} onChange={event => {
             setPath(event.target.value);
             setLoaded(undefined);
             setStatus('');
@@ -137,14 +143,19 @@ export default function ProjectFilesDialog({ scriptId, initialSource, prepareDra
       {error && <p className="import-game-error" role="alert">{error}</p>}
       {status && <p role="status">{status}</p>}
       {placementDraft && !status && <p>Review the proposed placement changes before saving.</p>}
-      {dirty && !status && <p>Save or discard your changes to switch files or close.</p>}
+      {dirty && !status && !conflict && <p>Save or discard your changes to switch files or close.</p>}
       <div className="project-module-actions">
-        {dirty && <button type="button" className="scene-control" disabled={saving} onClick={() => {
+        {(dirty || conflict) && <button type="button" className="scene-control" disabled={saving} onClick={() => {
           setDraft(loaded?.value ?? '');
           setPlacementDraft(undefined);
           setError('');
-        }}>Discard changes</button>}
-        <button type="button" className="scene-control" disabled={!dirty || saving} onClick={() => void save()}>
+          if (conflict) {
+            setConflict(false);
+            setLoaded(undefined);
+            setReload(value => value + 1);
+          }
+        }}>{conflict ? 'Discard and reload' : 'Discard changes'}</button>}
+        <button type="button" className="scene-control" disabled={!dirty || saving || conflict} onClick={() => void save()}>
           {saving ? 'Saving…' : 'Save module'}
         </button>
         <button type="button" className="scene-control" disabled={dirty || saving} onClick={close}>Close</button>

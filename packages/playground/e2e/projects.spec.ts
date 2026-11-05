@@ -2,11 +2,15 @@ import { clickCanvasText, expectCanvasText, observeCanvasUI } from '../../exampl
 import { expect, test } from '@playwright/test';
 import type { Monaco } from '@monaco-editor/react';
 import { spawn } from 'node:child_process';
+import { createHash } from 'node:crypto';
 import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { basename, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { once } from 'node:events';
+
+const moduleRevision = (source: string) => createHash('sha256').update(source).digest('hex');
+const moduleHeaders = (source: string) => ({ 'X-Dino-Module-Revision': moduleRevision(source) });
 
 test('an empty workspace seeds once and never replaces user games', async () => {
   const { ProjectStore } = await import('../lib/projects.js');
@@ -215,6 +219,27 @@ export const run = window.gameRuns;`);
     expect(await latest.json()).toBe(revisions[winner]);
     expect(latest.headers()['x-dino-module-revision']).toBe(writes[winner].headers()['x-dino-module-revision']);
     expect(latest.headers()['x-dino-module-revision']).not.toBe(revision);
+
+    await page.getByRole('button', { name: 'Project files', exact: true }).click();
+    await expect(modules.getByLabel('JavaScript module')).toHaveValue('src/counter.js');
+    await expect(moduleEditor).toContainText(revisions[winner]);
+    await moduleEditor.evaluate(element => {
+      const { monaco } = window as typeof window & { monaco: Monaco };
+      monaco.editor.getEditors().find(item => item.getDomNode() === element)!.setValue('export const run = 90;');
+    });
+    const otherEdit = await request.put(counterUrl, { data: {
+      data: 'export const run = 75;', revision: latest.headers()['x-dino-module-revision'],
+    } });
+    expect(otherEdit.ok()).toBe(true);
+    const save = modules.getByRole('button', { name: 'Save module', exact: true });
+    await save.click();
+    await expect(modules.getByRole('alert')).toContainText('This module changed since you opened it.', { timeout: 3000 });
+    await expect(save).toBeDisabled();
+    await expect(moduleEditor).toContainText('export const run = 90;');
+    expect(await (await request.get(counterUrl)).json()).toBe('export const run = 75;');
+    await modules.getByRole('button', { name: 'Discard and reload', exact: true }).click();
+    await expect(moduleEditor).toContainText('export const run = 75;');
+    await modules.getByRole('button', { name: 'Close', exact: true }).click();
   } finally {
     await rm(folder, { recursive: true, force: true });
     await rm(stored, { recursive: true, force: true });
@@ -255,9 +280,9 @@ new Engine({ onLoad() {
   await page.route(`**/api/scripts/${encodeURIComponent(id)}/modules?*`, route => {
     if (route.request().method() === 'PUT') {
       module = route.request().postDataJSON().data;
-      return route.fulfill({ json: { success: true } });
+      return route.fulfill({ headers: moduleHeaders(module), json: { success: true } });
     }
-    return route.fulfill({ json: module });
+    return route.fulfill({ headers: moduleHeaders(module), json: module });
   });
   await page.route(`**/project-runs/*/source-links/${modulePath}`, route => route.fulfill({ contentType: 'text/javascript', body: module }));
   await page.route('**/shared-object.mjs', route => route.fulfill({ contentType: 'text/javascript', body: `
@@ -323,14 +348,18 @@ new Engine({ onLoad() { makePlatform(); makeWall(); makeQuoted(); makeShadowed(V
   await page.route(`**/api/scripts/${encodeURIComponent(id)}/modules`, route => route.fulfill({ json: ['platform.js'] }));
   await page.route(`**/api/scripts/${encodeURIComponent(id)}/modules?*`, route => {
     if (route.request().method() === 'PUT') {
+      const { data, revision } = route.request().postDataJSON();
+      if (revision !== moduleRevision(module)) {
+        return route.fulfill({ status: 409, json: { error: 'This module changed since you opened it.' } });
+      }
       if (rejectSave) {
         rejectSave = false;
         return route.fulfill({ status: 500, json: { error: 'Could not save the module.' } });
       }
-      module = route.request().postDataJSON().data;
-      return route.fulfill({ json: { success: true } });
+      module = data;
+      return route.fulfill({ headers: moduleHeaders(module), json: { success: true } });
     }
-    return route.fulfill({ json: module });
+    return route.fulfill({ headers: moduleHeaders(module), json: module });
   });
   await page.route('**/project-runs/*/module-placement/platform.js', route => route.fulfill({ contentType: 'text/javascript', body: module }));
   await page.goto('/');
@@ -395,8 +424,18 @@ new Engine({ onLoad() { makePlatform(); makeWall(); makeQuoted(); makeShadowed(V
   expect(await liveCanvas?.evaluate(element => element === document.querySelector('#canvas'))).toBe(true);
   await expect(wall).not.toHaveAccessibleDescription('Pending canvas changes');
 
-  module = '// External edit\n' + module;
   await wall.press('Shift+ArrowDown');
+  await apply.click();
+  await expect(dialog.locator('.monaco-editor')).toContainText('new Vector2(160, 90)');
+  module = '// External edit\n' + module;
+  await save.click();
+  await expect(dialog.getByRole('alert')).toContainText('This module changed since you opened it.');
+  await expect(dialog.locator('.monaco-editor')).toContainText('new Vector2(160, 90)');
+  await expect(save).toBeDisabled();
+  await dialog.getByRole('button', { name: 'Discard and reload', exact: true }).click();
+  await expect(dialog.locator('.monaco-editor')).toContainText('// External edit');
+  await dialog.getByRole('button', { name: 'Close', exact: true }).click();
+  await expect(wall).toHaveAccessibleDescription('Pending canvas changes');
   await apply.click();
   await expect(dialog.getByRole('alert')).toContainText('Reset the game to refresh the source locations');
   await expect(save).toBeDisabled();
