@@ -1447,11 +1447,12 @@ new Engine({ onLoad() {
   };
   await startRotation();
   await page.mouse.move(box.x + 390, box.y + 275, { steps: 5 });
-  await expect(readout).toHaveText(/^Rotate · \d+(\.\d+)?°$/);
-  const unsnappedAngle = Number((await readout.innerText()).match(/[\d.]+/)![0]);
-  // Pointer coordinates can be rounded to CSS pixels by the browser.
-  expect(Math.abs(unsnappedAngle - 90)).toBeLessThan(3);
-  await expect(angle).toHaveValue(unsnappedAngle.toFixed(2));
+  // Pointer moves can render intermediate angles, and the browser can round CSS pixels.
+  await expect.poll(async () => {
+    const match = (await readout.innerText()).match(/^Rotate · (\d+(?:\.\d+)?)°$/);
+    const rotation = Number(match?.[1]);
+    return await angle.inputValue() === rotation.toFixed(2) ? Math.abs(rotation - 90) : Infinity;
+  }, { message: 'The rotation readout and Inspector agree near 90°' }).toBeLessThan(3);
   await page.keyboard.press('Escape');
   await expect(readout).toHaveCount(0);
   await page.mouse.up();
@@ -3022,11 +3023,9 @@ new Engine({
   await expect(page.getByRole('status').filter({ hasText: 'Added New circle to Workshop' })).toBeVisible();
   await expect(page.getByRole('spinbutton', { name: 'X', exact: true })).toHaveValue('170.00');
 
-  await page.locator('.monaco-editor .view-lines').click();
-  const modifier = await page.evaluate(() => navigator.userAgent.includes('Macintosh') ? 'Meta' : 'Control');
   const saved = page.waitForResponse(response => response.request().method() === 'PUT' &&
     response.url().endsWith('/api/scripts/script'));
-  await page.keyboard.press(`${modifier}+s`);
+  await page.getByRole('button', { name: 'Save script', exact: true }).click();
   await saved;
   expect(source).toMatch(/class Workshop extends Level\s*{\s*onLoad\(\)\s*{\s*new DinoPlaceCircle/);
   await page.reload();
