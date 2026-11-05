@@ -4,7 +4,7 @@ import InspectorRow, { InspectableObject, PropertyRowDef, resolveComponentPath }
 import { applyEditsToSource, findObjectConstructor, getLineOriginEdit, getStandaloneSceneObject, getSurgicalEdit, getSourceMapping, readObjectSourceMappings, type CanvasPlacementTransaction, type Edit } from '../utils/ast-utils';
 import { usePlayground } from '../context/PlaygroundContext';
 import { getProjectObjectLocation, getProjectObjectSource, openProjectObjectSourceEvent, type ProjectObjectSourceRequest } from '../utils/project-object-source';
-import { getCanvasPlacementBaseline, isCanvasTransformProperty, openEntryObjectSourceEvent, restoreSceneTransform, type CanvasPlacement, type SceneTransformState } from '../utils/scene-objects';
+import { getCanvasPlacementBaseline, isCanvasTransformProperty, openEntryObjectSourceEvent, restoreSceneTransform, revealSceneObjectEvent, type CanvasPlacement, type SceneTransformState } from '../utils/scene-objects';
 import '../styles/inspector.css';
 
 const { Engine } = Dino;
@@ -464,9 +464,14 @@ const Inspector: React.FC<InspectorProps> = ({ visible }) => {
               </section>
             )}
             {placementStatus && <span className="inspector-action-status" role="status">{placementStatus}</span>}
-            {(objectActions || canOpenModule || sourceId) && (
+            {selectedObject && (
               <div className="inspector-section">
                 <h3>Object actions</h3>
+                <button type="button" className="scene-control" onClick={() => {
+                  window.dispatchEvent(new CustomEvent(revealSceneObjectEvent, { detail: selectedObject }));
+                }}>
+                  <i className="fa-solid fa-list" aria-hidden="true" /> Reveal in Explorer
+                </button>
                 {(canOpenModule || sourceId) && <button type="button" className="scene-control"
                   title={canOpenModule ? moduleSource.path : 'Open the constructor in the script editor'} onClick={event => {
                     if (canOpenModule) {

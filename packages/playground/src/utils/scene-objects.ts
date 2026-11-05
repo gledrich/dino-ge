@@ -7,6 +7,7 @@ export const scenePointerDragEvent = 'playground-pointer-drag-scene-item';
 export const sceneKeyboardPlacementEvent = 'playground-position-scene-item';
 export const sceneObjectCodeEvent = 'playground-insert-scene-object-code';
 export const openEntryObjectSourceEvent = 'playground-open-entry-object-source';
+export const revealSceneObjectEvent = 'playground-reveal-scene-object';
 export const renameEntryObjectEvent = 'playground-rename-entry-object';
 export const sceneObjectTagHistoryEvent = 'playground-object-tag-history';
 export interface EntryObjectRename { object: Dino.GameObject; tag: string; previousTag: string; error?: string }

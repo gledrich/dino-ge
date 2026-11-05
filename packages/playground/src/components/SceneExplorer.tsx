@@ -1,7 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import * as Dino from 'dino-ge';
 import { usePlayground } from '../context/PlaygroundContext';
-import { nudgeSceneSelection, type CanvasPlacement } from '../utils/scene-objects';
+import { nudgeSceneSelection, revealSceneObjectEvent, type CanvasPlacement } from '../utils/scene-objects';
 import '../styles/scene-explorer.css';
 
 const { Engine } = Dino;
@@ -16,6 +16,8 @@ interface SceneTree {
   toggleBranch: (object: Dino.GameObject) => void;
   pending: ReadonlyMap<Dino.GameObject, CanvasPlacement>;
   pendingBranches: ReadonlySet<Dino.GameObject>;
+  revealTarget: Dino.GameObject | null;
+  revealRow: React.RefObject<HTMLButtonElement | null>;
 }
 
 const getSceneObjectName = (object: Dino.GameObject) => object.metadata?.tag || 'GameObject';
@@ -54,6 +56,7 @@ const SceneNode: React.FC<{ object: Dino.GameObject; depth: number; tree: SceneT
           <span className="spacer" />
         )}
         <button type="button" className="scene-node-select" aria-pressed={isSelected}
+          ref={object === tree.revealTarget ? tree.revealRow : undefined}
           aria-description={pendingDescription} onClick={() => onSelect(object)}
           onKeyDown={event => {
             if (editing && isSelected && nudgeSceneSelection(event)) {
@@ -90,10 +93,12 @@ const getIconForObject = (obj: Dino.GameObject): string => {
 };
 
 const SceneExplorer: React.FC = () => {
-  const { isPaused, isDebug, selectedObject, pendingCanvasPlacements } = usePlayground();
+  const { isPaused, isDebug, isExplorerVisible, setIsExplorerVisible, selectedObject, pendingCanvasPlacements } = usePlayground();
   const [members, setMembers] = useState(() => new Set(Engine.currentScene?.objects ?? Engine.objects));
   const [collapsedBranches, setCollapsedBranches] = useState<ReadonlySet<Dino.GameObject>>(() => new Set());
   const [query, setQuery] = useState('');
+  const [revealTarget, setRevealTarget] = useState<Dino.GameObject | null>(null);
+  const revealRow = useRef<HTMLButtonElement>(null);
   const search = useRef<HTMLInputElement>(null);
   const filter = query.trim().toLowerCase();
   const matches = filter ? [...members].filter(object => getSceneObjectName(object).toLowerCase().includes(filter)) : null;
@@ -146,6 +151,43 @@ const SceneExplorer: React.FC = () => {
     };
   }, []);
 
+  useEffect(() => {
+    const reveal = (event: Event) => {
+      const { detail: object } = event as CustomEvent<Dino.GameObject>;
+      const current = Engine.currentScene?.objects ?? Engine.objects;
+      if (Engine.selectedObject !== object || !current.has(object)) return;
+      const ancestors = new Set<Dino.GameObject>();
+      let parent = object.transform.parent?.gameObject;
+      while (parent && current.has(parent) && !ancestors.has(parent)) {
+        ancestors.add(parent);
+        parent = parent.transform.parent?.gameObject;
+      }
+      setCollapsedBranches(previous => {
+        const next = new Set(previous);
+        for (const ancestor of ancestors) next.delete(ancestor);
+        return next.size === previous.size ? previous : next;
+      });
+      const name = getSceneObjectName(object).toLowerCase();
+      setQuery(previous => name.includes(previous.trim().toLowerCase()) ? previous : '');
+      setIsExplorerVisible(true);
+      setRevealTarget(object);
+    };
+    window.addEventListener(revealSceneObjectEvent, reveal);
+    return () => window.removeEventListener(revealSceneObjectEvent, reveal);
+  }, [setIsExplorerVisible]);
+
+  useEffect(() => {
+    if (!isExplorerVisible || !revealTarget) return;
+    const frame = requestAnimationFrame(() => {
+      if (Engine.selectedObject === revealTarget) {
+        revealRow.current?.focus({ preventScroll: true });
+        revealRow.current?.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+      }
+      setRevealTarget(null);
+    });
+    return () => cancelAnimationFrame(frame);
+  }, [isExplorerVisible, revealTarget]);
+
   const handleSelect = (obj: Dino.GameObject) => {
     Engine.selectedObject = obj;
     // If not in debug mode, enable it to show the selection
@@ -170,6 +212,7 @@ const SceneExplorer: React.FC = () => {
   const tree: SceneTree = {
     selectedObject, onSelect: handleSelect, editing: isPaused && isDebug, members: visibleMembers,
     filtering: !!matches, collapsedBranches, toggleBranch, pending: pendingCanvasPlacements, pendingBranches,
+    revealTarget, revealRow,
   };
 
   return (

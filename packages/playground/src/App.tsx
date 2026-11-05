@@ -78,25 +78,23 @@ function App() {
             });
           }}
         >
-          {isExplorerVisible && (
-            <div className="panel-container">
-              <div 
-                className="panel-header"
-                onClick={() => setIsExplorerVisible(false)}
-                style={{ cursor: 'pointer' }}
-              >
-                Explorer
+          <div className="panel-container" hidden={!isExplorerVisible}>
+            <div
+              className="panel-header"
+              onClick={() => setIsExplorerVisible(false)}
+              style={{ cursor: 'pointer' }}
+            >
+              Explorer
+            </div>
+            <div className="panel-content" style={{ display: 'flex', flexDirection: 'column' }}>
+              <div style={{ flex: 1, overflow: 'auto' }}>
+                <SceneExplorer />
               </div>
-              <div className="panel-content" style={{ display: 'flex', flexDirection: 'column' }}>
-                <div style={{ flex: 1, overflow: 'auto' }}>
-                  <SceneExplorer />
-                </div>
-                <div style={{ height: '50%', borderTop: '1px solid var(--border-color)' }}>
-                  <Sidebar />
-                </div>
+              <div style={{ height: '50%', borderTop: '1px solid var(--border-color)' }}>
+                {isExplorerVisible && <Sidebar />}
               </div>
             </div>
-          )}
+          </div>
         </Panel>
         
         {!isExplorerVisible && (

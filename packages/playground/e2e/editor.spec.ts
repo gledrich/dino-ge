@@ -1461,6 +1461,24 @@ new Engine({ onLoad() {
   await page.getByRole('button', { name: 'Expand children of Platforms', exact: true }).click();
   await expect(blue).toHaveAttribute('aria-pressed', 'true');
   await expect(blue).toHaveAccessibleDescription('Pending canvas changes');
+
+  const reveal = page.getByRole('button', { name: 'Reveal in Explorer', exact: true });
+  await search.fill('blue');
+  await reveal.click({ timeout: 3000 });
+  await expect(search).toHaveValue('blue');
+  await expect(blue).toBeFocused();
+
+  await search.press('Escape');
+  await page.getByRole('button', { name: 'Collapse children of Platforms', exact: true }).click();
+  await search.fill('red');
+  await page.getByText('Explorer', { exact: true }).click();
+  await expect(search).toBeHidden();
+  await reveal.press('Enter');
+  await expect(search).toHaveValue('');
+  await expect(blue).toBeFocused();
+  await expect(blue).toHaveAttribute('aria-pressed', 'true');
+  await expect(blue).toHaveAccessibleDescription('Pending canvas changes');
+  await expect(page.getByRole('button', { name: 'Collapse children of Platforms', exact: true })).toHaveAttribute('aria-expanded', 'true');
 });
 
 test('keeps Library labels readable in a narrow sidebar', async ({ page }) => {
