@@ -107,14 +107,16 @@ const Sidebar: React.FC = () => {
       <div className="sidebar-content">
         {activeTab === 'library' ? (
           <div className="object-library">
-            <section className="library-section" aria-labelledby="library-objects">
+            <section className="library-section" aria-labelledby="library-objects" aria-describedby="library-placement-hint">
               <h3 id="library-objects">Scene objects</h3>
-              <p className="library-hint">Drag onto the scene or click to add at the centre.</p>
+              <p id="library-placement-hint" className="library-hint">
+                Drag or click to place. Use Insert to add code.
+              </p>
               {snippets.filter(item => item.kind || item.label === 'Sprite').map(({ label, icon, code, kind }) => (
                 <div className="library-row" key={label}>
                   <button type="button" className="scene-control snippet-btn" draggable={!!kind}
                     aria-label={kind ? `Add ${label.toLowerCase()}` : 'Choose sprite image'}
-                    title={kind ? `Drag ${label.toLowerCase()} onto the scene` : 'Choose an image in Assets'}
+                    title={kind ? `Drag ${label.toLowerCase()} onto the scene or click to add at the centre` : 'Choose an image in Assets'}
                     onDragStart={event => {
                       if (!kind) return;
                       event.dataTransfer.setData(sceneObjectDragType, kind);
@@ -132,7 +134,7 @@ const Sidebar: React.FC = () => {
                   </button>
                   <button type="button" className="scene-control library-code" aria-label={`Insert ${label.toLowerCase()} code`}
                     title={`Insert ${label.toLowerCase()} code`} onClick={() => insertSnippet(code)}>
-                    <span aria-hidden="true">Code</span>
+                    <span aria-hidden="true">Insert</span>
                   </button>
                 </div>
               ))}

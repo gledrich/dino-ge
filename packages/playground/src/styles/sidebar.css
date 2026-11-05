@@ -99,11 +99,15 @@
   gap: 4px;
 }
 
+.library-row .snippet-btn {
+  gap: 5px;
+  padding-inline: 7px;
+}
+
 .library-row .snippet-btn[draggable='true'] { cursor: grab; }
 .library-row .snippet-btn[draggable='true']:active { cursor: grabbing; }
 .library-row .library-code {
   color: var(--text-secondary);
-  font-size: 11px;
 }
 
 .library-row .library-code:hover { color: var(--text-primary); }
@@ -114,6 +118,7 @@
 }
 
 .snippet-btn i {
+  flex: none;
   width: 14px;
   text-align: center;
   color: var(--accent-primary);
@@ -121,7 +126,10 @@
 }
 
 .snippet-btn span {
-  font-size: 12px;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .snippet-btn .library-affordance {

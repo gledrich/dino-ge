@@ -82,7 +82,7 @@
 }
 .scene-panning canvas { cursor: grabbing !important; }
 .scene-edit-label { margin-inline-end: 4px; font-weight: 600; }
-.scene-edit-hint { color: var(--text-secondary); font-size: 11px; }
+.scene-edit-hint { color: var(--text-secondary); font-size: 11px; line-height: 1.45; }
 .scene-edit-status { border-top: 1px solid var(--border-color); padding-top: 6px; }
 
 .scene-edit-controls:has(.scene-placement-error) {
