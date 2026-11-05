@@ -445,10 +445,17 @@ new Engine({ async onLoad() {
   await expect(preview.locator('img')).toHaveAttribute('src', /\/gem\.svg$/);
   await expect.poll(async () => (await preview.locator('.scene-drop-outline').boundingBox())?.width ?? 0)
     .toBeCloseTo(48 * box.width / size.width, 0);
+  await session.send('Input.dispatchTouchEvent', { type: 'touchMove', touchPoints: [screen(size.width - 8, 210)] });
+  await expect.poll(async () => Number((await preview.innerText()).match(/X (\d+)/)?.[1])).toBeGreaterThan(size.width + 24);
+  await expect(preview.locator('img')).toHaveAttribute('src', /\/gem\.svg$/);
   await edit.press('Enter');
   await expect(preview).toHaveCount(0);
   await session.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
   await expect(sprite).toHaveCount(0);
+  expect(await page.evaluate(() => {
+    const { Engine } = window as unknown as { Engine: { camera: { position: { x: number } } } };
+    return Engine.camera.position.x;
+  })).toBe(0);
   await edit.click();
   await expect(asset).toBeEnabled();
 
@@ -1525,6 +1532,56 @@ new Engine({ onLoad() {
   })).toContain(`new Vector2(${placedX}, 256)`);
   await page.getByRole('button', { name: 'Play', exact: true }).click();
   await expect.poll(view).toMatchObject({ x: 40, y: 30, zoom: 1 });
+});
+
+test('pans the camera for a Library drop and keeps the snapped preview in sync', async ({ page }) => {
+  await page.route('**/files', route => route.fulfill({ json: ['script'] }));
+  await page.route('**/api/scripts/script', route => route.fulfill({ json: `
+import { Engine } from 'dino-ge';
+new Engine({ onLoad() { Engine.camera.position.set(40, 32); }, update() {} },
+  { containerId: 'playground-canvas-container' });` }));
+  await page.goto('/');
+  await page.getByRole('button', { name: 'Edit scene', exact: true }).click();
+  await page.getByRole('button', { name: 'Snap to grid', exact: true }).click();
+  const canvas = page.locator('#canvas');
+  const add = page.getByRole('button', { name: 'Add rectangle', exact: true });
+  const preview = page.locator('.scene-drop-preview');
+  const placed = page.getByRole('button', { name: 'New rectangle', exact: true });
+  const box = (await canvas.boundingBox())!;
+  const cameraX = () => page.evaluate(() => {
+    const { Engine } = window as unknown as { Engine: { camera: { position: { x: number } } } };
+    return Engine.camera.position.x;
+  });
+  const dragToEdge = async () => {
+    const dataTransfer = await page.evaluateHandle(() => new DataTransfer());
+    await add.dispatchEvent('dragstart', { dataTransfer });
+    await canvas.dispatchEvent('dragover', { dataTransfer, clientX: box.x + box.width - 8, clientY: box.y + 224 });
+    await expect(preview).toContainText('Rectangle');
+    await expect.poll(cameraX).toBeGreaterThan(72);
+    await expect.poll(async () => Number((await preview.innerText()).match(/X (\d+)/)?.[1]))
+      .toBeGreaterThan(40 + box.width);
+    return dataTransfer;
+  };
+  const cancelled = await dragToEdge();
+  await add.dispatchEvent('dragend', { dataTransfer: cancelled });
+  await expect(preview).toHaveCount(0);
+  await expect(placed).toHaveCount(0);
+  await expect.poll(cameraX).toBe(40);
+
+  const dataTransfer = await dragToEdge();
+  const inside = { dataTransfer, clientX: box.x + box.width / 2, clientY: box.y + 224 };
+  await canvas.dispatchEvent('dragover', inside);
+  const previewX = Number((await preview.innerText()).match(/X (\d+)/)?.[1]);
+  expect(previewX % 16).toBe(0);
+  const pannedX = await cameraX();
+  await canvas.dispatchEvent('drop', inside);
+  await expect(preview).toHaveCount(0);
+  await expect(placed).toHaveAttribute('aria-pressed', 'true');
+  await expect(page.getByRole('spinbutton', { name: 'X', exact: true })).toHaveValue(`${previewX}.00`);
+  await expect(page.getByRole('spinbutton', { name: 'Y', exact: true })).toHaveValue('256.00');
+  expect(await cameraX()).toBe(pannedX);
+  await page.getByRole('button', { name: 'Play', exact: true }).click();
+  await expect.poll(cameraX).toBe(40);
 });
 
 test('zooms at the pointer and preserves world coordinates for placement', async ({ page }) => {

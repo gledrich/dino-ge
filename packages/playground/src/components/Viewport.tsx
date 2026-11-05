@@ -74,6 +74,22 @@ interface CameraPan {
   origin: ScenePoint & { zoom: number };
 }
 
+interface DropPreviewItem {
+  kind?: SceneObjectKind;
+  asset?: SceneImageAsset;
+  importingImage?: boolean;
+}
+
+interface DropPan {
+  canvas: HTMLCanvasElement;
+  scene: typeof Engine.currentScene;
+  camera: typeof Engine.camera;
+  point: ScenePoint;
+  item: DropPreviewItem;
+  frame: number;
+  origin?: ScenePoint;
+}
+
 function getCameraContactFrame(contacts: ReadonlyMap<number, ScenePoint>) {
   const [first, second] = contacts.values();
   if (!second) return { centre: first, distance: 1 };
@@ -88,6 +104,14 @@ function getEdgePanStrength(offset: number, size: number) {
   if (offset < edge) return (offset - edge) / edge;
   if (offset > size - edge) return (offset - (size - edge)) / edge;
   return 0;
+}
+
+function getEdgePanDelta({ bounds, scaleX, scaleY }: CanvasProjection, x: number, y: number, elapsedMs: number) {
+  if (x < 0 || x > bounds.width || y < 0 || y > bounds.height) return;
+  const travel = 0.45 * Math.max(0, Math.min(elapsedMs, 50));
+  const dx = getEdgePanStrength(x, bounds.width) * travel / scaleX;
+  const dy = getEdgePanStrength(y, bounds.height) * travel / scaleY;
+  if (dx || dy) return { x: dx, y: dy };
 }
 
 const Viewport: React.FC = () => {
@@ -127,6 +151,7 @@ const Viewport: React.FC = () => {
   const [placementStatus, setPlacementStatus] = useState<{ message: string; error?: boolean; pending?: boolean }>();
   const importingImage = useRef(false);
   const draggedAsset = useRef<SceneImageAsset | null>(null);
+  const dropPan = useRef<DropPan | null>(null);
   const [manipulationReadout, setManipulationReadout] = useState('');
   const [keyboardPlacement, setKeyboardPlacement] = useState<KeyboardPlacement>();
   const isPanReady = isEditingScene && (isPanTool || isSpacePan) && !keyboardPlacement;
@@ -252,11 +277,20 @@ const Viewport: React.FC = () => {
   }, [setIsDebug, setIsInspectorVisible, setIsPaused]);
 
   const placeLibraryObject = useCallback((kind: SceneObjectKind, x?: number, y?: number) => {
-    if (addObject(kind, getPlacementPoint(x, y))) enterSceneEditing();
+    const placed = addObject(kind, getPlacementPoint(x, y));
+    if (placed) enterSceneEditing();
+    return placed;
   }, [addObject, enterSceneEditing, getPlacementPoint]);
 
+  const rememberCamera = useCallback((canvas: HTMLCanvasElement) => {
+    const scene = Engine.currentScene;
+    if (savedCamera.current?.canvas === canvas && savedCamera.current.scene === scene) return;
+    const { position, zoom } = Engine.camera;
+    savedCamera.current = { canvas, scene, x: position.x, y: position.y, zoom };
+  }, []);
+
   const showDropGuide = useCallback((point: ReturnType<typeof getCanvasPlacement>,
-    { kind, asset, importingImage }: { kind?: SceneObjectKind; asset?: SceneImageAsset; importingImage?: boolean }) => {
+    { kind, asset, importingImage }: DropPreviewItem) => {
     const rect = viewportContainerRef.current?.getBoundingClientRect();
     if (!point || !rect) {
       setDropGuide(undefined);
@@ -271,6 +305,68 @@ const Viewport: React.FC = () => {
       importingImage,
       asset: asset && { tag: asset.tag, src: asset.image.src } });
   }, []);
+
+  const finishDropPreview = useCallback((placed = false) => {
+    const drag = dropPan.current;
+    dropPan.current = null;
+    if (drag) {
+      cancelAnimationFrame(drag.frame);
+      if (!placed && drag.origin && drag.canvas.isConnected && drag.scene === Engine.currentScene && drag.camera === Engine.camera) {
+        drag.camera.position.set(drag.origin.x, drag.origin.y);
+      }
+    }
+    setDropGuide(undefined);
+  }, []);
+
+  const showPointerDropGuide = useCallback((canvas: HTMLCanvasElement, point: ScenePoint, item: DropPreviewItem) => {
+    showDropGuide(getCanvasPlacement(canvas, placementStep, point.x, point.y), item);
+    if (!isEditingScene || item.importingImage || (!item.kind && !item.asset)) return;
+    if (dropPan.current) {
+      dropPan.current.point = point;
+      dropPan.current.item = item;
+      return;
+    }
+
+    const drag: DropPan = { canvas, scene: Engine.currentScene, camera: Engine.camera, point, item, frame: 0 };
+    let previousTime = performance.now();
+    const panAtEdge = (now: number) => {
+      if (!canvas.isConnected || drag.scene !== Engine.currentScene || drag.camera !== Engine.camera) {
+        finishDropPreview();
+        return;
+      }
+      drag.frame = requestAnimationFrame(panAtEdge);
+      const elapsed = now - previousTime;
+      previousTime = now;
+      const projection = getCanvasProjection(canvas);
+      if (!projection || pan.current || Input.isManipulatingObject) return;
+      const { point, item } = drag;
+      const { bounds, position } = projection;
+      const delta = getEdgePanDelta(projection, point.x - bounds.left, point.y - bounds.top, elapsed);
+      if (!delta) return;
+      rememberCamera(canvas);
+      drag.origin ??= { x: position.x, y: position.y };
+      position.set(position.x + delta.x, position.y + delta.y);
+      showDropGuide(getCanvasPlacement(canvas, placementStep, point.x, point.y), item);
+    };
+    dropPan.current = drag;
+    drag.frame = requestAnimationFrame(panAtEdge);
+  }, [finishDropPreview, isEditingScene, placementStep, rememberCamera, showDropGuide]);
+
+  useEffect(() => {
+    const cancel = () => { if (dropPan.current) finishDropPreview(); };
+    const escape = (event: KeyboardEvent) => { if (event.key === 'Escape') cancel(); };
+    window.addEventListener('dragend', cancel, true);
+    window.addEventListener('blur', cancel);
+    window.addEventListener('keydown', escape);
+    window.addEventListener('playground-before-run', cancel);
+    return () => {
+      window.removeEventListener('dragend', cancel, true);
+      window.removeEventListener('blur', cancel);
+      window.removeEventListener('keydown', escape);
+      window.removeEventListener('playground-before-run', cancel);
+      cancel();
+    };
+  }, [isEditingScene, finishDropPreview]);
 
   const cancelKeyboardPlacement = useCallback(() => {
     setKeyboardPlacement(undefined);
@@ -350,14 +446,14 @@ const Viewport: React.FC = () => {
   };
 
   const placeLoadedImage = useCallback((asset: SceneImageAsset, x?: number, y?: number) => {
-    addObject('Sprite', getPlacementPoint(x, y), asset);
+    return addObject('Sprite', getPlacementPoint(x, y), asset);
   }, [addObject, getPlacementPoint]);
 
   useEffect(() => {
     const updatePointerDrag = (event: Event) => {
       const { detail } = event as CustomEvent<ScenePointerDrag | null>;
       if (!detail || ('asset' in detail && !isEditingScene)) {
-        setDropGuide(undefined);
+        finishDropPreview();
         return;
       }
       const { phase, point: { x, y } } = detail;
@@ -366,18 +462,17 @@ const Viewport: React.FC = () => {
       const isOverCanvas = target instanceof HTMLCanvasElement && target.id === 'canvas' &&
         viewportContainerRef.current?.contains(target);
       if (isOverCanvas && phase === 'preview') {
-        showDropGuide(getCanvasPlacement(target, placementStep, x, y), detail);
+        showPointerDropGuide(target, detail.point, detail);
+      } else if (isOverCanvas && phase === 'drop') {
+        const placed = 'asset' in detail ? placeLoadedImage(detail.asset, x, y) : placeLibraryObject(detail.kind, x, y);
+        finishDropPreview(placed);
       } else {
-        setDropGuide(undefined);
-        if (isOverCanvas && phase === 'drop') {
-          if ('asset' in detail) placeLoadedImage(detail.asset, x, y);
-          else placeLibraryObject(detail.kind, x, y);
-        }
+        finishDropPreview();
       }
     };
     window.addEventListener(scenePointerDragEvent, updatePointerDrag);
     return () => window.removeEventListener(scenePointerDragEvent, updatePointerDrag);
-  }, [isEditingScene, placeLibraryObject, placeLoadedImage, placementStep, showDropGuide]);
+  }, [finishDropPreview, isEditingScene, placeLibraryObject, placeLoadedImage, showPointerDropGuide]);
 
   const placeImageFile = useCallback(async (files: File[], x?: number, y?: number) => {
     const reject = (message: string) => setPlacementStatus({ message, error: true });
@@ -488,13 +583,6 @@ const Viewport: React.FC = () => {
     }
   };
 
-  const rememberCamera = useCallback((canvas: HTMLCanvasElement) => {
-    const scene = Engine.currentScene;
-    if (savedCamera.current?.canvas === canvas && savedCamera.current.scene === scene) return;
-    const { position, zoom } = Engine.camera;
-    savedCamera.current = { canvas, scene, x: position.x, y: position.y, zoom };
-  }, []);
-
   useEffect(() => {
     if (!isEditingScene) return;
     let frame: number | undefined;
@@ -514,20 +602,17 @@ const Viewport: React.FC = () => {
         return;
       }
       frame = requestAnimationFrame(panAtEdge);
-      const elapsed = Math.max(0, Math.min(now - previousTime, 50)) / 1000;
+      const elapsed = now - previousTime;
       previousTime = now;
       const projection = getCanvasProjection(canvas);
       if (!projection) return;
-      const { bounds, position, scaleX, scaleY } = projection;
+      const { position, scaleX, scaleY } = projection;
       const x = (Input.mouseX - position.x) * scaleX;
       const y = (Input.mouseY - position.y) * scaleY;
-      if (x < 0 || x > bounds.width || y < 0 || y > bounds.height) return;
-      const travel = 450 * elapsed;
-      const dx = getEdgePanStrength(x, bounds.width) * travel / scaleX;
-      const dy = getEdgePanStrength(y, bounds.height) * travel / scaleY;
-      if (!dx && !dy) return;
+      const delta = getEdgePanDelta(projection, x, y, elapsed);
+      if (!delta) return;
       rememberCamera(canvas);
-      Input.panObjectDragBy(dx, dy);
+      Input.panObjectDragBy(delta.x, delta.y);
     };
 
     const update = ({ detail }: CustomEvent<ObjectManipulationPreview | null>) => {
@@ -570,6 +655,7 @@ const Viewport: React.FC = () => {
   const restoreCamera = useCallback(() => {
     const saved = savedCamera.current;
     savedCamera.current = null;
+    if (dropPan.current) finishDropPreview();
     endPan();
     if (saved?.canvas.isConnected && saved.scene === Engine.currentScene) {
       Input.cancelObjectManipulation();
@@ -577,7 +663,7 @@ const Viewport: React.FC = () => {
       Engine.camera.zoom = saved.zoom;
     }
     setZoomPercent(undefined);
-  }, [endPan]);
+  }, [endPan, finishDropPreview]);
 
   useEffect(() => {
     if (!isEditingScene) return;
@@ -625,7 +711,7 @@ const Viewport: React.FC = () => {
   }, [rememberCamera]);
 
   const zoomView = useCallback((factor: number, pointer?: ScenePoint) => {
-    if (pan.current || keyboardPlacement || Input.isManipulatingObject) return;
+    if (pan.current || dropPan.current || keyboardPlacement || Input.isManipulatingObject) return;
     const canvas = viewportContainerRef.current?.querySelector<HTMLCanvasElement>('canvas#canvas');
     if (canvas) transformView(canvas, factor, pointer);
   }, [keyboardPlacement, transformView]);
@@ -648,7 +734,7 @@ const Viewport: React.FC = () => {
   }, [isEditingScene, zoomView]);
 
   const frameSelection = () => {
-    if (!selectedObject || keyboardPlacement || pan.current || Input.isManipulatingObject) return;
+    if (!selectedObject || keyboardPlacement || pan.current || dropPan.current || Input.isManipulatingObject) return;
     const canvas = viewportContainerRef.current?.querySelector<HTMLCanvasElement>('canvas#canvas');
     const view = canvas?.getBoundingClientRect();
     if (!canvas?.width || !canvas.height || !view?.height) return;
@@ -801,14 +887,17 @@ const Viewport: React.FC = () => {
           const kind = sceneObjectKinds.find(item => types.includes(`${sceneObjectDragType}-${item.toLowerCase()}`));
           const dragged = draggedAsset.current;
           const asset = dragged && types.includes(getSceneAssetPreviewType(dragged.tag)) ? dragged : undefined;
-          showDropGuide(getCanvasPlacement(event.target, placementStep, event.clientX, event.clientY), { kind, asset, importingImage });
+          showPointerDropGuide(event.target, { x: event.clientX, y: event.clientY }, { kind, asset, importingImage });
         }}
-        onDragLeave={() => setDropGuide(undefined)}
+        onDragLeave={() => finishDropPreview()}
         onDrop={event => {
-          setDropGuide(undefined);
-          if (!(event.target instanceof HTMLCanvasElement)) return;
+          if (!(event.target instanceof HTMLCanvasElement)) {
+            finishDropPreview();
+            return;
+          }
           if (event.dataTransfer.types.includes('Files')) {
             event.preventDefault();
+            finishDropPreview();
             void placeImageFile(Array.from(event.dataTransfer.files), event.clientX, event.clientY);
             return;
           }
@@ -816,15 +905,14 @@ const Viewport: React.FC = () => {
             event.preventDefault();
             const asset = draggedAsset.current;
             draggedAsset.current = null;
-            if (asset?.tag === event.dataTransfer.getData(sceneAssetDragType)) {
+            const placed = asset?.tag === event.dataTransfer.getData(sceneAssetDragType) &&
               placeLoadedImage(asset, event.clientX, event.clientY);
-            }
+            finishDropPreview(placed);
             return;
           }
           const kind = sceneObjectKinds.find(item => item === event.dataTransfer.getData(sceneObjectDragType));
-          if (!kind) return;
-          event.preventDefault();
-          placeLibraryObject(kind, event.clientX, event.clientY);
+          if (kind) event.preventDefault();
+          finishDropPreview(!!kind && placeLibraryObject(kind, event.clientX, event.clientY));
         }}
         onClickCapture={suppressGameActivation}
         onKeyDownCapture={event => {
