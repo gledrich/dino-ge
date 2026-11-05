@@ -227,6 +227,22 @@ export default class Engine {
     this.events.dispatchEvent(new CustomEvent(type, { detail }));
   }
 
+  /** Observe construction after the base components are initialised and before subclasses finish. */
+  public static observeObjectCreation(callback: (object: GameObject) => void): () => void {
+    const state = this._state;
+    const observers = state.objectCreationObservers ??= { events: new EventTarget(), count: 0 };
+    const notify = (event: Event) => callback((event as CustomEvent<GameObject>).detail);
+    observers.events.addEventListener('created', notify);
+    observers.count++;
+    let subscribed = true;
+    return () => {
+      if (!subscribed) return;
+      subscribed = false;
+      observers.events.removeEventListener('created', notify);
+      if (--observers.count === 0) state.objectCreationObservers = undefined;
+    };
+  }
+
   /**
    * The currently selected object in debug mode.
    */

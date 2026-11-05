@@ -703,7 +703,6 @@ describe('Engine', () => {
     otherScene.add(child);
     expect(hierarchy).not.toHaveBeenCalled();
     scene.add(parent);
-    expect(hierarchy).toHaveBeenLastCalledWith(expect.objectContaining({ detail: parent }));
     scene.objects.add(child);
     scene.objects.add(child);
     parent.transform.addChild(child.transform);
@@ -712,7 +711,6 @@ describe('Engine', () => {
 
     Engine.selectedObject = child;
     scene.remove(child);
-    expect(hierarchy).toHaveBeenLastCalledWith(expect.objectContaining({ detail: null }));
     expect(selection).toHaveBeenLastCalledWith(expect.objectContaining({ detail: null }));
     expect(Engine.selectedObject).toBeNull();
     expect(hierarchy).toHaveBeenCalledTimes(5);
@@ -721,6 +719,25 @@ describe('Engine', () => {
     Engine.currentScene = otherScene;
     expect(Engine.selectedObject).toBeNull();
     expect(hierarchy).toHaveBeenCalledTimes(6);
+  });
+
+  it('observes object creation before registration and allows observers to unsubscribe independently', () => {
+    const first = jest.fn();
+    const second = jest.fn();
+    const stopFirst = Engine.observeObjectCreation(first);
+    const stopSecond = Engine.observeObjectCreation(second);
+    const object = new MockGameObject('unregistered', 0);
+    expect(Engine.objects.has(object)).toBe(false);
+    expect(first).toHaveBeenCalledWith(object);
+    expect(second).toHaveBeenCalledWith(object);
+    stopFirst();
+    stopFirst();
+    const next = new MockGameObject('next', 0);
+    expect(first).toHaveBeenCalledTimes(1);
+    expect(second).toHaveBeenLastCalledWith(next);
+    stopSecond();
+    new MockGameObject('ignored', 0);
+    expect(second).toHaveBeenCalledTimes(2);
   });
 
   it('manages debug visualization toggles', () => {

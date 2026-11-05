@@ -18,6 +18,7 @@ export interface EngineState {
   systems: System[];
   renderingSystem?: RenderingSystem;
   events: EventTarget;
+  objectCreationObservers?: { events: EventTarget; count: number };
   totalPausedTime: number;
   pauseStartTime: number;
   currentScene: Scene | null;
@@ -42,7 +43,7 @@ export const getEngineState = (): EngineState => {
 };
 
 /** Notify observers after membership changes in the active object collection. */
-export function notifySceneObjectsChanged(collection?: Set<GameObject>, addedObject?: GameObject) {
+export function notifySceneObjectsChanged(collection?: Set<GameObject>) {
   const state = getEngineState();
   if (!state) return;
   const active = state.currentScene?.objects ?? state.objects;
@@ -52,7 +53,7 @@ export function notifySceneObjectsChanged(collection?: Set<GameObject>, addedObj
     state.selectedObject = null;
     state.events.dispatchEvent(new CustomEvent('selectedObjectChanged', { detail: null }));
   }
-  state.events.dispatchEvent(new CustomEvent('sceneHierarchyChanged', { detail: addedObject ?? null }));
+  state.events.dispatchEvent(new CustomEvent('sceneHierarchyChanged'));
 }
 
 export function notifySceneObjectChanged(object?: GameObject) {

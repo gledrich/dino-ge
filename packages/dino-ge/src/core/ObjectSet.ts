@@ -8,7 +8,7 @@ export class ObjectSet extends Set<GameObject> {
   override add(object: GameObject): this {
     const size = this.size;
     super.add(object);
-    if (this.size !== size) notifySceneObjectsChanged(this, object);
+    if (this.size !== size) notifySceneObjectsChanged(this);
     return this;
   }
 

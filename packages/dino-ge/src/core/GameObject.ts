@@ -4,6 +4,7 @@ import TransformComponent from '../components/TransformComponent.js';
 import TagComponent from '../components/TagComponent.js';
 import BoundsComponent from '../components/BoundsComponent.js';
 import EventBusComponent from '../components/EventBusComponent.js';
+import { getEngineState } from './EngineState.js';
 
 /**
  * Interface representing an abstract class constructor.
@@ -72,6 +73,7 @@ export default abstract class GameObject {
   constructor(tag: string = 'obj', zIndex: number = 0, sourceId?: string) {
     this.addComponent(new TagComponent(tag, zIndex, sourceId));
     this.addComponent(new TransformComponent());
+    getEngineState()?.objectCreationObservers?.events.dispatchEvent(new CustomEvent('created', { detail: this }));
   }
 
   /**
