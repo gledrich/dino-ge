@@ -6,7 +6,7 @@ import TextComponent from '../components/TextComponent.js';
 import VisibilityComponent from '../components/VisibilityComponent.js';
 import Line from '../objects/Line.js';
 import type GameObject from './GameObject.js';
-import { containsViewportPoint, getViewportDrawOrder, getViewportGeometry, getViewportLineEndpoints, getViewportRotationHandle, projectOntoObjectAxes, snapToGrid } from './ViewportGeometry.js';
+import { containsViewportPoint, getViewportAlignment, getViewportBounds, getViewportDrawOrder, getViewportGeometry, getViewportLineEndpoints, getViewportRotationHandle, projectOntoObjectAxes, snapToGrid } from './ViewportGeometry.js';
 
 /** Detail of an objectManipulationPreview event. A null detail ends the preview. */
 export interface ObjectManipulationPreview {
@@ -25,7 +25,7 @@ type ObjectGesture = {
   previewValue?: Vector2;
   previewProportional?: boolean;
 } & (
-  | { kind: 'drag'; offset: Vector2; panOrigin?: {
+  | { kind: 'drag'; offset: Vector2; alignment?: ReturnType<typeof getViewportAlignment>; panOrigin?: {
     camera: typeof Engine.camera; scene: typeof Engine.currentScene; position: Vector2;
   } }
   | { kind: 'resize'; offset: Vector2; initialBounds?: Vector2; initialWorldSize: Vector2 }
@@ -48,6 +48,11 @@ export default class Input {
   /** Whether a pointer is currently manipulating a scene object. */
   static get isManipulatingObject(): boolean {
     return this.gesture !== null;
+  }
+
+  /** Active world-space alignment guides for the current object drag. */
+  static get objectAlignment() {
+    return this.gesture?.kind === 'drag' ? this.gesture.alignment : undefined;
   }
 
   /** Roll back any in-progress object manipulation. */
@@ -258,15 +263,44 @@ export default class Input {
     this.publishPreview(gesture, proportional);
   }
 
+  private static getDragAlignment(object: GameObject, x: number, y: number) {
+    const canvas = document.getElementById('canvas') as HTMLCanvasElement | null;
+    const { zoom } = Engine.camera;
+    if (!canvas || !Number.isFinite(zoom) || zoom <= 0) return;
+    const view = Engine.camera.getViewportBounds(canvas.width, canvas.height);
+    const objects = Engine.currentScene?.objects ?? Engine.objects;
+    const transform = object.transform;
+    const geometry = getViewportGeometry(object);
+    const moving = getViewportBounds(geometry);
+    const dx = x - geometry.origin.x;
+    const dy = y - geometry.origin.y;
+    const targets: Array<ReturnType<typeof getViewportBounds>> = [];
+    for (const candidate of objects) {
+      if (candidate === object || !candidate.bounds || candidate.getComponent(VisibilityComponent)?.visible === false) continue;
+      let parent = candidate.transform.parent;
+      while (parent && parent !== transform) parent = parent.parent;
+      if (parent) continue; // A descendant moves with the selection.
+      const bounds = getViewportBounds(getViewportGeometry(candidate));
+      if (bounds.right > view.x && bounds.left < view.x + view.width &&
+          bounds.bottom > view.y && bounds.top < view.y + view.height) targets.push(bounds);
+    }
+    return getViewportAlignment({ left: moving.left + dx, right: moving.right + dx,
+      top: moving.top + dy, bottom: moving.bottom + dy }, targets, 6 / zoom);
+  }
+
   private static moveObjectDrag(gesture: Extract<ObjectGesture, { kind: 'drag' }>) {
     const { object } = gesture;
     const { parent, position } = object.transform;
     const step = Engine.debugPositionGridSize;
     let x = snapToGrid(this.mouseX - gesture.offset.x, step);
     let y = snapToGrid(this.mouseY - gesture.offset.y, step);
-    if (parent) {
+    const scale = parent?.worldScale;
+    gesture.alignment = Engine.paused && Engine.debugSnapAlignment && !step && scale?.x !== 0 && scale?.y !== 0
+      ? this.getDragAlignment(object, x, y) : undefined;
+    x += gesture.alignment?.x?.delta ?? 0;
+    y += gesture.alignment?.y?.delta ?? 0;
+    if (parent && scale) {
       const origin = parent.worldPosition;
-      const scale = parent.worldScale;
       const rotation = parent.worldRotation;
       const dx = x - origin.x;
       const dy = y - origin.y;

@@ -65,6 +65,34 @@ export function getViewportBounds({ origin, width, height, cos, sin, line }: Ret
   };
 }
 
+type ViewportBounds = ReturnType<typeof getViewportBounds>;
+
+function getAxisAlignment(min: number, max: number, targetMin: number, targetMax: number, tolerance: number) {
+  const pairs = [[min, targetMin], [min, targetMax], [max, targetMin], [max, targetMax],
+    [(min + max) / 2, (targetMin + targetMax) / 2]];
+  let closest: { delta: number; coordinate: number } | undefined;
+  for (const [anchor, coordinate] of pairs) {
+    const delta = coordinate - anchor;
+    if (Math.abs(delta) <= tolerance && (!closest || Math.abs(delta) < Math.abs(closest.delta))) {
+      closest = { delta, coordinate };
+    }
+  }
+  return closest;
+}
+
+/** Match edges to edges and centres to centres independently on each world axis. */
+export function getViewportAlignment(moving: ViewportBounds, targets: Iterable<ViewportBounds>, tolerance: number) {
+  let x: ReturnType<typeof getAxisAlignment>;
+  let y: ReturnType<typeof getAxisAlignment>;
+  for (const target of targets) {
+    const nextX = getAxisAlignment(moving.left, moving.right, target.left, target.right, tolerance);
+    const nextY = getAxisAlignment(moving.top, moving.bottom, target.top, target.bottom, tolerance);
+    if (nextX && (!x || Math.abs(nextX.delta) < Math.abs(x.delta))) x = nextX;
+    if (nextY && (!y || Math.abs(nextY.delta) < Math.abs(y.delta))) y = nextY;
+  }
+  return { x, y };
+}
+
 export function projectOntoObjectAxes(geometry: ReturnType<typeof getViewportGeometry>, x: number, y: number) {
   const dx = x - geometry.origin.x;
   const dy = y - geometry.origin.y;

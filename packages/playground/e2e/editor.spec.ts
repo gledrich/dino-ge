@@ -1899,6 +1899,58 @@ new Engine({ onLoad() { Engine.camera.position.set(3, 5); }, update() {} },
   await expect(x).toHaveValue('319.00');
 });
 
+test('snaps a dragged object to visible edges and centres and draws alignment guides', async ({ page }) => {
+  await page.route('**/files', route => route.fulfill({ json: ['script'] }));
+  await page.route('**/api/scripts/script', route => route.fulfill({ json: `
+import { Engine, Rectangle, Vector2 } from 'dino-ge';
+new Engine({ onLoad() {
+  new Rectangle({ tag: 'Platform', position: new Vector2(330, 265), width: 50, height: 32 });
+  new Rectangle({ tag: 'Anchor', position: new Vector2(520, 235), width: 80, height: 48 });
+  new Rectangle({ tag: 'Hidden', position: new Vector2(518, 234), width: 80, height: 48, visible: false });
+}, update() {} }, { containerId: 'playground-canvas-container' });` }));
+  await page.goto('/');
+  const platform = page.getByRole('button', { name: 'Platform', exact: true });
+  await expect(platform).toBeVisible();
+  await page.getByRole('button', { name: 'Edit scene', exact: true }).click();
+  const align = page.getByRole('button', { name: 'Align to objects', exact: true });
+  const grid = page.getByRole('button', { name: 'Snap to grid', exact: true });
+  await grid.click();
+  await align.click();
+  await expect(align).toHaveAttribute('aria-pressed', 'true');
+  await expect(grid).toHaveAttribute('aria-pressed', 'false');
+
+  const canvas = page.locator('#canvas');
+  const box = (await canvas.boundingBox())!;
+  const pixel = (x: number, y: number) => canvas.evaluate((element: HTMLCanvasElement, [x, y]) =>
+    Array.from(element.getContext('2d')!.getImageData(x, y, 1, 1).data), [x, y]);
+  const x = page.getByRole('spinbutton', { name: 'X', exact: true });
+  const y = page.getByRole('spinbutton', { name: 'Y', exact: true });
+  const drag = async () => {
+    await page.mouse.move(box.x + 345, box.y + 280);
+    await page.mouse.down();
+    await page.mouse.move(box.x + 481, box.y + 256, { steps: 6 });
+    await expect(x).toHaveValue('470.00');
+    await expect(y).toHaveValue('243.00');
+  };
+  await drag();
+  await expect.poll(() => pixel(520, 202)).toEqual([22, 117, 94, 255]);
+  await expect.poll(() => pixel(98, 259)).toEqual([22, 117, 94, 255]);
+  await page.keyboard.press('Escape');
+  await page.mouse.up();
+  await expect(x).toHaveValue('330.00');
+  await expect(platform).toHaveAccessibleDescription('');
+  await expect.poll(() => pixel(520, 202)).toEqual([255, 255, 255, 255]);
+
+  await drag();
+  await page.mouse.up();
+  await expect.poll(() => pixel(520, 202)).toEqual([255, 255, 255, 255]);
+  await page.getByRole('button', { name: 'Apply placement to code', exact: true }).click();
+  await expect.poll(() => page.evaluate(() => {
+    const { monaco } = window as typeof window & { monaco: Monaco };
+    return monaco.editor.getEditors()[0].getValue();
+  })).toContain('new Vector2(470, 243)');
+});
+
 test('snaps rotated resize corners and circle diameters with live feedback', async ({ page }) => {
   await page.route('**/files', route => route.fulfill({ json: ['script'] }));
   await page.route('**/api/scripts/script', route => route.fulfill({ json: `

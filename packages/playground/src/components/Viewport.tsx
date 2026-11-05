@@ -146,7 +146,9 @@ const Viewport: React.FC = () => {
   const [isPanTool, setIsPanTool] = useState(false);
   const [isSpacePan, setIsSpacePan] = useState(false);
   const [zoomPercent, setZoomPercent] = useState<number>();
-  const [isGridSnapping, setIsGridSnapping] = useState(false);
+  const [snapMode, setSnapMode] = useState<'off' | 'grid' | 'objects'>('off');
+  const isGridSnapping = snapMode === 'grid';
+  const isAlignmentSnapping = snapMode === 'objects';
   const [sceneGridSize, setSceneGridSize] = useState(16);
   const [keepProportions, setKeepProportions] = useState(false);
   const [snapRotation, setSnapRotation] = useState(false);
@@ -177,11 +179,16 @@ const Viewport: React.FC = () => {
   }, [isEditingScene]);
 
   useEffect(() => {
-    if (!isEditingScene || !isGridSnapping) return;
-    const previous = Engine.debugPositionGridSize;
-    Engine.debugPositionGridSize = sceneGridSize;
-    return () => { Engine.debugPositionGridSize = previous; };
-  }, [isEditingScene, isGridSnapping, sceneGridSize]);
+    if (!isEditingScene || snapMode === 'off') return;
+    const previousGridSize = Engine.debugPositionGridSize;
+    const previousAlignment = Engine.debugSnapAlignment;
+    Engine.debugPositionGridSize = snapMode === 'grid' ? sceneGridSize : 0;
+    Engine.debugSnapAlignment = snapMode === 'objects';
+    return () => {
+      Engine.debugPositionGridSize = previousGridSize;
+      Engine.debugSnapAlignment = previousAlignment;
+    };
+  }, [isEditingScene, snapMode, sceneGridSize]);
 
   useEffect(() => {
     if (!isEditingScene) return;
@@ -981,7 +988,7 @@ const Viewport: React.FC = () => {
                   onClick={() => setSnapRotation(enabled => !enabled)}>Snap rotation to 15°</button>
               </div>
             </div>
-            <div className="scene-object-options" role="group" aria-label="Scene camera and grid">
+            <div className="scene-object-options" role="group" aria-label="Scene camera and snapping">
               <button type="button" className="scene-control scene-icon-control" aria-label="Pan view"
                 title="Pan view · Drag to pan or pinch to zoom" aria-pressed={isPanTool}
                 disabled={!!keyboardPlacement || !!manipulationReadout} onClick={() => setIsPanTool(enabled => !enabled)}>
@@ -991,17 +998,21 @@ const Viewport: React.FC = () => {
                 onClick={() => zoomView(1 / 1.25)}><i className="fa-solid fa-magnifying-glass-minus" aria-hidden="true" /></button>
               <button type="button" className="scene-control scene-icon-control" aria-label="Zoom in" title="Zoom in"
                 onClick={() => zoomView(1.25)}><i className="fa-solid fa-magnifying-glass-plus" aria-hidden="true" /></button>
-              <button type="button" className="scene-control" onClick={restoreCamera}>Reset view</button>
+              <button type="button" className="scene-control scene-icon-control" aria-label="Reset view" title="Reset view"
+                onClick={restoreCamera}><i className="fa-solid fa-arrows-rotate" aria-hidden="true" /></button>
               <button type="button" className="scene-control" aria-label="Frame selection" title="Frame selected object or group (F)"
                 aria-keyshortcuts="F" disabled={!selectedObject || !!keyboardPlacement || !!manipulationReadout}
                 onClick={frameSelection}>Frame</button>
               <button type="button" className="scene-control" aria-label="Snap to grid"
                 aria-pressed={isGridSnapping} title={`Snap moves, resizes and drops to the ${sceneGridSize} px grid`}
-                onClick={() => setIsGridSnapping(enabled => !enabled)}>Grid snap</button>
+                onClick={() => setSnapMode(mode => mode === 'grid' ? 'off' : 'grid')}>Grid snap</button>
               <select className="scene-control scene-grid-size" aria-label="Grid cell size" value={sceneGridSize}
                 onChange={event => setSceneGridSize(Number(event.target.value))}>
                 {sceneGridSizes.map(size => <option key={size} value={size}>{size} px</option>)}
               </select>
+              <button type="button" className="scene-control" aria-label="Align to objects"
+                aria-pressed={isAlignmentSnapping} title="Snap dragged objects to visible edges and centres"
+                onClick={() => setSnapMode(mode => mode === 'objects' ? 'off' : 'objects')}>Align</button>
             </div>
             {!keyboardPlacement && <span id="scene-keyboard-hint" className="scene-edit-hint">
               {isPanTool ? 'Hand tool · Drag to pan · Pinch to zoom' : 'Space or middle drag pans'} · {isGridSnapping ? 'Arrows move 1 cell · Shift moves 10 cells' : 'Arrows move 1 px · Shift moves 10 px'}<br />

@@ -72,8 +72,9 @@
 
 .scene-object-options .scene-control { pointer-events: auto; }
 .scene-object-options .scene-icon-control { width: var(--scene-control-height); }
-.scene-grid-size {
+.scene-object-options .scene-grid-size {
   color-scheme: dark;
+  padding-inline: 5px;
 }
 .scene-object-options .scene-control[aria-pressed='true'] {
   color: var(--accent-primary);

@@ -62,6 +62,7 @@ const createInitialState = (): EngineState => ({
   debugCollisions: [],
   showDebugHud: true,
   debugPositionGridSize: 0,
+  debugSnapAlignment: false,
   debugKeepProportions: false,
   debugSnapRotation: false,
   showPhysicsVectors: false,
@@ -128,6 +129,10 @@ export default class Engine {
   public static set debugPositionGridSize(val: number) {
     this._state.debugPositionGridSize = Number.isFinite(val) && val > 0 ? val : 0;
   }
+
+  /** Snap paused debug drags to the visible objects' edges and centres. */
+  public static get debugSnapAlignment(): boolean { return this._state.debugSnapAlignment ?? false; }
+  public static set debugSnapAlignment(val: boolean) { this._state.debugSnapAlignment = val; }
 
   /** Whether debug resizing preserves the object's proportions by default. */
   public static get debugKeepProportions(): boolean { return this._state.debugKeepProportions ?? false; }
@@ -516,10 +521,36 @@ export default class Engine {
     }
 
     if (Engine.debug && Engine.debugPositionGridSize > 0) this._drawPositionGrid();
+    if (Engine.debug && Engine.paused && Engine.debugSnapAlignment) this._drawAlignmentGuides();
     if (Engine.debug && Engine.showDebugHud) {
       this._drawDebug(objects);
     }
     if (this.screenUI && this.callbacks.drawUI) this.screenUI.render(this.callbacks.drawUI);
+  }
+
+  private _drawAlignmentGuides() {
+    const alignment = Input.objectAlignment;
+    if (!alignment?.x && !alignment?.y) return;
+    const { position, zoom } = Engine.camera;
+    const { width, height } = this._canvas.canvas;
+    this._ctx.save();
+    this._ctx.setTransform(1, 0, 0, 1, 0, 0);
+    this._ctx.strokeStyle = '#16755e';
+    this._ctx.lineWidth = 1;
+    this._ctx.setLineDash([4, 4]);
+    this._ctx.beginPath();
+    if (alignment.x) {
+      const x = Math.round((alignment.x.coordinate - position.x) * zoom) + 0.5;
+      this._ctx.moveTo(x, 0);
+      this._ctx.lineTo(x, height);
+    }
+    if (alignment.y) {
+      const y = Math.round((alignment.y.coordinate - position.y) * zoom) + 0.5;
+      this._ctx.moveTo(0, y);
+      this._ctx.lineTo(width, y);
+    }
+    this._ctx.stroke();
+    this._ctx.restore();
   }
 
   private _drawPositionGrid() {
