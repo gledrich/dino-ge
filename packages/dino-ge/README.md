@@ -83,3 +83,23 @@ Full API documentation and guides are available at [https://gledrich.github.io/d
 ## License
 
 Dino GE is released under the MIT License.
+
+### Particle bursts
+
+Create a `ParticleEmitter` while a scene is active to keep its visual effects
+with that scene. Each burst starts at a world-space position and uses seconds
+for its lifetime. The emitter caps the number of live particles and advances
+them on the engine's fixed step.
+
+```ts
+const sparks = new ParticleEmitter({ capacity: 128, zIndex: 10 });
+sparks.burst(new Vector2(120, 80), {
+  count: 8,
+  velocity: index => new Vector2((index - 3.5) * 20, -80),
+  gravity: new Vector2(0, 160),
+  lifetime: 0.4,
+  startRadius: 4,
+  endRadius: 0,
+  colour: '#ffcf64',
+});
+```

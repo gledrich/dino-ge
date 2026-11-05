@@ -22,6 +22,7 @@ export { default as Sprite } from './objects/Sprite.js';
 export { default as Vector2 } from './math/Vector2.js';
 export { default as Camera } from './core/Camera.js';
 export { default as Canvas } from './core/Canvas.js';
+export { default as ParticleEmitter, type ParticleBurst, type ParticleEmitterOptions } from './objects/ParticleEmitter.js';
 export { default as Circle } from './objects/Circle.js';
 export { default as Input, type ObjectManipulationPreview } from './core/Input.js';
 export { getViewportAlignment, getViewportBounds, getViewportGeometry, snapToGrid } from './core/ViewportGeometry.js';

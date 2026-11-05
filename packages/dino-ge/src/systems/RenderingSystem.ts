@@ -6,6 +6,7 @@ import Engine from '../core/Engine.js';
 import PhysicsComponent from '../components/PhysicsComponent.js';
 import Vector2 from '../math/Vector2.js';
 import Line from '../objects/Line.js';
+import ParticleEmitter from '../objects/ParticleEmitter.js';
 import { getEngineState } from '../core/EngineState.js';
 import { getViewportBounds, getViewportDrawOrder, getViewportGeometry, getViewportLineEndpoints, getViewportRotationHandle } from '../core/ViewportGeometry.js';
 
@@ -99,6 +100,11 @@ export default class RenderingSystem extends System {
     const editSelection = debug && Engine.paused ? Engine.selectedObject : null;
     let selectedGeometry: ReturnType<typeof getViewportGeometry> | undefined;
     state.sortedObjects.forEach((object) => {
+      if (object instanceof ParticleEmitter) {
+        object.drawParticles(this.ctx, bounds);
+        return;
+      }
+
       const geometry = getViewportGeometry(object);
       const { left, right, top, bottom } = getViewportBounds(geometry);
 

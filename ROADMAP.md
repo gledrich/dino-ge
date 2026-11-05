@@ -42,8 +42,8 @@ This document outlines the planned features and milestones for the **Dino Game E
 ## Phase 3: Long-Term (Advanced Features)
 
 - **Particle System:**
-  - [ ] Create a `ParticleEmitter` class for fire, smoke, and explosions.
-  - [ ] Support for velocity, gravity, and life-cycle scaling for particles.
+  - [x] Create a `ParticleEmitter` class for fire, smoke, and explosions.
+  - [x] Support for velocity, gravity, and life-cycle scaling for particles.
 - **Spatial Partitioning:**
   - [ ] Implement a Quadtree to handle hundreds of active objects efficiently during collision checks.
 - **Scene Effects:**

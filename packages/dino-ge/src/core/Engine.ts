@@ -2,6 +2,7 @@ import Canvas from './Canvas.js';
 import GameObject from './GameObject.js';
 import Input from './Input.js';
 import Scene from './Scene.js';
+import ParticleEmitter from '../objects/ParticleEmitter.js';
 import ScreenUI, { type ScreenUIEditing, type ScreenUISnapshot } from './ScreenUI.js';
 import Camera from './Camera.js';
 import System from './System.js';
@@ -563,6 +564,10 @@ export default class Engine {
         system.fixedUpdate(objects, this._fixedDelta);
       }
     });
+
+    for (const object of objects) {
+      if (object instanceof ParticleEmitter) object.advance(this._fixedDelta);
+    }
 
     if (this.callbacks.fixedUpdate) {
       this.callbacks.fixedUpdate();

@@ -8,6 +8,7 @@ import {
   Circle,
   VisibilityComponent,
   PhysicsComponent,
+  ParticleEmitter,
   Input,
   GameObject,
   Loader as ResourceLoader
@@ -85,7 +86,6 @@ class PlayScene extends Scene {
 
     this.fireballs = [];
     this.meteors = [];
-    this.particles = [];
     this.starsMid = [];
     this.starsNear = [];
 
@@ -95,6 +95,7 @@ class PlayScene extends Scene {
 
   onLoad() {
     this.game.cursor = 'none';
+    this.explosions = new ParticleEmitter({ zIndex: 3 });
     this.startTime = Date.now();
 
     // Background Layers (Hierarchical)
@@ -313,16 +314,6 @@ class PlayScene extends Scene {
       return true;
     });
 
-    // Update and Cleanup Particles
-    this.particles = this.particles.filter((p) => {
-      p.life -= 0.02;
-      if (p.life <= 0) {
-        p.destroySelf();
-        return false;
-      }
-      return true;
-    });
-
     // Camera follows player
     Engine.camera.follow(this.player, this.game.width, this.game.height);
 
@@ -398,21 +389,15 @@ class PlayScene extends Scene {
   }
 
   spawnExplosion(pos, radius, colour) {
-    for (let i = 0; i < 8; i++) {
-      const p = new Circle({
-        position: new Vector2(pos.x + radius, pos.y + radius),
-        radius: 2 + Math.random() * 3,
-        colour: colour,
-        zIndex: 3,
-        tag: 'particle'
-      });
-      p.addComponent(new PhysicsComponent());
-      const pPhys = p.getComponent(PhysicsComponent);
-      pPhys.velocity.x = (Math.random() - 0.5) * 400;
-      pPhys.velocity.y = (Math.random() - 0.5) * 400;
-      p.life = 1.0;
-      this.particles.push(p);
-    }
+    this.explosions.burst(new Vector2(pos.x + radius, pos.y + radius), {
+      count: 8,
+      velocity: () => new Vector2((Math.random() - 0.5) * 400, (Math.random() - 0.5) * 400),
+      gravity: new Vector2(0, 180),
+      lifetime: 0.65,
+      startRadius: 4,
+      endRadius: 0,
+      colour,
+    });
   }
 }
 

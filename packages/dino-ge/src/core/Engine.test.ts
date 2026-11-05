@@ -8,6 +8,7 @@ import PhysicsComponent from '../components/PhysicsComponent.js';
 import BoundsComponent from '../components/BoundsComponent.js';
 import RenderingSystem from '../systems/RenderingSystem.js';
 import System from './System.js';
+import { ParticleEmitter } from '../index.js';
 
 class MockScene extends Scene {
   onLoad = jest.fn();
@@ -215,6 +216,85 @@ describe('Engine', () => {
     const after = Engine.totalTime;
     // Total elapsed wall time was 1000ms, but all was paused.
     expect(after - initial).toBeLessThan(100); 
+  });
+
+  it('advances world-space particles and shrinks them over their lifetime', async () => {
+    const game = new Engine(callbacks);
+    await Promise.resolve();
+    const emitter = new ParticleEmitter();
+    emitter.burst(new Vector2(100, 100), {
+      count: 1, velocity: () => new Vector2(60, 0), gravity: new Vector2(0, 60),
+      lifetime: 1, startRadius: 10, endRadius: 0, colour: 'gold',
+    });
+
+    jest.advanceTimersByTime(400);
+    const [x, y, radius] = (mockCtx.arc as jest.Mock).mock.lastCall!;
+    expect(x).toBeGreaterThan(115);
+    expect(y).toBeGreaterThan(102);
+    expect(radius).toBeGreaterThan(5);
+    expect(radius).toBeLessThan(8);
+
+    jest.advanceTimersByTime(800);
+    (mockCtx.arc as jest.Mock).mockClear();
+    jest.advanceTimersByTime(32);
+    expect(mockCtx.arc).not.toHaveBeenCalled();
+    game.terminate();
+  });
+
+  it('culls individual particles using the world viewport', async () => {
+    const game = new Engine(callbacks);
+    await Promise.resolve();
+    const emitter = new ParticleEmitter();
+    const burst = { count: 1, velocity: () => new Vector2(0, 0), lifetime: 1,
+      startRadius: 4, endRadius: 4, colour: 'gold' };
+    Engine.camera.position.set(1000, 1000);
+    emitter.burst(new Vector2(1100, 1100), burst);
+    emitter.burst(new Vector2(100, 100), burst);
+
+    jest.advanceTimersByTime(16);
+    expect(mockCtx.arc).toHaveBeenCalledWith(1100, 1100, 4, 0, Math.PI * 2);
+    expect(mockCtx.arc).not.toHaveBeenCalledWith(100, 100, 4, 0, Math.PI * 2);
+    game.terminate();
+  });
+
+  it('respects emitter capacity when a velocity callback emits another burst', () => {
+    const emitter = new ParticleEmitter({ capacity: 1 });
+    const position = new Vector2(100, 100);
+    const burst = { count: 1, velocity: () => new Vector2(0, 0), lifetime: 1,
+      startRadius: 4, endRadius: 4, colour: 'gold' };
+
+    emitter.burst(position, {
+      ...burst,
+      velocity: () => {
+        emitter.burst(position, burst);
+        return new Vector2(1, 0);
+      },
+    });
+
+    expect(emitter.activeCount).toBe(1);
+  });
+
+  it('caps particles, freezes them while paused and removes them with their scene', async () => {
+    const game = new Engine(callbacks);
+    await Promise.resolve();
+    const scene = new MockScene();
+    Engine.currentScene = scene;
+    const emitter = new ParticleEmitter({ capacity: 1 });
+    emitter.burst(new Vector2(200, 100), {
+      count: 3, velocity: () => new Vector2(100, 0), lifetime: 1,
+      startRadius: 4, endRadius: 2, colour: 'gold',
+    });
+    Engine.paused = true;
+
+    jest.advanceTimersByTime(1200);
+    expect(emitter.activeCount).toBe(1);
+    expect(mockCtx.arc).toHaveBeenLastCalledWith(200, 100, 4, 0, Math.PI * 2);
+
+    scene.clear();
+    (mockCtx.arc as jest.Mock).mockClear();
+    jest.advanceTimersByTime(32);
+    expect(mockCtx.arc).not.toHaveBeenCalled();
+    game.terminate();
   });
 
   it('handles scene transitions correctly', () => {

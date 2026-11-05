@@ -81,6 +81,7 @@ export default [
       'node_modules/',
       'packages/*/dist/',
       'packages/*/built/',
+      'packages/playground/scripts/',
       'coverage/',
       'packages/*/coverage/',
       'docs/api/',

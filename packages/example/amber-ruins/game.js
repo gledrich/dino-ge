@@ -2,6 +2,7 @@ import {
   Engine,
   Input,
   Loader,
+  ParticleEmitter,
   Sound,
   Sprite,
   SpriteComponent,
@@ -44,6 +45,7 @@ const embedded = !!document.getElementById('playground-canvas-container');
 
 let tilemap;
 let player;
+let particles;
 let amberImage;
 let relics = [];
 
@@ -188,6 +190,7 @@ function collectRelic(now) {
     visibility.visible = false;
     collected++;
     sounds.pickup?.play();
+    emitBurst('#ffcf64');
     relicPulse = now + 260;
     if (collected === relicCells.length) {
       tilemap.data[exitRow][exitColumn] = floorTile;
@@ -254,6 +257,23 @@ function updateCamera(now) {
   previousFrame = now;
 }
 
+function emitBurst(colour) {
+  if (reducedMotion.matches) return;
+
+  particles.burst(new Vector2((column + 0.5) * cellSize, (row + 0.5) * cellSize), {
+    count: 8,
+    velocity: index => {
+      const angle = index * Math.PI / 4;
+      return new Vector2(Math.cos(angle) * 95, Math.sin(angle) * 95);
+    },
+    gravity: new Vector2(0, 160),
+    lifetime: 0.4,
+    startRadius: 4,
+    endRadius: 0,
+    colour,
+  });
+}
+
 function checkSpikeDamage(now) {
   if (
     active &&
@@ -263,6 +283,7 @@ function checkSpikeDamage(now) {
     vulnerableAt = now + damageGrace;
     health--;
     sounds.damage?.play();
+    emitBurst('#ff9474');
     healthPulse = now + 260;
     hint = 'Watch out for the obsidian spikes!';
     if (health === 0) finish(false);
@@ -305,6 +326,7 @@ async function loadLevel() {
   relics = relicCells.map(([x, y], index) =>
     makeSprite(`relic-${index + 1}`, amberImage, x, y, relicSize),
   );
+  particles = new ParticleEmitter({ zIndex: 10 });
   player = makeSprite(
     'explorer',
     Loader.getImage('explorer'),
