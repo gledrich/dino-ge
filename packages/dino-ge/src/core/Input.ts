@@ -7,6 +7,22 @@ import VisibilityComponent from '../components/VisibilityComponent.js';
 import type GameObject from './GameObject.js';
 import { containsViewportPoint, getViewportDrawOrder, getViewportGeometry, projectOntoObjectAxes } from './ViewportGeometry.js';
 
+/** Detail of an objectManipulationPreview event. A null detail ends the preview. */
+export interface ObjectManipulationPreview {
+  object: GameObject;
+  kind: 'drag' | 'resize';
+  value: Vector2;
+}
+
+interface ObjectGesture {
+  kind: ObjectManipulationPreview['kind'];
+  object: GameObject;
+  offset: Vector2;
+  initial?: Vector2;
+  initialBounds?: Vector2;
+  previewValue?: Vector2;
+}
+
 /**
  * Handles mouse and keyboard input events.
  */
@@ -16,9 +32,24 @@ export default class Input {
   private static keys: Set<string> = new Set();
   private static isinitialised = false;
 
-  private static gesture: {
-    kind: 'drag' | 'resize'; object: GameObject; offset: Vector2; initial?: Vector2; initialBounds?: Vector2;
-  } | null = null;
+  private static gesture: ObjectGesture | null = null;
+
+  private static clearGesture() {
+    const gesture = this.gesture;
+    this.gesture = null;
+    if (gesture?.previewValue) Engine.emit('objectManipulationPreview', null);
+    return gesture;
+  }
+
+  private static publishPreview(gesture: ObjectGesture) {
+    const previous = gesture.previewValue ?? gesture.initial;
+    if (!previous) return;
+    const { object, kind } = gesture;
+    const value = this.getGestureValue(object, kind);
+    if (value.x === previous.x && value.y === previous.y) return;
+    gesture.previewValue = value;
+    Engine.emit('objectManipulationPreview', { object, kind, value: value.clone() } satisfies ObjectManipulationPreview);
+  }
 
   private static updateMousePosition(event: MouseEvent, canvas: HTMLCanvasElement | null) {
     const rect = typeof canvas?.getBoundingClientRect === 'function' ? canvas.getBoundingClientRect() : undefined;
@@ -69,7 +100,7 @@ export default class Input {
       this.updateMousePosition(event, canvas);
 
       if (this.gesture && (!Engine.debug || this.gesture.object !== Engine.selectedObject)) {
-        this.gesture = null;
+        this.clearGesture();
       }
       const gesture = this.gesture;
 
@@ -105,6 +136,7 @@ export default class Input {
             }
           }
         }
+        this.publishPreview(gesture);
         return;
       }
 
@@ -128,6 +160,7 @@ export default class Input {
           position.x = worldX;
           position.y = worldY;
         }
+        this.publishPreview(gesture);
         return;
       }
 
@@ -151,7 +184,7 @@ export default class Input {
 
       // If debug mode is on, try to select/drag/resize an object
       if (Engine.debug && event.button === 0) {
-        this.gesture = null;
+        this.clearGesture();
         const selected = Engine.selectedObject;
         const handle = selected && this.getHoveredResizeHandle(selected, worldPos.x, worldPos.y);
         if (selected && handle) {
@@ -201,8 +234,7 @@ export default class Input {
     document.addEventListener('mouseup', (event: MouseEvent) => {
       this.keys.delete(`mouse${event.button}`);
       if (event.button !== 0) return;
-      const gesture = this.gesture;
-      this.gesture = null;
+      const gesture = this.clearGesture();
       if (Engine.debug && gesture?.initial && gesture.object === Engine.selectedObject) {
         const value = this.getGestureValue(gesture.object, gesture.kind);
         if (value.x !== gesture.initial.x || value.y !== gesture.initial.y) {
@@ -228,7 +260,7 @@ export default class Input {
       const gesture = this.gesture;
       if (key === 'escape' && Engine.debug && gesture?.initial && gesture.object === Engine.selectedObject) {
         const { object, kind, initial, initialBounds } = gesture;
-        this.gesture = null;
+        this.clearGesture();
         if (kind === 'drag') {
           object.transform.position.set(initial.x, initial.y);
         } else {
@@ -262,7 +294,7 @@ export default class Input {
 
     window.addEventListener('blur', () => {
       this.keys.clear();
-      this.gesture = null;
+      this.clearGesture();
     });
   }
 
