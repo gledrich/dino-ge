@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { Engine, Input, SpriteComponent, getViewportAlignment, snapToGrid, type EngineRuntimeError, type GameObject, type ObjectManipulationPreview } from 'dino-ge';
+import { Engine, Input, SpriteComponent, getViewportAlignment, snapToGrid, type GameObject, type ObjectManipulationPreview } from 'dino-ge';
 import { usePlayground } from '../context/PlaygroundContext';
+import type { GameRunError } from '../hooks/usePlaygroundScripts';
 import Toolbar from './Toolbar';
 import Logo from './Logo';
 import { frameSceneObjectEvent, getAssetSource, getDefaultSceneObjectTag, getSceneArrowMovement, getSceneAssetPreviewType, getSceneSelectionBounds, getSceneSource, getSceneSpritePlacement, getSceneSpriteScale, isReplaceableSprite, isSceneFrameShortcut, nudgeSceneSelection, sceneAssetDragEvent, sceneAssetDragType, sceneKeyboardPlacementEvent, sceneObjectDefaults, sceneObjectDragType, sceneObjectKinds, scenePointerDragEvent, type SceneImageAsset, type SceneKeyboardPlacementRequest, type SceneObjectKind, type SceneObjectPlacement, type ScenePointerDrag, type ScenePoint } from '../utils/scene-objects';
@@ -136,7 +137,7 @@ function getEdgePanDelta({ bounds, scaleX, scaleY }: CanvasProjection, x: number
   if (dx || dy) return { x: dx, y: dy };
 }
 
-const Viewport: React.FC<{ runtimeError?: EngineRuntimeError; onOpenConsole: () => void }> = ({ runtimeError, onOpenConsole }) => {
+const Viewport: React.FC<{ runtimeError?: GameRunError; onOpenConsole: () => void }> = ({ runtimeError, onOpenConsole }) => {
   const { 
     currentScriptId,
     isViewportReady, 
@@ -1092,7 +1093,7 @@ const Viewport: React.FC<{ runtimeError?: EngineRuntimeError; onOpenConsole: () 
       <Logo visible={!isInspectorVisible && isViewportReady && !isEditingScene} />
       {runtimeError && <div className="game-runtime-error">
         <div role="alert">
-          <strong>{runtimeError.phase === 'startup' ? 'Game setup failed' : 'Game stopped running'}</strong>
+          <strong>{{ script: 'Game script failed to run', startup: 'Game setup failed', frame: 'Game stopped running' }[runtimeError.phase]}</strong>
           <div className="game-runtime-error-message">
             {(runtimeError.error instanceof Error ? runtimeError.error.message
               : typeof runtimeError.error === 'string' ? runtimeError.error : '') || 'See the Console for details.'}

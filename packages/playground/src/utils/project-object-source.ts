@@ -59,7 +59,7 @@ export function getProjectObjectLocation(source: ProjectObjectSource, value: str
 }
 
 /** Capture the module that created the object, even if it registers later. */
-export function trackProjectObjectSources(scriptId: string, run: number) {
+export function trackProjectObjectSources(scriptId: string, run: number, entryModuleUrl: string) {
   const session = { scriptId, run, modules: new Map<string, ModuleRevision | null>() };
   activeProject = session;
   const [project, ...entry] = scriptId.split('/');
@@ -73,6 +73,7 @@ export function trackProjectObjectSources(scriptId: string, run: number) {
     // V8 wraps named frames in parentheses. Firefox and Safari put the URL after @.
     let foundEngineFrame = false;
     for (const frame of stack.split('\n')) {
+      if (frame.includes(`${entryModuleUrl}:`)) break;
       const match = frame.trimEnd().match(/(https?:\/\/.+):(\d+):(\d+)\)?$/);
       if (match?.[1] === location.href || /<anonymous>:\d+:\d+/.test(frame)) break;
       if (!match) continue;

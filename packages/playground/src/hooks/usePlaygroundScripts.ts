@@ -3,17 +3,21 @@ import * as Dino from 'dino-ge';
 import { getScript, setCurrentScriptId as rememberScriptId, updateScript } from '../utils/helpers';
 import { instrumentCode, rebaseModule } from '../utils/ast-utils';
 import { trackProjectObjectSources } from '../utils/project-object-source';
+import runtimeModulePath from '../utils/game-module-runtime.js?url&no-inline';
 import { usePlayground } from '../context/PlaygroundContext';
 
 const { Engine, Loader } = Dino;
 
 type RunChange = { kind: 'reset' } | { kind: 'switch'; scriptId: string };
+export type GameRunError = Dino.EngineRuntimeError | { phase: 'script'; error: unknown };
 
 export const usePlaygroundScripts = () => {
   const runId = useRef(0);
+  const retireScript = useRef<() => void>(undefined);
+  const cancelPendingScript = useRef<() => void>(undefined);
   const stopTrackingSources = useRef<() => void>(undefined);
   const [pendingRunChange, setPendingRunChange] = useState<RunChange>();
-  const [runtimeError, setRuntimeError] = useState<Dino.EngineRuntimeError>();
+  const [runtimeError, setRuntimeError] = useState<GameRunError>();
   const { 
     currentScriptId, 
     setCurrentScriptId, 
@@ -31,6 +35,7 @@ export const usePlaygroundScripts = () => {
   }, []);
   useEffect(() => () => {
     ++runId.current;
+    retireScript.current?.();
     stopTrackingSources.current?.();
     stopTrackingSources.current = undefined;
   }, []);
@@ -59,7 +64,7 @@ export const usePlaygroundScripts = () => {
     Engine.selectedObject = null;
     Loader.clear();
     
-    document.querySelectorAll('script[data-playground-script]').forEach(s => s.remove());
+    retireScript.current?.();
     
     const container = document.getElementById('playground-canvas-container');
     if (container) {
@@ -74,14 +79,44 @@ export const usePlaygroundScripts = () => {
       if (run !== runId.current) return;
       const script = document.createElement('script');
       script.type = 'module';
-      const encodedPath = currentScriptId.split('/').map(encodeURIComponent).join('/');
-      if (currentScriptId.includes('/')) {
-        const entryUrl = new URL(`/project-runs/${run}/${encodedPath}.js`, location.href);
-        script.textContent = `${rebaseModule(result.code, entryUrl)}\n//# sourceURL=${entryUrl.href}`;
-        stopTrackingSources.current = trackProjectObjectSources(currentScriptId, run);
-      } else script.textContent = result.code;
-      script.setAttribute('data-playground-script', currentScriptId);
+      script.dataset.playgroundScript = currentScriptId;
+      script.dataset.playgroundRun = String(run);
+      const moduleUrls: string[] = [];
+      const createModuleUrl = (code: string) => {
+        const url = URL.createObjectURL(new Blob([code], { type: 'text/javascript' }));
+        moduleUrls.push(url);
+        return url;
+      };
+      const releaseUrls = () => moduleUrls.splice(0).forEach(url => URL.revokeObjectURL(url));
+      const cancel = () => { delete script.dataset.playgroundRun; };
+      cancelPendingScript.current = cancel;
+      retireScript.current = () => {
+        script.remove();
+        releaseUrls();
+      };
       document.body.appendChild(script);
+      const loadEntry = async () => {
+        const encodedPath = currentScriptId.split('/').map(encodeURIComponent).join('/');
+        const isProject = currentScriptId.includes('/');
+        const sourceUrl = new URL(isProject ? `/project-runs/${run}/${encodedPath}.js` : `/scripts/${encodedPath}.js`, location.href);
+        const base = isProject ? sourceUrl : new URL(document.baseURI);
+        const runtimeUrl = new URL(runtimeModulePath, import.meta.url).href;
+        const entry = `${rebaseModule(result.code, base, runtimeUrl, run)}\n//# sourceURL=${sourceUrl.href}`;
+        const entryUrl = createModuleUrl(entry);
+        if (isProject) stopTrackingSources.current = trackProjectObjectSources(currentScriptId, run, entryUrl);
+        // A launcher with no exports keeps import() from calling a game's exported `then`.
+        const launcherUrl = createModuleUrl(`import ${JSON.stringify(entryUrl)};`);
+        await import(/* @vite-ignore */ launcherUrl);
+      };
+      void loadEntry().catch((error: unknown) => {
+        if (!script.isConnected || !script.dataset.playgroundRun) return;
+        const referencesBlob = error instanceof Error && moduleUrls.some(url => error.message.includes(url));
+        setRuntimeError({ phase: 'script', error: referencesBlob ? 'A game module could not load. Check the import paths.' : error });
+        console.error('Could not run the game script', error);
+      }).finally(() => {
+        releaseUrls();
+        if (cancelPendingScript.current === cancel) cancelPendingScript.current = undefined;
+      });
     });
   }, [currentScriptId, isViewportReady]);
 
@@ -110,6 +145,7 @@ export const usePlaygroundScripts = () => {
   }, []);
 
   const performRunChange = useCallback((change: RunChange) => {
+    cancelPendingScript.current?.();
     if (change.kind === 'switch') {
       ++runId.current;
       rememberScriptId(change.scriptId);

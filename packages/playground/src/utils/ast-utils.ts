@@ -265,29 +265,27 @@ export interface InstrumentationResult {
   error?: string;
 }
 
-/** Preserves an imported entry module's file location when the Playground runs it inline. */
-export function rebaseModule(code: string, moduleUrl: URL): string {
+/** Preserves the entry's file location when the Playground loads it from a Blob. */
+export function rebaseModule(code: string, moduleUrl: URL, runtimeUrl: string, run: number): string {
   const ast = acorn.parse(code, { ecmaVersion: 'latest', sourceType: 'module' });
   const replacements: Edit[] = [];
+  const identifiers = new Set<string>();
+  const dynamicImports: { start: number; end: number }[] = [];
+  const pathSpecifier = /^(?:\.{1,2}\/|\/)/;
+  const base = JSON.stringify(moduleUrl.href);
   const visit = (node: any) => {
+    if (node.type === 'Identifier') identifiers.add(node.name);
     if (['ImportDeclaration', 'ExportNamedDeclaration', 'ExportAllDeclaration', 'ImportExpression'].includes(node.type)) {
       const source = node.source;
-      if (typeof source?.value === 'string' && /^\.{1,2}\//.test(source.value)) {
+      if (node.type === 'ImportExpression' && source &&
+          (typeof source.value !== 'string' || pathSpecifier.test(source.value))) {
+        dynamicImports.push(source);
+      } else if (typeof source?.value === 'string' && pathSpecifier.test(source.value)) {
         replacements.push({
           start: source.start, end: source.end,
           newText: JSON.stringify(new URL(source.value, moduleUrl).href),
         });
-      } else if (node.type === 'ImportExpression' && source && typeof source.value !== 'string') {
-        // Wrap only the expression so nested edits, including import.meta.url, still apply.
-        replacements.push({
-          start: source.start, end: source.start,
-          newText: `((specifier) => typeof specifier === 'string' && /^\\.{1,2}\\//.test(specifier) ? new URL(specifier, ${JSON.stringify(moduleUrl.href)}).href : specifier)(`,
-        }, { start: source.end, end: source.end, newText: ')' });
       }
-    } else if (node.type === 'MemberExpression' && node.object.type === 'MetaProperty' &&
-        node.object.meta.name === 'import' && node.object.property.name === 'meta' &&
-        (node.computed ? node.property.value === 'url' : node.property.name === 'url')) {
-      replacements.push({ start: node.start, end: node.end, newText: JSON.stringify(moduleUrl.href) });
     }
     for (const child of Object.values(node)) {
       for (const item of Array.isArray(child) ? child : [child]) {
@@ -296,10 +294,21 @@ export function rebaseModule(code: string, moduleUrl: URL): string {
     }
   };
   visit(ast);
+  let runtime = '__dinoModuleRuntime';
+  while (identifiers.has(runtime)) runtime += '_';
+  for (const { start, end } of dynamicImports) {
+    // Wrap only the expression so nested imports can still be rewritten.
+    replacements.push({ start, end: start, newText: `${runtime}.dynamicSpecifier((` },
+      { start: end, end, newText: `), ${base})` });
+  }
   for (const edit of replacements.sort((a, b) => b.start - a.start || b.end - a.end)) {
     code = code.slice(0, edit.start) + edit.newText + code.slice(edit.end);
   }
-  return code;
+  const prepare = `import * as ${runtime} from ${JSON.stringify(runtimeUrl)}; ${runtime}.prepare(import.meta, ${base}, ${run}); `;
+  // Keep the source line numbers and leave a hashbang at the beginning of the module.
+  const hashbang = code.match(/^#![^\r\n\u2028\u2029]*(?:\r\n?|[\n\u2028\u2029]|$)/)?.[0];
+  if (!hashbang) return prepare + code;
+  return hashbang + (/[\r\n\u2028\u2029]$/.test(hashbang) ? '' : '\n') + prepare + code.slice(hashbang.length);
 }
 
 /**

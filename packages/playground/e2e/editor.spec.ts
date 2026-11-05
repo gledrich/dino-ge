@@ -49,6 +49,100 @@ new Engine({ onLoad() {
   });
 }
 
+test('reports entry evaluation and missing dependencies, then runs the repaired script', async ({ page }) => {
+  let source = "throw new Error('Level definition is invalid');";
+  await page.route('**/files', route => route.fulfill({ json: ['script'] }));
+  await page.route('**/api/scripts/script', route => route.fulfill({ json: source }));
+  await page.route('**/missing-game-module.mjs', route => route.fulfill({ status: 404 }));
+  await page.route('**/fixture-game-module.mjs', route => route.fulfill({
+    contentType: 'application/javascript', body: "export const label = 'Recovered module';",
+  }));
+  await page.goto('/');
+
+  const alert = page.getByRole('alert').filter({ hasText: 'Game script failed to run' });
+  await expect(alert).toContainText('Level definition is invalid');
+  await page.getByRole('button', { name: 'Open Console', exact: true }).click();
+  const errors = page.locator('.console-line.error');
+  await expect(errors.filter({ hasText: 'Level definition is invalid' })).toHaveCount(1);
+
+  source = "import './missing-game-module.mjs';";
+  await page.getByRole('button', { name: 'Reset game' }).click();
+  await expect(alert).toBeVisible();
+  await expect(alert).not.toContainText('Level definition is invalid');
+  await expect(errors.filter({ hasText: 'Could not run the game script' })).toHaveCount(2);
+
+  source = "import '//[';";
+  await page.getByRole('button', { name: 'Reset game' }).click();
+  await expect(errors.filter({ hasText: 'Could not run the game script' })).toHaveCount(3);
+  await expect(alert).toBeVisible();
+
+  source = `#!/usr/bin/env node
+import { label } from '/fixture-game-module.mjs';
+export function then() { throw new Error('The entry exports a then function'); }
+const globalThis = 'A local binding';
+const __dinoModuleRuntime = globalThis;
+const meta = import.meta;
+const specifier = './fixture-game-module.mjs';
+let evaluated = false;
+const { label: dynamicLabel } = await import((evaluated = true, specifier));
+const invalidSpecifier = await import(Symbol()).catch(error => error instanceof TypeError);
+const malformedPath = await import('//[').catch(error => error instanceof TypeError);
+if (meta.url !== location.href || meta.resolve(specifier) !== new URL(specifier, location.href).href) {
+  throw new Error('Entry module metadata changed');
+}
+const output = document.createElement('p');
+output.dataset.playgroundGame = '';
+output.textContent = evaluated && invalidSpecifier && malformedPath && label === dynamicLabel
+  ? label : 'Unexpected dynamic import';
+document.getElementById('playground-canvas-container').append(output);`;
+  await page.getByRole('button', { name: 'Reset game' }).click();
+  await expect(page.getByText('Recovered module', { exact: true })).toBeVisible();
+  await expect(alert).toHaveCount(0);
+});
+
+test('a replaced entry does not start after its delayed dependency arrives', async ({ page }) => {
+  await page.route('**/files', route => route.fulfill({ json: ['script', 'next'] }));
+  await page.route('**/api/scripts/script', route => route.fulfill({ json: `
+import './slow-game-module.mjs';
+document.body.dataset.staleGameStarted = 'true';
+throw new Error('Previous game failed');` }));
+  let releaseNext!: () => void;
+  const nextReady = new Promise<void>(resolve => { releaseNext = resolve; });
+  await page.route('**/api/scripts/next', async route => {
+    await nextReady;
+    await route.fulfill({ json: `
+import { Engine, Rectangle, Vector2 } from 'dino-ge';
+new Engine({ onLoad() {
+  new Rectangle({ tag: 'Current game', position: new Vector2(60, 60), width: 40, height: 30 });
+} }, { containerId: 'playground-canvas-container' });` });
+  });
+  let release!: () => void;
+  const delayed = new Promise<void>(resolve => { release = resolve; });
+  await page.route('**/slow-game-module.mjs', async route => {
+    await delayed;
+    await route.fulfill({ contentType: 'application/javascript',
+      body: "document.body.dataset.oldDependencyLoaded = 'true';" });
+  });
+  const dependencyRequested = page.waitForRequest('**/slow-game-module.mjs');
+  try {
+    await page.goto('/', { waitUntil: 'domcontentloaded' });
+    await dependencyRequested;
+    const nextRequested = page.waitForRequest('**/api/scripts/next');
+    await page.getByRole('combobox', { name: 'Current script' }).selectOption('next');
+    await nextRequested;
+    release();
+    await expect(page.locator('body')).toHaveAttribute('data-old-dependency-loaded', 'true');
+    expect(await page.locator('body').getAttribute('data-stale-game-started')).toBeNull();
+    await expect(page.getByRole('alert').filter({ hasText: 'Previous game failed' })).toHaveCount(0);
+  } finally {
+    release();
+    releaseNext();
+  }
+  await expect(page.getByRole('button', { name: 'Current game', exact: true })).toBeVisible();
+  expect(await page.locator('body').getAttribute('data-stale-game-started')).toBeNull();
+  await expect(page.getByRole('alert').filter({ hasText: 'Previous game failed' })).toHaveCount(0);
+});
+
 test('keeps unsaved edits across tabs and panel collapse, and retains hidden console messages', async ({ page }) => {
   await page.route('**/files', route => route.fulfill({ json: ['script'] }));
   await page.route('**/api/scripts/script', route => route.fulfill({ json: 'const initial = true;' }));
