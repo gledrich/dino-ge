@@ -112,6 +112,14 @@ app.get('/files', async (req, res) => {
   }
 });
 
+app.get('/api/scripts/:id/assets', async (req, res) => {
+  try {
+    res.json(await projects.listSprites(req.params.id));
+  } catch (err) {
+    res.status(scriptErrorStatus(err)).json({ error: err.message });
+  }
+});
+
 app.post('/api/scripts/:id/assets', express.raw({ type: spriteImageTypes, limit: '5mb' }), async (req, res) => {
   try {
     const type = req.get('content-type')?.split(';')[0].trim().toLowerCase();

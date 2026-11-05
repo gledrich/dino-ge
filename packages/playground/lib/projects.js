@@ -75,13 +75,34 @@ export class ProjectStore {
     return path.join(directory, name.endsWith('.js') ? name : `${name}.js`);
   }
 
+  async spriteDirectory(id) {
+    const script = await this.scriptPath(id);
+    if (!(await fs.lstat(script)).isFile()) throw new ProjectError('The open script could not be found.', 404);
+    return path.join(path.dirname(script), '_dino-assets');
+  }
+
+  spriteUrl(filename) {
+    return `/scripts/${path.relative(this.root, filename).split(path.sep).map(encodeURIComponent).join('/')}`;
+  }
+
+  async listSprites(id) {
+    const directory = await this.spriteDirectory(id);
+    const info = await fs.lstat(directory, { throwIfNoEntry: false });
+    if (!info) return [];
+    if (!info.isDirectory()) throw new ProjectError('The sprite asset directory is unavailable.');
+    const files = await fs.readdir(directory, { withFileTypes: true });
+    return files.flatMap(file => {
+      const match = /^([a-z0-9_-]{1,48})-[a-f0-9]{64}\.(?:png|jpg|gif|webp)$/.exec(file.name);
+      if (!file.isFile() || !match) return [];
+      return [{ name: match[1], url: this.spriteUrl(path.join(directory, file.name)) }];
+    }).sort((a, b) => a.url.localeCompare(b.url));
+  }
+
   async importSprite(id, name, type, bytes) {
     if (!Buffer.isBuffer(bytes)) throw new ProjectError('Choose a PNG, JPEG, GIF or WebP image.', 415);
     if (bytes.length > maxImageBytes) throw new ProjectError('Sprite images can be up to 5 MiB.', 413);
     const extension = imageExtension(bytes, type);
-    const script = await this.scriptPath(id);
-    if (!(await fs.lstat(script)).isFile()) throw new ProjectError('The open script could not be found.', 404);
-    const directory = path.join(path.dirname(script), '_dino-assets');
+    const directory = await this.spriteDirectory(id);
     await fs.mkdir(directory, { recursive: true });
     if (!(await fs.lstat(directory)).isDirectory()) throw new ProjectError('The sprite asset directory is unavailable.');
 
@@ -98,7 +119,7 @@ export class ProjectStore {
     } finally {
       await fs.rm(temporary, { force: true });
     }
-    return `/scripts/${path.relative(this.root, filename).split(path.sep).map(encodeURIComponent).join('/')}`;
+    return this.spriteUrl(filename);
   }
 
   async create(name, entry, writeProject) {
