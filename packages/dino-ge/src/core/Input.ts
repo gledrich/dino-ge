@@ -17,7 +17,7 @@ export default class Input {
   private static isinitialised = false;
 
   private static gesture: {
-    kind: 'drag' | 'resize'; object: GameObject; offset: Vector2; initial?: Vector2;
+    kind: 'drag' | 'resize'; object: GameObject; offset: Vector2; initial?: Vector2; initialBounds?: Vector2;
   } | null = null;
 
   private static updateMousePosition(event: MouseEvent, canvas: HTMLCanvasElement | null) {
@@ -38,6 +38,14 @@ export default class Input {
     }
     if (object.getComponent?.(SpriteComponent)) return object.transform.scale.clone();
     return new Vector2(object.bounds?.width ?? 0, object.bounds?.height ?? 0);
+  }
+
+  private static restoreObjectSize(object: GameObject, width: number, height: number) {
+    const shape = object.getComponent(ShapeComponent);
+    const size = shape ?? object.getComponent(TextComponent) ?? object.bounds;
+    if (!size) return;
+    size.width = shape?.type === 'circle' ? width / 2 : width;
+    size.height = height;
   }
 
   private static getHoveredResizeHandle(object: GameObject, x: number, y: number) {
@@ -87,19 +95,14 @@ export default class Input {
           const localHeight = height / Math.abs(geometry.scaleY);
 
           const shape = obj.getComponent(ShapeComponent);
-          const text = obj.getComponent(TextComponent);
-
           if (shape?.type === 'circle') {
             shape.width = localWidth / 2;
-          } else if (shape) {
-            shape.width = localWidth;
-            shape.height = localHeight;
-          } else if (text) {
-            text.width = localWidth;
-            text.height = localHeight;
-          } else if (obj.bounds) {
-            obj.bounds.width = localWidth;
-            obj.bounds.height = localHeight;
+          } else {
+            const size = shape ?? obj.getComponent(TextComponent) ?? obj.bounds;
+            if (size) {
+              size.width = localWidth;
+              size.height = localHeight;
+            }
           }
         }
         return;
@@ -157,6 +160,7 @@ export default class Input {
             object: selected,
             offset: new Vector2(worldPos.x - handle.cornerX, worldPos.y - handle.cornerY),
             initial: this.getGestureValue(selected, 'resize'),
+            initialBounds: selected.bounds && new Vector2(selected.bounds.width, selected.bounds.height),
           };
           return;
         }
@@ -221,6 +225,24 @@ export default class Input {
       }
 
       const key = String(event.key).toLowerCase();
+      const gesture = this.gesture;
+      if (key === 'escape' && Engine.debug && gesture?.initial && gesture.object === Engine.selectedObject) {
+        const { object, kind, initial, initialBounds } = gesture;
+        this.gesture = null;
+        if (kind === 'drag') {
+          object.transform.position.set(initial.x, initial.y);
+        } else {
+          if (object.getComponent(SpriteComponent)) object.transform.scale.set(initial.x, initial.y);
+          if (initialBounds && object.bounds &&
+              (object.bounds.width !== initialBounds.x || object.bounds.height !== initialBounds.y)) {
+            this.restoreObjectSize(object, initialBounds.x, initialBounds.y);
+          }
+          const canvas = document.getElementById('canvas');
+          if (canvas?.style.cursor === 'se-resize') canvas.style.cursor = 'default';
+        }
+        event.preventDefault();
+        return;
+      }
       this.keys.add(key);
 
       // Toggle Pause with P

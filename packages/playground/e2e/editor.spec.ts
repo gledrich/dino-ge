@@ -96,17 +96,37 @@ new Engine({
 
   await page.mouse.move(box.x + 155, box.y + 165, { steps: 5 });
   await expect.poll(async () => Number(await x.inputValue())).toBeCloseTo(30);
+  await page.keyboard.press('Escape');
+  await expect(x).toHaveValue('10.00');
+  await page.mouse.move(box.x + 185, box.y + 185);
+  await page.mouse.up();
+  await expect(x).toHaveValue('10.00');
+  await expect(page.getByRole('button', { name: 'Apply placement to code' })).toHaveCount(0);
+
+  await page.mouse.move(box.x + 125, box.y + 125);
+  await page.mouse.down();
+  await page.mouse.move(box.x + 155, box.y + 165, { steps: 5 });
   await page.mouse.up();
   await page.mouse.move(box.x + 185, box.y + 185);
   await expect.poll(async () => Number(await x.inputValue())).toBeCloseTo(30);
 
   await page.mouse.move(box.x + 102, box.y + 201);
   await expect(canvas).toHaveCSS('cursor', 'se-resize');
+  const width = page.getByRole('spinbutton', { name: 'Width', exact: true });
+  const height = page.getByRole('spinbutton', { name: 'Height', exact: true });
+  await page.mouse.down();
+  await page.mouse.move(box.x + 72, box.y + 221, { steps: 5 });
+  await expect.poll(async () => Number(await width.inputValue())).toBeCloseTo(30, 0);
+  await page.keyboard.press('Escape');
+  await page.mouse.up();
+  await expect(width).toHaveValue('20.00');
+  await expect(height).toHaveValue('20.00');
+  await expect(x).toHaveValue('30.00');
+
+  await page.mouse.move(box.x + 102, box.y + 201);
   await page.mouse.down();
   await page.mouse.move(box.x + 72, box.y + 221, { steps: 5 });
   await page.mouse.up();
-  const width = page.getByRole('spinbutton', { name: 'Width', exact: true });
-  const height = page.getByRole('spinbutton', { name: 'Height', exact: true });
   await expect.poll(async () => Number(await width.inputValue())).toBeCloseTo(30, 0);
   await expect.poll(async () => Number(await height.inputValue())).toBeCloseTo(30, 0);
 

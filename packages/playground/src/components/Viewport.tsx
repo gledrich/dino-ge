@@ -309,7 +309,10 @@ const Viewport: React.FC = () => {
               <button type="button" className="scene-control" onClick={() => zoomView(1.25)}>Zoom in</button>
               <button type="button" className="scene-control" onClick={restoreCamera}>Reset view</button>
             </div>
-            <span id="scene-keyboard-hint" className="scene-edit-hint">Middle drag pans · Arrows move selection · Shift moves 10</span>
+            <span id="scene-keyboard-hint" className="scene-edit-hint">
+              Middle drag pans · Arrows move selection · Shift moves 10<br />
+              Esc cancels a move or resize
+            </span>
             {placementStatus && <span className="scene-edit-status" role="status">{placementStatus}</span>}
           </div>
       )}
