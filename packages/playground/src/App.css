@@ -71,6 +71,10 @@
 }
 
 .scene-history-actions button { pointer-events: auto; }
+.scene-grid-size {
+  pointer-events: auto;
+  color-scheme: dark;
+}
 .scene-grid-toggle[aria-pressed='true'] {
   color: var(--text-primary);
   background: var(--bg-tertiary);

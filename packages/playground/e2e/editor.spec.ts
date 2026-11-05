@@ -417,7 +417,7 @@ new Engine({ onLoad() {
   await expect.poll(readCamera).toEqual({ x: 40, y: 30, zoom: 1 });
 });
 
-test('snaps a Library preview, drop and later move to the same world grid after zooming', async ({ page }) => {
+test('uses the selected world grid for Library drops and pointer and keyboard moves', async ({ page }) => {
   await page.route('**/files', route => route.fulfill({ json: ['script'] }));
   await page.route('**/api/scripts/script', route => route.fulfill({ json: `
 import { Engine } from 'dino-ge';
@@ -431,6 +431,9 @@ new Engine({ onLoad() { Engine.camera.position.set(3, 5); }, update() {} },
   await page.getByRole('button', { name: 'Zoom in', exact: true }).click();
   const snap = page.getByRole('button', { name: 'Snap to grid', exact: true });
   await expect(snap).toHaveAttribute('aria-pressed', 'false');
+  const cellSize = page.getByRole('combobox', { name: 'Grid cell size' });
+  await expect(cellSize).toHaveValue('16');
+  await cellSize.selectOption('32');
   await snap.click();
   await expect(snap).toHaveAttribute('aria-pressed', 'true');
 
@@ -447,35 +450,52 @@ new Engine({ onLoad() { Engine.camera.position.set(3, 5); }, update() {} },
     y: (y - view.y) * view.zoom * box.height / view.height,
   });
   const readGridPixel = () => canvas.evaluate((element: HTMLCanvasElement, column) =>
-    element.getContext('2d')!.getImageData(column, 12, 1, 1).data[0], Math.floor((160 - view.x) * view.zoom));
+    element.getContext('2d')!.getImageData(column, 12, 1, 1).data[0], Math.floor((192 - view.x) * view.zoom));
   await expect.poll(readGridPixel).toBeLessThan(245);
   const target = project(317, 211);
   const add = page.getByRole('button', { name: 'Add rectangle', exact: true });
   const transfer = await page.evaluateHandle(() => new DataTransfer());
   await add.dispatchEvent('dragstart', { dataTransfer: transfer });
   await canvas.dispatchEvent('dragover', { dataTransfer: transfer, clientX: box.x + target.x, clientY: box.y + target.y });
-  await expect(page.locator('.scene-drop-preview')).toContainText('Rectangle · X 320 · Y 208');
+  await expect(page.locator('.scene-drop-preview')).toContainText('Rectangle · X 320 · Y 224');
   await add.dragTo(canvas, { targetPosition: target });
   const x = page.getByRole('spinbutton', { name: 'X', exact: true });
   const y = page.getByRole('spinbutton', { name: 'Y', exact: true });
   await expect(x).toHaveValue('320.00');
-  await expect(y).toHaveValue('208.00');
-  const from = project(330, 218);
-  const to = project(359, 239);
+  await expect(y).toHaveValue('224.00');
+  const from = project(330, 234);
+  const to = project(359, 255);
   await page.mouse.move(box.x + from.x, box.y + from.y);
   await page.mouse.down();
   await page.mouse.move(box.x + to.x, box.y + to.y, { steps: 5 });
-  await expect(page.getByRole('group', { name: 'Current scene gesture' })).toHaveText('Move · X 352 · Y 224');
+  await expect(page.getByRole('group', { name: 'Current scene gesture' })).toHaveText('Move · X 352 · Y 256');
   await page.mouse.up();
   await expect(x).toHaveValue('352.00');
+  await expect(y).toHaveValue('256.00');
+  const viewport = page.getByRole('region', { name: 'Scene viewport' });
+  const object = page.getByRole('button', { name: 'New rectangle', exact: true });
+  await viewport.press('ArrowUp');
   await expect(y).toHaveValue('224.00');
+  await object.press('ArrowRight');
+  await expect(x).toHaveValue('384.00');
+  await cellSize.selectOption('8');
+  await viewport.press('Shift+ArrowLeft');
+  await expect(x).toHaveValue('304.00');
+  await cellSize.selectOption('64');
+  await object.press('ArrowDown');
+  await expect(y).toHaveValue('256.00');
+  await expect(x).toHaveValue('304.00');
+  await viewport.press('ArrowRight');
+  await expect(x).toHaveValue('320.00');
   await page.getByRole('button', { name: 'Apply placement to code' }).click();
   await expect.poll(() => page.evaluate(() => {
     const { monaco } = window as typeof window & { monaco: Monaco };
     return monaco.editor.getEditors()[0].getValue();
-  })).toMatch(/position: new \w+\(352, 224\)/);
+  })).toMatch(/position: new \w+\(320, 256\)/);
   await snap.click();
   await expect.poll(readGridPixel).toBe(255);
+  await viewport.press('ArrowLeft');
+  await expect(x).toHaveValue('319.00');
 });
 
 test('places a line, moves it by its stroke and restores the saved geometry', async ({ page }) => {

@@ -11,7 +11,7 @@ const shapePreviewDimensions: Partial<Record<SceneObjectKind, { width: number; h
   Line: { width: sceneObjectDefaults.Line.length, height: sceneObjectDefaults.Line.strokeWidth },
   Text: sceneObjectDefaults.Text,
 };
-const sceneGridSize = 16;
+const sceneGridSizes = [8, 16, 32, 64];
 
 function TextDropPreview() {
   const { width, height, text, colour, backgroundColour, fontSize, font } = sceneObjectDefaults.Text;
@@ -60,6 +60,7 @@ const Viewport: React.FC = () => {
   const pan = useRef<{ id: number; x: number; y: number } | null>(null);
   const [isPanning, setIsPanning] = useState(false);
   const [isGridSnapping, setIsGridSnapping] = useState(false);
+  const [sceneGridSize, setSceneGridSize] = useState(16);
   const placementStep = isGridSnapping ? sceneGridSize : 1;
   const [placementStatus, setPlacementStatus] = useState<{ message: string; error?: boolean }>();
   const [manipulationReadout, setManipulationReadout] = useState('');
@@ -81,7 +82,7 @@ const Viewport: React.FC = () => {
     const previous = Engine.debugPositionGridSize;
     Engine.debugPositionGridSize = sceneGridSize;
     return () => { Engine.debugPositionGridSize = previous; };
-  }, [isEditingScene, isGridSnapping]);
+  }, [isEditingScene, isGridSnapping, sceneGridSize]);
 
   useEffect(() => {
     if (!isEditingScene) return;
@@ -374,16 +375,20 @@ const Viewport: React.FC = () => {
                   {action === 'undo' ? 'Undo' : 'Redo'}</button>
               ))}
             </div>
-            <div className="scene-object-options scene-history-actions" role="group" aria-label="Scene camera">
+            <div className="scene-object-options scene-history-actions" role="group" aria-label="Scene camera and grid">
               <button type="button" className="scene-control" onClick={() => zoomView(1 / 1.25)}>Zoom out</button>
               <button type="button" className="scene-control" onClick={() => zoomView(1.25)}>Zoom in</button>
               <button type="button" className="scene-control" onClick={restoreCamera}>Reset view</button>
               <button type="button" className="scene-control scene-grid-toggle"
-                aria-pressed={isGridSnapping} title={`Snap pointer moves and drops to the ${sceneGridSize} px grid`}
+                aria-pressed={isGridSnapping} title={`Snap moves and drops to the ${sceneGridSize} px grid`}
                 onClick={() => setIsGridSnapping(enabled => !enabled)}>Snap to grid</button>
+              <select className="scene-control scene-grid-size" aria-label="Grid cell size" value={sceneGridSize}
+                onChange={event => setSceneGridSize(Number(event.target.value))}>
+                {sceneGridSizes.map(size => <option key={size} value={size}>{size} px</option>)}
+              </select>
             </div>
             <span id="scene-keyboard-hint" className="scene-edit-hint">
-              Middle drag pans · Arrows move selection · Shift moves 10<br />
+              Middle drag pans · {isGridSnapping ? 'Arrows move 1 cell · Shift moves 10 cells' : 'Arrows move 1 px · Shift moves 10 px'}<br />
               Esc cancels a move or resize
             </span>
           </>}

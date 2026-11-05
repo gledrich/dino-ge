@@ -24,6 +24,14 @@ export interface SceneTransformState {
   size?: ScenePoint;
 }
 
+function gridNudge(coordinate: number, steps: number, cellSize: number): number {
+  if (!steps) return 0;
+  const cell = coordinate / cellSize;
+  // Treat tiny transform round-off as already on the grid.
+  const boundary = steps > 0 ? Math.floor(cell + 1e-9) : Math.ceil(cell - 1e-9);
+  return (boundary + steps) * cellSize - coordinate;
+}
+
 /** Move the selection in viewport axes while retaining its local transform. */
 export function nudgeSceneSelection(event: Pick<KeyboardEvent, 'key' | 'shiftKey' | 'altKey' | 'ctrlKey' | 'metaKey'>): boolean {
   const { key, shiftKey, altKey, ctrlKey, metaKey } = event;
@@ -42,7 +50,12 @@ export function nudgeSceneSelection(event: Pick<KeyboardEvent, 'key' | 'shiftKey
   const { Engine } = Dino;
   const object = Engine.selectedObject;
   if (!object || !(Engine.currentScene?.objects ?? Engine.objects).has(object)) return true;
-  const { position, parent } = object.transform;
+  const { position, parent, worldPosition } = object.transform;
+  const cellSize = Engine.debugPositionGridSize;
+  if (cellSize > 0) {
+    x = gridNudge(worldPosition.x, x, cellSize);
+    y = gridNudge(worldPosition.y, y, cellSize);
+  }
   const initial = position.clone();
   if (parent) {
     const { worldRotation, worldScale } = parent;
