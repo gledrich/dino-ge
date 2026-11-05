@@ -6,7 +6,7 @@ import { usePlayground } from '../context/PlaygroundContext';
 import ProjectFilesDialog from './ProjectFilesDialog';
 import { createScript, getScript, getFilesList, readGameFolder, importGameFolder, type GameFolder } from '../utils/helpers';
 import { Edit, instrumentCode, getSourceMapping, getSceneObjectCreation, getSceneObjectDeletion, getSceneObjectDuplication, getSpriteImageReplacement, type CanvasPlacementTransaction } from '../utils/ast-utils';
-import { createSceneObject, duplicateSceneObject, getSceneSource, insertSceneObjectCode, isReplaceableSprite, restoreSceneTransform, sceneObjectCodeEvent, sceneObjectDragType, sceneObjectKinds, scenePointerDragEvent, type CanvasTransformChange, type SceneObjectKind, type SceneObjectPlacement, type ScenePointerDrag } from '../utils/scene-objects';
+import { createSceneObject, duplicateSceneObject, getSceneSource, insertSceneObjectCode, isReplaceableSprite, restoreSceneTransform, sceneAssetDragEvent, sceneAssetDragType, sceneObjectCodeEvent, sceneObjectDragType, sceneObjectKinds, scenePointerDragEvent, type CanvasTransformChange, type SceneImageAsset, type SceneObjectPlacement, type ScenePointerDrag, type ScenePointerDragItem } from '../utils/scene-objects';
 import { useMonacoEditor } from '../hooks/useMonacoEditor';
 import '../styles/editor.css';
 
@@ -41,14 +41,15 @@ const CodeEditor: React.FC<EditorProps> = ({ currentScriptId, onSave, onSelectSc
   const [isObjectOverEditor, setIsObjectOverEditor] = useState(false);
   const [dropFeedback, setDropFeedback] = useState<{ scriptId: string; message: string; error: boolean }>();
   const editorDropTarget = useRef<HTMLDivElement>(null);
+  const draggedAsset = useRef<SceneImageAsset | null>(null);
   const projectFilesButton = useRef<HTMLButtonElement>(null);
   const folderPicker = useRef<HTMLInputElement>(null);
   const loadedScriptId = useRef('');
   const sceneHistory = useRef<SceneHistoryEntry[]>([]);
   const { monacoEditorRef, formatCode, applyEdits, pushEditOperations } = useMonacoEditor();
 
-  const dropObjectCode = useCallback((kind: SceneObjectKind) => {
-    const { sourceId, tag, error } = insertSceneObjectCode(kind);
+  const dropObjectCode = useCallback((item: ScenePointerDragItem) => {
+    const { sourceId, tag, error } = insertSceneObjectCode(item, currentScriptId);
     const message = sourceId ? `Inserted ${tag}. Reset game to preview it.`
       : error ?? 'Open a script before dropping an object into the editor.';
     setDropFeedback({ scriptId: currentScriptId, message, error: !sourceId });
@@ -56,29 +57,35 @@ const CodeEditor: React.FC<EditorProps> = ({ currentScriptId, onSave, onSelectSc
   }, [currentScriptId]);
 
   useEffect(() => {
-    const clearGuide = () => setIsObjectOverEditor(false);
+    const endDrag = () => {
+      draggedAsset.current = null;
+      setIsObjectOverEditor(false);
+    };
     const clearDrop = () => {
-      clearGuide();
+      endDrag();
       setDropFeedback(undefined);
     };
     const updatePointerDrag = (event: Event) => {
       const { detail } = event as CustomEvent<ScenePointerDrag | null>;
-      if (detail && 'kind' in detail) {
+      if (detail) {
         const target = document.elementFromPoint(detail.point.x, detail.point.y);
         if (target && editorDropTarget.current?.contains(target)) {
           setIsObjectOverEditor(detail.phase === 'preview');
-          if (detail.phase === 'drop') dropObjectCode(detail.kind);
+          if (detail.phase === 'drop') dropObjectCode(detail);
           return;
         }
       }
-      clearGuide();
+      setIsObjectOverEditor(false);
     };
+    const trackAssetDrag = (event: Event) => { draggedAsset.current = (event as CustomEvent<SceneImageAsset | null>).detail; };
+    window.addEventListener(sceneAssetDragEvent, trackAssetDrag);
     window.addEventListener(scenePointerDragEvent, updatePointerDrag);
-    window.addEventListener('dragend', clearGuide);
+    window.addEventListener('dragend', endDrag);
     window.addEventListener('playground-before-run', clearDrop);
     return () => {
+      window.removeEventListener(sceneAssetDragEvent, trackAssetDrag);
       window.removeEventListener(scenePointerDragEvent, updatePointerDrag);
-      window.removeEventListener('dragend', clearGuide);
+      window.removeEventListener('dragend', endDrag);
       window.removeEventListener('playground-before-run', clearDrop);
     };
   }, [dropObjectCode]);
@@ -729,7 +736,8 @@ const CodeEditor: React.FC<EditorProps> = ({ currentScriptId, onSave, onSelectSc
         role={dropFeedback.error ? 'alert' : 'status'}>{dropFeedback.message}</p>}
       <div className="editor-textbox" ref={editorDropTarget}
         onDragOverCapture={event => {
-          if (!event.dataTransfer.types.includes(sceneObjectDragType)) return;
+          const { types } = event.dataTransfer;
+          if (!types.includes(sceneObjectDragType) && !(draggedAsset.current && types.includes(sceneAssetDragType))) return;
           event.preventDefault();
           event.stopPropagation();
           event.dataTransfer.dropEffect = 'copy';
@@ -742,11 +750,14 @@ const CodeEditor: React.FC<EditorProps> = ({ currentScriptId, onSave, onSelectSc
         }}
         onDropCapture={event => {
           setIsObjectOverEditor(false);
-          if (!event.dataTransfer.types.includes(sceneObjectDragType)) return;
+          const { dataTransfer } = event;
+          if (!dataTransfer.types.includes(sceneObjectDragType) && !dataTransfer.types.includes(sceneAssetDragType)) return;
           event.preventDefault();
           event.stopPropagation();
-          const kind = sceneObjectKinds.find(item => item === event.dataTransfer.getData(sceneObjectDragType));
-          if (kind && dropObjectCode(kind)) monacoEditorRef.current?.focus();
+          const kind = sceneObjectKinds.find(item => item === dataTransfer.getData(sceneObjectDragType));
+          const asset = draggedAsset.current;
+          const item = kind ? { kind } : asset && asset.tag === dataTransfer.getData(sceneAssetDragType) ? { asset } : undefined;
+          if (item && dropObjectCode(item)) monacoEditorRef.current?.focus();
         }}>
         {isObjectOverEditor && <div className="editor-drop-guide" aria-hidden="true">
           <span><i className="fa-solid fa-code" /> Drop to insert code</span>

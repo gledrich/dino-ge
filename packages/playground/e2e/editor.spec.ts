@@ -670,6 +670,16 @@ new Engine({ async onLoad() {
     const { monaco } = window as typeof window & { monaco: Monaco };
     return monaco.editor.getEditors()[0].getValue();
   })).toContain('src: "/gem.svg"');
+
+  const editorBox = (await page.locator('.monaco-editor').boundingBox())!;
+  const editorPoint = { x: editorBox.x + editorBox.width / 2, y: editorBox.y + editorBox.height / 2 };
+  await session.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [await startPoint()] });
+  await session.send('Input.dispatchTouchEvent', { type: 'touchMove', touchPoints: [editorPoint] });
+  await expect(page.getByText('Drop to insert code')).toBeVisible();
+  await session.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
+  await expect(page.getByText('Drop to insert code')).toHaveCount(0);
+  await expect(page.getByRole('status').filter({ hasText: 'Inserted gem sprite 2' })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'gem sprite 2', exact: true })).toHaveCount(0);
 });
 
 test('pinches and pans the scene camera with two touches in the Hand tool', async ({ page, browserName }) => {
@@ -2960,6 +2970,19 @@ new Engine({ async onLoad() {
   await asset.dragTo(page.locator('#canvas'), { targetPosition: { x: 360, y: 225 } });
   await expect(page.getByRole('button', { name: 'gem sprite 2', exact: true })).toHaveAttribute('aria-pressed', 'true');
   await expect(x).toHaveValue('360.00');
+  await expect(scale).toHaveValue('0.50');
+  await expect(width).toHaveValue('256.00');
+
+  const editor = page.locator('.monaco-editor');
+  await asset.dragTo(editor);
+  await expect(page.getByRole('status').filter({ hasText: 'Inserted gem sprite 3' })).toBeVisible({ timeout: 3000 });
+  await expect(page.getByRole('button', { name: 'gem sprite 3', exact: true })).toHaveCount(0);
+  await page.getByRole('button', { name: 'Reset game', exact: true }).click();
+  const thirdSprite = page.getByRole('button', { name: 'gem sprite 3', exact: true });
+  await expect(thirdSprite).toBeVisible();
+  await page.getByRole('button', { name: 'Edit scene', exact: true }).click();
+  await thirdSprite.click();
+  await expect(x).toHaveValue('100.00');
   await expect(scale).toHaveValue('0.50');
   await expect(width).toHaveValue('256.00');
 });

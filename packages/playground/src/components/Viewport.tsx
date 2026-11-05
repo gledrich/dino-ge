@@ -3,7 +3,7 @@ import { Engine, Input, SpriteComponent, getViewportAlignment, snapToGrid, type 
 import { usePlayground } from '../context/PlaygroundContext';
 import Toolbar from './Toolbar';
 import Logo from './Logo';
-import { getAssetSource, getDefaultSceneObjectTag, getSceneArrowMovement, getSceneAssetPreviewType, getSceneSelectionBounds, getSceneSource, getSceneSpritePlacement, getSceneSpriteScale, isReplaceableSprite, nudgeSceneSelection, sceneAssetDragType, sceneKeyboardPlacementEvent, sceneObjectDefaults, sceneObjectDragType, sceneObjectKinds, scenePointerDragEvent, type SceneImageAsset, type SceneKeyboardPlacementRequest, type SceneObjectKind, type SceneObjectPlacement, type ScenePointerDrag, type ScenePoint } from '../utils/scene-objects';
+import { getAssetSource, getDefaultSceneObjectTag, getSceneArrowMovement, getSceneAssetPreviewType, getSceneSelectionBounds, getSceneSource, getSceneSpritePlacement, getSceneSpriteScale, isReplaceableSprite, nudgeSceneSelection, sceneAssetDragEvent, sceneAssetDragType, sceneKeyboardPlacementEvent, sceneObjectDefaults, sceneObjectDragType, sceneObjectKinds, scenePointerDragEvent, type SceneImageAsset, type SceneKeyboardPlacementRequest, type SceneObjectKind, type SceneObjectPlacement, type ScenePointerDrag, type ScenePoint } from '../utils/scene-objects';
 import { maxSpriteImageBytes, spriteImageTypes, storeSpriteImage } from '../utils/helpers';
 
 const shapePreviewDimensions: Record<SceneObjectKind, { width: number; height: number }> = {
@@ -589,12 +589,12 @@ const Viewport: React.FC = () => {
     const clearAssetDrag = () => { draggedAsset.current = null; };
     window.addEventListener('playground-place-asset', placeAsset);
     window.addEventListener('playground-replace-sprite-image', replaceAsset);
-    window.addEventListener('playground-drag-scene-asset', trackAssetDrag);
+    window.addEventListener(sceneAssetDragEvent, trackAssetDrag);
     window.addEventListener('playground-before-run', clearAssetDrag);
     return () => {
       window.removeEventListener('playground-place-asset', placeAsset);
       window.removeEventListener('playground-replace-sprite-image', replaceAsset);
-      window.removeEventListener('playground-drag-scene-asset', trackAssetDrag);
+      window.removeEventListener(sceneAssetDragEvent, trackAssetDrag);
       window.removeEventListener('playground-before-run', clearAssetDrag);
       clearAssetDrag();
     };

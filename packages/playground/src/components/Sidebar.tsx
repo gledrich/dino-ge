@@ -61,7 +61,7 @@ const Sidebar: React.FC = () => {
   };
 
   const insertShapeCode = (kind: SceneObjectKind) => {
-    const placement = insertSceneObjectCode(kind);
+    const placement = insertSceneObjectCode({ kind }, currentScriptId);
     const message = placement.sourceId ? `Inserted ${placement.tag} into the script.`
       : placement.error ?? 'Open a script in the editor before inserting shape code.';
     setFeedback({ scriptId: currentScriptId, message, error: !placement.sourceId });

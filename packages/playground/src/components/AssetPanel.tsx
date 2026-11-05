@@ -2,7 +2,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import { Engine, Loader } from 'dino-ge';
 import { usePlayground } from '../context/PlaygroundContext';
 import { useScenePlacementSource } from '../hooks/useScenePlacementSource';
-import { getSceneAssetPreviewType, getSceneSpritePlacement, isReplaceableSprite, sceneAssetDragType, sceneObjectCodeEvent, type SceneImageAsset, type SceneObjectPlacement } from '../utils/scene-objects';
+import { getSceneAssetPreviewType, insertSceneObjectCode, isReplaceableSprite, sceneAssetDragEvent, sceneAssetDragType, type SceneImageAsset } from '../utils/scene-objects';
 import { listSpriteImages, spriteImageTypes, type StoredSpriteImage } from '../utils/helpers';
 import '../styles/asset-panel.css';
 
@@ -40,9 +40,9 @@ function AssetTile({ asset, isEditing, canReplace, placementSource, onInsert }: 
           event.dataTransfer.setData(sceneAssetDragType, asset.tag);
           event.dataTransfer.setData(getSceneAssetPreviewType(asset.tag), '');
           event.dataTransfer.effectAllowed = 'copy';
-          window.dispatchEvent(new CustomEvent<SceneImageAsset>('playground-drag-scene-asset', { detail: { tag: asset.tag, image } }));
+          window.dispatchEvent(new CustomEvent<SceneImageAsset>(sceneAssetDragEvent, { detail: { tag: asset.tag, image } }));
         }}
-        onDragEnd={() => window.dispatchEvent(new CustomEvent('playground-drag-scene-asset', { detail: null }))}
+        onDragEnd={() => window.dispatchEvent(new CustomEvent(sceneAssetDragEvent, { detail: null }))}
       >
         <div className="asset-preview">
           {!unavailable && <img src={asset.url} alt="" draggable={false} loading="lazy"
@@ -152,9 +152,7 @@ const AssetPanel: React.FC = () => {
 
   const insertSpriteCode = (asset: SceneImageAsset) => {
     const reject = (message: string) => setFeedback({ message, error: true });
-    const placement = getSceneSpritePlacement(asset, { x: 100, y: 100 }, currentScriptId);
-    if (!placement) return reject('This image needs a reusable URL before it can be added to the script.');
-    window.dispatchEvent(new CustomEvent<SceneObjectPlacement>(sceneObjectCodeEvent, { detail: placement }));
+    const placement = insertSceneObjectCode({ asset }, currentScriptId);
     if (!placement.sourceId) return reject(placement.error ?? 'Wait for the open script to start before inserting sprite code.');
     setFeedback({ message: `Inserted ${placement.tag}. Reset game to preview it.` });
   };
@@ -173,7 +171,8 @@ const AssetPanel: React.FC = () => {
       <p className="asset-help">Import an image or drop it onto the canvas to place a sprite.</p>
       {assets.length > 0 && (
         <p className="asset-help">
-          {isEditing ? 'Drag or click an image to place it. Shift+Enter positions with keys.' : 'Enter Edit scene to place listed images.'} Use Insert to add sprite code.
+          {isEditing ? 'Drag to the canvas to place, or to the editor for code. Click to place. Shift+Enter positions with keys.'
+            : 'Enter Edit scene to drag images. Use Insert to add sprite code.'}
         </p>
       )}
       {feedback && <p className={`library-feedback${feedback.error ? ' library-feedback-error' : ''}`}

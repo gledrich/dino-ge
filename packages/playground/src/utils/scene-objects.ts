@@ -7,6 +7,7 @@ export const scenePointerDragEvent = 'playground-pointer-drag-scene-item';
 export const sceneKeyboardPlacementEvent = 'playground-position-scene-item';
 export const sceneObjectCodeEvent = 'playground-insert-scene-object-code';
 export const sceneAssetDragType = 'application/x-dino-scene-asset';
+export const sceneAssetDragEvent = 'playground-drag-scene-asset';
 export const sceneSourceKey = '__dinoPlaygroundSceneSource';
 
 // Drag payloads are protected until drop, but their type names remain visible.
@@ -203,8 +204,12 @@ export function getDefaultSceneObjectTag(kind: SceneObjectKind) {
   return `New ${kind.toLowerCase()}`;
 }
 
-export function insertSceneObjectCode(kind: SceneObjectKind): SceneObjectPlacement {
-  const placement: SceneObjectPlacement = { kind, tag: getDefaultSceneObjectTag(kind), x: 100, y: 100 };
+export function insertSceneObjectCode(item: ScenePointerDragItem, scriptId: string): { tag?: string; sourceId?: string; error?: string } {
+  const point = { x: 100, y: 100 };
+  const placement: SceneObjectPlacement | undefined = 'asset' in item
+    ? getSceneSpritePlacement(item.asset, point, scriptId)
+    : { kind: item.kind, tag: getDefaultSceneObjectTag(item.kind), ...point };
+  if (!placement) return { error: 'This image needs a reusable URL before it can be added to the script.' };
   window.dispatchEvent(new CustomEvent<SceneObjectPlacement>(sceneObjectCodeEvent, { detail: placement }));
   return placement;
 }
