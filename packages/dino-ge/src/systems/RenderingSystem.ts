@@ -6,7 +6,7 @@ import Engine from '../core/Engine.js';
 import PhysicsComponent from '../components/PhysicsComponent.js';
 import Vector2 from '../math/Vector2.js';
 import { getEngineState } from '../core/EngineState.js';
-import { getViewportDrawOrder, getViewportGeometry } from '../core/ViewportGeometry.js';
+import { getViewportDrawOrder, getViewportGeometry, getViewportRotationHandle } from '../core/ViewportGeometry.js';
 
 /**
  * A system that processes entities with RenderComponents.
@@ -96,8 +96,8 @@ export default class RenderingSystem extends System {
     }
 
     state.sortedObjects.forEach((object) => {
-      const { origin: worldPosition, width, height, rotation, cos, sin, cornerX, cornerY, line } =
-        getViewportGeometry(object);
+      const geometry = getViewportGeometry(object);
+      const { origin: worldPosition, width, height, rotation, cos, sin, cornerX, cornerY, line } = geometry;
       const acrossX = width * cos;
       const acrossY = width * sin;
       const downX = -height * sin;
@@ -163,6 +163,24 @@ export default class RenderingSystem extends System {
               handleSize,
               handleSize
             );
+          }
+
+          if (Engine.paused && object === Engine.selectedObject) {
+            const handle = getViewportRotationHandle(geometry, Engine.camera.zoom);
+            if (handle) {
+              this.ctx.strokeStyle = '#65d9b2';
+              this.ctx.lineWidth = 1 / Engine.camera.zoom;
+              this.ctx.beginPath();
+              this.ctx.moveTo(handle.anchorX, handle.anchorY);
+              this.ctx.lineTo(handle.x, handle.y);
+              this.ctx.stroke();
+              this.ctx.beginPath();
+              this.ctx.arc(handle.x, handle.y, handle.radius, 0, Math.PI * 2);
+              this.ctx.fillStyle = '#65d9b2';
+              this.ctx.fill();
+              this.ctx.strokeStyle = '#111';
+              this.ctx.stroke();
+            }
           }
 
           this.ctx.save();

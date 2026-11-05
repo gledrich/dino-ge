@@ -5,23 +5,23 @@ import ShapeComponent from '../components/ShapeComponent.js';
 import TextComponent from '../components/TextComponent.js';
 import VisibilityComponent from '../components/VisibilityComponent.js';
 import type GameObject from './GameObject.js';
-import { containsViewportPoint, getViewportDrawOrder, getViewportGeometry, projectOntoObjectAxes, snapToGrid } from './ViewportGeometry.js';
+import { containsViewportPoint, getViewportDrawOrder, getViewportGeometry, getViewportRotationHandle, projectOntoObjectAxes, snapToGrid } from './ViewportGeometry.js';
 
 /** Detail of an objectManipulationPreview event. A null detail ends the preview. */
 export interface ObjectManipulationPreview {
   object: GameObject;
-  kind: 'drag' | 'resize';
+  kind: 'drag' | 'resize' | 'rotate';
   value: Vector2;
 }
 
-interface ObjectGesture {
-  kind: ObjectManipulationPreview['kind'];
+type ObjectGesture = {
   object: GameObject;
-  offset: Vector2;
   initial?: Vector2;
-  initialBounds?: Vector2;
   previewValue?: Vector2;
-}
+} & (
+  | { kind: 'drag' | 'resize'; offset: Vector2; initialBounds?: Vector2 }
+  | { kind: 'rotate'; pointerAngle: number; rotation: number }
+);
 
 /**
  * Handles mouse and keyboard input events.
@@ -37,6 +37,10 @@ export default class Input {
   private static clearGesture() {
     const gesture = this.gesture;
     this.gesture = null;
+    if (gesture?.kind === 'rotate') {
+      const canvas = document.getElementById('canvas');
+      if (canvas?.style.cursor === 'grabbing') canvas.style.cursor = 'default';
+    }
     if (gesture?.previewValue) Engine.emit('objectManipulationPreview', null);
     return gesture;
   }
@@ -62,7 +66,8 @@ export default class Input {
     this.mousePosition.set((event.clientX - rect.left) * scaleX, (event.clientY - rect.top) * scaleY);
   }
 
-  private static getGestureValue(object: GameObject, kind: 'drag' | 'resize'): Vector2 {
+  private static getGestureValue(object: GameObject, kind: ObjectGesture['kind']): Vector2 {
+    if (kind === 'rotate') return new Vector2(object.transform.rotation, 0);
     if (kind === 'drag') {
       const position = object.transform.position;
       return new Vector2(position?.x, position?.y);
@@ -88,6 +93,13 @@ export default class Input {
     return !line && width !== 0 && height !== 0 && isInside ? geometry : null;
   }
 
+  private static isOverRotationHandle(object: GameObject, x: number, y: number) {
+    if (!Engine.paused || !object.bounds) return false;
+    const zoom = Engine.camera.zoom;
+    const handle = getViewportRotationHandle(getViewportGeometry(object), zoom);
+    return !!handle && Math.hypot(x - handle.x, y - handle.y) <= handle.radius + 2 / zoom;
+  }
+
   /**
    * initialises input event listeners.
    */
@@ -103,6 +115,26 @@ export default class Input {
         this.clearGesture();
       }
       const gesture = this.gesture;
+
+      if (gesture?.kind === 'rotate') {
+        if (!Engine.paused) {
+          if (gesture.initial) gesture.object.transform.rotation = gesture.initial.x;
+          this.clearGesture();
+          return;
+        }
+        const { transform } = gesture.object;
+        const origin = transform.worldPosition;
+        const dx = this.mouseX - origin.x;
+        const dy = this.mouseY - origin.y;
+        if (Math.hypot(dx, dy) < 2 / Engine.camera.zoom) return;
+        const angle = Math.atan2(dy, dx);
+        const delta = angle - gesture.pointerAngle;
+        gesture.rotation += Math.atan2(Math.sin(delta), Math.cos(delta));
+        gesture.pointerAngle = angle;
+        transform.rotation = event.shiftKey ? snapToGrid(gesture.rotation, Math.PI / 12) : gesture.rotation;
+        this.publishPreview(gesture);
+        return;
+      }
 
       if (gesture?.kind === 'resize') {
         const obj = gesture.object;
@@ -166,9 +198,11 @@ export default class Input {
       }
 
       const selected = Engine.selectedObject;
-      if (canvas && Engine.debug && selected && this.getHoveredResizeHandle(selected, this.mouseX, this.mouseY)) {
+      if (canvas && Engine.debug && selected && this.isOverRotationHandle(selected, this.mouseX, this.mouseY)) {
+        canvas.style.cursor = 'grab';
+      } else if (canvas && Engine.debug && selected && this.getHoveredResizeHandle(selected, this.mouseX, this.mouseY)) {
         canvas.style.cursor = 'se-resize';
-      } else if (canvas?.style?.cursor === 'se-resize') {
+      } else if (canvas && (canvas.style?.cursor === 'se-resize' || canvas.style?.cursor === 'grab')) {
         canvas.style.cursor = 'default';
       }
     });
@@ -187,6 +221,16 @@ export default class Input {
       if (Engine.debug && event.button === 0) {
         this.clearGesture();
         const selected = Engine.selectedObject;
+        if (selected && this.isOverRotationHandle(selected, worldPos.x, worldPos.y)) {
+          const { rotation, worldPosition } = selected.transform;
+          this.gesture = {
+            kind: 'rotate', object: selected, rotation,
+            pointerAngle: Math.atan2(worldPos.y - worldPosition.y, worldPos.x - worldPosition.x),
+            initial: this.getGestureValue(selected, 'rotate'),
+          };
+          target.style.cursor = 'grabbing';
+          return;
+        }
         const handle = selected && this.getHoveredResizeHandle(selected, worldPos.x, worldPos.y);
         if (selected && handle) {
           this.gesture = {
@@ -260,11 +304,14 @@ export default class Input {
       const key = String(event.key).toLowerCase();
       const gesture = this.gesture;
       if (key === 'escape' && Engine.debug && gesture?.initial && gesture.object === Engine.selectedObject) {
-        const { object, kind, initial, initialBounds } = gesture;
+        const { object, kind, initial } = gesture;
         this.clearGesture();
         if (kind === 'drag') {
           object.transform.position.set(initial.x, initial.y);
+        } else if (kind === 'rotate') {
+          object.transform.rotation = initial.x;
         } else {
+          const { initialBounds } = gesture;
           if (object.getComponent(SpriteComponent)) object.transform.scale.set(initial.x, initial.y);
           if (initialBounds && object.bounds &&
               (object.bounds.width !== initialBounds.x || object.bounds.height !== initialBounds.y)) {

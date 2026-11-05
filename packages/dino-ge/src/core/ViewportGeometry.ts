@@ -49,6 +49,27 @@ export function projectOntoObjectAxes(geometry: ReturnType<typeof getViewportGeo
   return { x: dx * geometry.cos + dy * geometry.sin, y: -dx * geometry.sin + dy * geometry.cos };
 }
 
+/** The rotation handle follows the upper edge or the midpoint of a line. */
+export function getViewportRotationHandle(geometry: ReturnType<typeof getViewportGeometry>, zoom: number) {
+  const { origin, width, height, cos, sin, line } = geometry;
+  const gap = 20 / zoom;
+  const radius = 5 / zoom;
+  if (line) {
+    const dx = line.x2 - line.x1;
+    const dy = line.y2 - line.y1;
+    const length = Math.hypot(dx, dy);
+    if (!length) return;
+    const anchorX = (line.x1 + line.x2) / 2;
+    const anchorY = (line.y1 + line.y2) / 2;
+    return { anchorX, anchorY, x: anchorX + dy / length * gap, y: anchorY - dx / length * gap, radius };
+  }
+  if (!width || !height) return;
+  const anchorX = origin.x + width * cos / 2;
+  const anchorY = origin.y + width * sin / 2;
+  const outward = Math.sign(height) * gap;
+  return { anchorX, anchorY, x: anchorX + sin * outward, y: anchorY - cos * outward, radius };
+}
+
 export function containsViewportPoint(object: GameObject, geometry: ReturnType<typeof getViewportGeometry>,
   x: number, y: number, lineTolerance: number): boolean {
   const { line } = geometry;
