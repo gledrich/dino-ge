@@ -122,21 +122,28 @@
 .library-row {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
-  gap: 4px;
 }
 
 .library-row .snippet-btn {
   padding-inline: 7px;
+  border-start-end-radius: 0;
+  border-end-end-radius: 0;
 }
 
 .library-row .snippet-btn[draggable='true'] { cursor: grab; touch-action: pan-y; }
 .library-row .snippet-btn[draggable='true']:active { cursor: grabbing; }
 .library-row .library-code {
   gap: 5px;
+  margin-inline-start: -1px;
+  border-start-start-radius: 0;
+  border-end-start-radius: 0;
+  background: var(--bg-secondary);
   color: var(--text-secondary);
 }
 
+.library-row .scene-control:is(:hover, :focus-visible) { z-index: 1; }
 .library-row .library-code:is(:hover, :focus-visible) { color: var(--text-primary); }
+.library-row .library-code:hover { background: var(--bg-tertiary); }
 
 .library-code i { font-size: 11px; }
 
@@ -167,11 +174,11 @@
 
 @container (max-width: 174px) {
   .sidebar-tab i,
-  .snippet-btn i,
+  .snippet-btn .library-affordance,
   .library-code i { display: none; }
 
   .sidebar-tabs,
   .sidebar-content { padding-inline: 8px; }
 
-  .library-row .scene-control { padding-inline: 5px; }
+  .library-row .scene-control { gap: 5px; padding-inline: 5px; }
 }

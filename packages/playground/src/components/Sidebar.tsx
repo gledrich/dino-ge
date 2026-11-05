@@ -92,10 +92,10 @@ const Sidebar: React.FC = () => {
             <section className="library-section" aria-labelledby="library-objects" aria-describedby="library-placement-hint">
               <h3 id="library-objects">Game objects</h3>
               <p id="library-placement-hint" className="library-hint">
-                Drag to the canvas to place, or to the editor for code.
+                Drag to the canvas or the editor. Click an object to place it, or choose Code to insert it.
               </p>
               <p className="library-hint library-shortcuts">
-                Click to place. <kbd>Shift+Enter</kbd> to position with keys.
+                <kbd>Shift+Enter</kbd> to position with arrow keys.
               </p>
               {feedback?.scriptId === currentScriptId && <p className={`library-feedback${feedback.error ? ' library-feedback-error' : ''}`}
                 role={feedback.error ? 'alert' : 'status'}>{feedback.message}</p>}
@@ -126,7 +126,7 @@ const Sidebar: React.FC = () => {
                   <button type="button" className="scene-control library-code" aria-label={`Insert ${kind.toLowerCase()} code`}
                     title={`Insert ${kind.toLowerCase()} code`} onClick={() => insertShapeCode(kind)}>
                     <i className="fa-solid fa-code" aria-hidden="true" />
-                    <span>Insert</span>
+                    <span>Code</span>
                   </button>
                 </div>
               ))}
