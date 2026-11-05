@@ -1199,12 +1199,13 @@ new Engine({ update() {} }, { containerId: 'playground-canvas-container', backgr
   await expect(debug).toHaveAttribute('aria-pressed', 'true');
   const box = (await canvas.boundingBox())!;
   await page.getByRole('button', { name: 'Add rectangle' }).dragTo(canvas, {
-    targetPosition: { x: Math.round(box.width) - 110, y: 26 },
+    // Stay under the HUD and outside the camera's edge-pan zone.
+    targetPosition: { x: Math.round(box.width) - 110, y: 56 },
   });
   await expect(page.getByRole('button', { name: 'New rectangle', exact: true })).toHaveAttribute('aria-pressed', 'true');
-  await expect(page.getByRole('spinbutton', { name: 'Y', exact: true })).toHaveValue('26.00');
+  await expect(page.getByRole('spinbutton', { name: 'Y', exact: true })).toHaveValue('56.00');
   await expect.poll(() => canvas.evaluate((element: HTMLCanvasElement) =>
-    Array.from(element.getContext('2d')!.getImageData(element.width - 80, 45, 1, 1).data))).toEqual([84, 214, 173, 255]);
+    Array.from(element.getContext('2d')!.getImageData(element.width - 80, 72, 1, 1).data))).toEqual([84, 214, 173, 255]);
 
   await page.getByRole('button', { name: 'Play', exact: true }).click();
   await debug.click();
