@@ -94,6 +94,20 @@
   line-height: 1.4;
 }
 
+.library-feedback {
+  margin: 0;
+  padding: 6px 8px;
+  border-inline-start: 2px solid var(--accent-primary);
+  border-radius: var(--scene-control-radius);
+  background: var(--bg-secondary);
+  color: var(--text-primary);
+  font-size: 12px;
+  line-height: 1.4;
+  overflow-wrap: anywhere;
+}
+
+.library-feedback-error { border-inline-start-color: var(--accent-secondary); }
+
 .library-row {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;

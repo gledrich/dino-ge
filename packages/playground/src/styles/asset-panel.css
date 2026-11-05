@@ -36,20 +36,6 @@
 .asset-actions .scene-control { flex: 1; }
 .asset-actions .scene-control:disabled { opacity: 0.7; cursor: default; }
 
-.asset-feedback {
-  margin: 0;
-  padding: 6px 8px;
-  border-inline-start: 2px solid var(--accent-primary);
-  border-radius: var(--scene-control-radius);
-  background: var(--bg-secondary);
-  color: var(--text-primary);
-  font-size: 12px;
-  line-height: 1.4;
-  overflow-wrap: anywhere;
-}
-
-.asset-feedback-error { border-inline-start-color: var(--accent-secondary); }
-
 .asset-preview {
   flex-shrink: 0;
   width: 48px;

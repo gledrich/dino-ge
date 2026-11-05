@@ -1,24 +1,16 @@
 import React, { useRef, useState } from 'react';
 import AssetPanel from './AssetPanel';
-import { getDefaultSceneObjectTag, getSceneShapeOptionLines, sceneObjectDragType, type SceneObjectKind } from '../utils/scene-objects';
+import { usePlayground } from '../context/PlaygroundContext';
+import { getDefaultSceneObjectTag, sceneObjectCodeEvent, sceneObjectDragType, type SceneObjectKind, type SceneObjectPlacement } from '../utils/scene-objects';
 import { useScenePlacementSource } from '../hooks/useScenePlacementSource';
 import '../styles/sidebar.css';
 
-function shapeSnippet(kind: SceneObjectKind, icon: string) {
-  const options = [
-    `tag: ${JSON.stringify(getDefaultSceneObjectTag(kind))}`,
-    'position: new Vector2(100, 100)',
-    ...getSceneShapeOptionLines(kind),
-  ];
-  return { icon, kind, code: `new ${kind}({\n  ${options.join(',\n  ')}\n});` };
-}
-
-const shapeSnippets = [
-  shapeSnippet('Text', 'fa-font'),
-  shapeSnippet('Rectangle', 'fa-square'),
-  shapeSnippet('Circle', 'fa-circle'),
-  shapeSnippet('Line', 'fa-minus'),
-];
+const shapeItems = [
+  { kind: 'Text', icon: 'fa-font' },
+  { kind: 'Rectangle', icon: 'fa-square' },
+  { kind: 'Circle', icon: 'fa-circle' },
+  { kind: 'Line', icon: 'fa-minus' },
+] as const;
 
 const codeSnippets = [
   { icon: 'fa-arrows-up-down-left-right', label: 'Vector2', code: 'new Vector2(0, 0)' },
@@ -58,12 +50,22 @@ floor.addComponent(floorPhys);` }
 type TabType = 'library' | 'assets';
 
 const Sidebar: React.FC = () => {
+  const { currentScriptId } = usePlayground();
   const [activeTab, setActiveTab] = useState<TabType>('library');
+  const [feedback, setFeedback] = useState<{ scriptId: string; message: string; error: boolean }>();
   const assetsTab = useRef<HTMLButtonElement>(null);
   const placementSource = useScenePlacementSource(activeTab === 'library');
 
   const insertSnippet = (code: string) => {
     window.dispatchEvent(new CustomEvent('playground-insert-text', { detail: code }));
+  };
+
+  const insertShapeCode = (kind: SceneObjectKind) => {
+    const placement: SceneObjectPlacement = { kind, tag: getDefaultSceneObjectTag(kind), x: 100, y: 100 };
+    window.dispatchEvent(new CustomEvent<SceneObjectPlacement>(sceneObjectCodeEvent, { detail: placement }));
+    const message = placement.sourceId ? `Inserted ${placement.tag} into the script.`
+      : placement.error ?? 'Open a script in the editor before inserting shape code.';
+    setFeedback({ scriptId: currentScriptId, message, error: !placement.sourceId });
   };
 
   return (
@@ -93,7 +95,9 @@ const Sidebar: React.FC = () => {
               <p id="library-placement-hint" className="library-hint">
                 Drag or click to place. Shift+Enter positions with keys. Use Insert to add code.
               </p>
-              {shapeSnippets.map(({ icon, code, kind }) => (
+              {feedback?.scriptId === currentScriptId && <p className={`library-feedback${feedback.error ? ' library-feedback-error' : ''}`}
+                role={feedback.error ? 'alert' : 'status'}>{feedback.message}</p>}
+              {shapeItems.map(({ icon, kind }) => (
                 <div className="library-row" key={kind}>
                   <button type="button" className="scene-control snippet-btn" draggable
                     aria-label={`Add ${kind.toLowerCase()}`}
@@ -118,7 +122,7 @@ const Sidebar: React.FC = () => {
                     <i className="fa-solid fa-grip-vertical library-affordance" aria-hidden="true" />
                   </button>
                   <button type="button" className="scene-control library-code" aria-label={`Insert ${kind.toLowerCase()} code`}
-                    title={`Insert ${kind.toLowerCase()} code`} onClick={() => insertSnippet(code)}>
+                    title={`Insert ${kind.toLowerCase()} code`} onClick={() => insertShapeCode(kind)}>
                     <span aria-hidden="true">Insert</span>
                   </button>
                 </div>

@@ -413,8 +413,8 @@ function getPlacedObjectInsertion(callback: acorn.Expression | undefined): numbe
   }
 }
 
-/** Adds a constructor to the active scene or engine startup callback. */
-export function getSceneObjectCreation(source: string, placement: SceneObjectPlacement) {
+/** Adds a constructor to the active setup, or to a standalone script when requested. */
+export function getSceneObjectCreation(source: string, placement: SceneObjectPlacement, allowStandalone = false) {
   let ast: acorn.Program;
   try {
     ast = acorn.parse(source, { ecmaVersion: 'latest', sourceType: 'module' });
@@ -439,7 +439,7 @@ export function getSceneObjectCreation(source: string, placement: SceneObjectPla
     (key.type === 'Literal' && (key as acorn.Literal).value === 'onLoad');
   let callback: acorn.Expression | undefined;
   let engineHook: acorn.Property | undefined;
-  let insertion: number;
+  let insertion: number | undefined;
   if (placement.scene) {
     const scene = sceneDeclarations(ast, imports).find(item => item.id?.name === placement.scene?.className);
     if (!scene || scene.body.body.some(member => 'computed' in member && member.computed)) return null;
@@ -451,14 +451,15 @@ export function getSceneObjectCreation(source: string, placement: SceneObjectPla
     insertion = scene.body.start + 1;
   } else {
     visit(ast);
-    if (configurations.length !== 1) return null;
-    const config = configurations[0];
-    if (config.properties.some(prop => prop.type !== 'Property' || prop.computed)) return null;
-    const hooks = config.properties.filter((prop): prop is acorn.Property => prop.type === 'Property' && isOnLoad(prop.key));
-    if (hooks.length > 1 || (hooks[0] && hooks[0].kind !== 'init')) return null;
-    engineHook = hooks[0];
-    callback = engineHook?.value;
-    insertion = config.start + 1;
+    if (configurations.length === 1) {
+      const [config] = configurations;
+      if (config.properties.some(prop => prop.type !== 'Property' || prop.computed)) return null;
+      const hooks = config.properties.filter((prop): prop is acorn.Property => prop.type === 'Property' && isOnLoad(prop.key));
+      if (hooks.length > 1 || (hooks[0] && hooks[0].kind !== 'init')) return null;
+      engineHook = hooks[0];
+      callback = engineHook?.value;
+      insertion = config.start + 1;
+    } else if (configurations.length || !allowStandalone) return null;
   }
   const wrappedInsertion = getPlacedObjectInsertion(callback);
   const body = callback?.type === 'ArrowFunctionExpression' || callback?.type === 'FunctionExpression' ? callback.body : undefined;
@@ -510,13 +511,22 @@ export function getSceneObjectCreation(source: string, placement: SceneObjectPla
     const directive = body.body.filter(item => 'directive' in item).at(-1);
     const start = directive?.end ?? body.start + 1;
     edits.push({ start, end: start, newText: `\n    ${statement}\n` });
-  } else {
+  } else if (insertion !== undefined) {
     const separator = placement.scene ? '' : ',';
     edits.push({ start: insertion, end: insertion, newText: `\n  onLoad() {\n    ${statement}\n  }${separator}\n` });
+  } else {
+    edits.push({ start: source.length, end: source.length, newText: `\n${statement}\n` });
   }
   if (addedImports.length) {
-    const start = ast.body.find(node => node.type === 'ImportDeclaration')?.start ?? 0;
-    edits.push({ start, end: start, newText: `import { ${addedImports.join(', ')} } from 'dino-ge';\n` });
+    const start = ast.body.find(node => node.type === 'ImportDeclaration')?.start ??
+      ast.body.find(node => !('directive' in node))?.start ?? source.length;
+    const newText = `import { ${addedImports.join(', ')} } from 'dino-ge';\n`;
+    if (start === source.length) {
+      // An empty or directive-only script gets a single insertion at the end.
+      edits[0].newText = `${source.length ? '\n' : ''}${newText}${statement}\n`;
+    } else {
+      edits.push({ start, end: start, newText });
+    }
   }
   return { edits, tag, sourceId: `${constructor}-${tag}-0` };
 }

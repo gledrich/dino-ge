@@ -19,8 +19,15 @@ test('keeps unsaved edits across tabs and panel collapse, and retains hidden con
   await page.getByRole('button', { name: 'Collapse editor' }).click();
   await page.getByRole('button', { name: 'Expand editor' }).click();
   await expect(editor).toContainText('local draft');
+  await page.getByRole('tab', { name: 'Console' }).click();
   await page.getByRole('button', { name: 'Insert rectangle code', exact: true }).click();
-  await expect(editor).toContainText('new Rectangle');
+  await expect(page.getByRole('tab', { name: 'Editor' })).toHaveAttribute('aria-selected', 'true');
+  await expect(editor).toContainText('new DinoPlaceRectangle');
+  await expect(editor).toContainText('local draft');
+  await expect.poll(() => page.evaluate(() => {
+    const { monaco } = window as typeof window & { monaco: Monaco };
+    return monaco.editor.getEditors()[0].getValue();
+  })).toContain("import { Rectangle as DinoPlaceRectangle, Vector2 as DinoPlaceVector2 } from 'dino-ge';");
   await expect(page.getByRole('button', { name: 'Edit scene', exact: true })).toHaveAttribute('aria-pressed', 'false');
 });
 
@@ -1320,12 +1327,12 @@ new Engine({ onLoad() {} }, { containerId: 'playground-canvas-container' });` })
   await expect(editor).toContainText('new Engine');
   const insert = page.getByRole('button', { name: 'Insert rectangle code' });
   await insert.click();
-  await expect(editor).toContainText('new Rectangle');
+  await expect(editor).toContainText('new DinoPlaceRectangle');
 });
 
-test('runs Library shape snippets with the same defaults as canvas drops', async ({ page }) => {
+test('runs Library shape snippets without pre-imported constructors and matches canvas drops', async ({ page }) => {
   let source = `
-import { Engine, Rectangle, Circle, Text, Line, Vector2 } from 'dino-ge';
+import { Engine } from 'dino-ge';
 new Engine({ onLoad() {}, update() {} }, { containerId: 'playground-canvas-container' });`;
   await page.route('**/files', route => route.fulfill({ json: ['script'] }));
   await page.route('**/api/scripts/script', route => {

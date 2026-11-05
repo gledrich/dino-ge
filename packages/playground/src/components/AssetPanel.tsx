@@ -2,7 +2,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import { Engine, Loader } from 'dino-ge';
 import { usePlayground } from '../context/PlaygroundContext';
 import { useScenePlacementSource } from '../hooks/useScenePlacementSource';
-import { getSceneAssetPreviewType, getSceneSource, getSceneSpritePlacement, isReplaceableSprite, sceneAssetDragType, sceneObjectCodeEvent, type SceneImageAsset, type SceneObjectPlacement } from '../utils/scene-objects';
+import { getSceneAssetPreviewType, getSceneSpritePlacement, isReplaceableSprite, sceneAssetDragType, sceneObjectCodeEvent, type SceneImageAsset, type SceneObjectPlacement } from '../utils/scene-objects';
 import { listSpriteImages, spriteImageTypes, type StoredSpriteImage } from '../utils/helpers';
 import '../styles/asset-panel.css';
 
@@ -90,7 +90,7 @@ const AssetPanel: React.FC = () => {
   const [catalogue, setCatalogue] = useState<{ scriptId: string; images: StoredSpriteImage[]; error?: string }>();
   const [feedback, setFeedback] = useState<{ message: string; error?: boolean }>();
   const filePicker = useRef<HTMLInputElement>(null);
-  const { currentScriptId, isPaused, isDebug, setActiveTab, setIsEditorVisible } = usePlayground();
+  const { currentScriptId, isPaused, isDebug } = usePlayground();
   const isEditing = isPaused && isDebug;
   const placementSource = useScenePlacementSource(isEditing);
   const canReplace = isEditing && isReplaceableSprite(selected);
@@ -152,14 +152,10 @@ const AssetPanel: React.FC = () => {
 
   const insertSpriteCode = (asset: SceneImageAsset) => {
     const reject = (message: string) => setFeedback({ message, error: true });
-    const scene = Engine.currentScene ? getSceneSource(Engine.currentScene) : undefined;
-    if (Engine.currentScene && !scene) return reject('Insert sprite code in a named scene class declared in the open script.');
-    const placement = getSceneSpritePlacement(asset, { x: 100, y: 100 }, currentScriptId, scene);
+    const placement = getSceneSpritePlacement(asset, { x: 100, y: 100 }, currentScriptId);
     if (!placement) return reject('This image needs a reusable URL before it can be added to the script.');
     window.dispatchEvent(new CustomEvent<SceneObjectPlacement>(sceneObjectCodeEvent, { detail: placement }));
     if (!placement.sourceId) return reject(placement.error ?? 'Wait for the open script to start before inserting sprite code.');
-    setActiveTab('editor');
-    setIsEditorVisible(true);
     setFeedback({ message: `Inserted ${placement.tag}. Reset game to preview it.` });
   };
 
@@ -180,7 +176,7 @@ const AssetPanel: React.FC = () => {
           {isEditing ? 'Drag or click an image to place it. Shift+Enter positions with keys.' : 'Enter Edit scene to place listed images.'} Use Insert to add sprite code.
         </p>
       )}
-      {feedback && <p className={`asset-feedback${feedback.error ? ' asset-feedback-error' : ''}`}
+      {feedback && <p className={`library-feedback${feedback.error ? ' library-feedback-error' : ''}`}
         role={feedback.error ? 'alert' : 'status'}>{feedback.message}</p>}
       {workspace?.error && <p className="asset-help" role="status">{workspace.error}</p>}
       {canReplace && <p className="asset-help">Use the swap button to change the selected sprite’s image.</p>}
