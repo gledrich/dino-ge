@@ -15,6 +15,8 @@ export interface LineProperties {
   __sourceId?: string;
   /** Stroke width of the line. */
   width?: number;
+  /** Transform origin for local endpoints. Defaults to p1 for existing lines. */
+  position?: Vector2;
   /** Start point of the line. */
   p1: Vector2;
   /** End point of the line. */
@@ -80,7 +82,7 @@ export default class Line extends GameObject {
     this.x2 = defaultedProps.p2.x;
     this.y2 = defaultedProps.p2.y;
     this.metadata.zIndex = defaultedProps.zIndex;
-    this.transform.position = defaultedProps.p1;
+    this.transform.position = defaultedProps.position ?? defaultedProps.p1;
 
     const width = Math.abs(this.x2 - this.x1);
     const height = Math.abs(this.y2 - this.y1);

@@ -96,20 +96,19 @@ export default class RenderingSystem extends System {
     }
 
     state.sortedObjects.forEach((object) => {
-      const { origin: worldPosition, width, height, rotation, cos, sin, cornerX, cornerY } =
+      const { origin: worldPosition, width, height, rotation, cos, sin, cornerX, cornerY, line } =
         getViewportGeometry(object);
       const acrossX = width * cos;
       const acrossY = width * sin;
       const downX = -height * sin;
       const downY = height * cos;
+      const left = line ? Math.min(line.x1, line.x2) - line.padding : worldPosition.x + Math.min(0, acrossX) + Math.min(0, downX);
+      const right = line ? Math.max(line.x1, line.x2) + line.padding : worldPosition.x + Math.max(0, acrossX) + Math.max(0, downX);
+      const top = line ? Math.min(line.y1, line.y2) - line.padding : worldPosition.y + Math.min(0, acrossY) + Math.min(0, downY);
+      const bottom = line ? Math.max(line.y1, line.y2) + line.padding : worldPosition.y + Math.max(0, acrossY) + Math.max(0, downY);
 
       // Frustum Culling
-      if (
-        worldPosition.x + Math.min(0, acrossX) + Math.min(0, downX) < bounds.x + bounds.width &&
-        worldPosition.x + Math.max(0, acrossX) + Math.max(0, downX) > bounds.x &&
-        worldPosition.y + Math.min(0, acrossY) + Math.min(0, downY) < bounds.y + bounds.height &&
-        worldPosition.y + Math.max(0, acrossY) + Math.max(0, downY) > bounds.y
-      ) {
+      if (left < bounds.x + bounds.width && right > bounds.x && top < bounds.y + bounds.height && bottom > bounds.y) {
         // Find any RenderComponent on the entity
         const renderable = object.getComponent(RenderComponent);
         const visibility = object.getComponent(VisibilityComponent);
@@ -130,7 +129,12 @@ export default class RenderingSystem extends System {
             this.ctx.setLineDash([5 / Engine.camera.zoom, 5 / Engine.camera.zoom]);
           }
 
-          if (object === Engine.selectedObject && rotation !== 0) {
+          if (line) {
+            this.ctx.beginPath();
+            this.ctx.moveTo(line.x1, line.y1);
+            this.ctx.lineTo(line.x2, line.y2);
+            this.ctx.stroke();
+          } else if (object === Engine.selectedObject && rotation !== 0) {
             this.ctx.save();
             this.ctx.translate(worldPosition.x, worldPosition.y);
             this.ctx.rotate(rotation);
@@ -142,7 +146,7 @@ export default class RenderingSystem extends System {
           this.ctx.setLineDash([]);
 
           // Draw resize handle if selected
-          if (object === Engine.selectedObject && width !== 0 && height !== 0) {
+          if (!line && object === Engine.selectedObject && width !== 0 && height !== 0) {
             const handleSize = 8 / Engine.camera.zoom;
             this.ctx.fillStyle = '#FFD166';
             this.ctx.fillRect(

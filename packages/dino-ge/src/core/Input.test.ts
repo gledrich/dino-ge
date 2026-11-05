@@ -414,7 +414,6 @@ describe('Input', () => {
     Input.init();
     
     // Shape
-    (obj.getComponent as jest.Mock).mockReturnValueOnce(mockComp);
     (Input as unknown as { mousePosition: Vector2 }).mousePosition = new Vector2(100, 100);
     capturedListeners['mousemove']({ clientX: 100, clientY: 100 } as unknown as MouseEvent);
     expect(mockComp.width).toBe(100);

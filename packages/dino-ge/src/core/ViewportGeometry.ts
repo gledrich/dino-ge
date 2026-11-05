@@ -1,5 +1,6 @@
 import type GameObject from './GameObject.js';
 import ShapeComponent from '../components/ShapeComponent.js';
+import LineComponent from '../components/LineComponent.js';
 
 /** Back to front, with the first registered object on top when layers tie. */
 export function getViewportDrawOrder(objects: Iterable<GameObject>): GameObject[] {
@@ -18,8 +19,21 @@ export function getViewportGeometry(object: GameObject) {
   const sin = Math.sin(rotation);
   const cornerX = origin.x + width * cos - height * sin;
   const cornerY = origin.y + width * sin + height * cos;
+  const segment = object.getComponent?.(LineComponent);
+  const dx = segment ? segment.p2.x - segment.p1.x : 0;
+  const dy = segment ? segment.p2.y - segment.p1.y : 0;
+  const worldLength = segment && Math.hypot(dx * scaleX, dy * scaleY);
+  const line = segment && {
+    x1: origin.x + segment.p1.x * scaleX * cos - segment.p1.y * scaleY * sin,
+    y1: origin.y + segment.p1.x * scaleX * sin + segment.p1.y * scaleY * cos,
+    x2: origin.x + segment.p2.x * scaleX * cos - segment.p2.y * scaleY * sin,
+    y2: origin.y + segment.p2.x * scaleX * sin + segment.p2.y * scaleY * cos,
+    // Scaling changes the stroke's area by the determinant, then its length by worldLength.
+    radius: worldLength ? segment.strokeWidth * Math.abs(scaleX * scaleY) * Math.hypot(dx, dy) / (2 * worldLength) : 0,
+    padding: segment.strokeWidth * Math.max(Math.abs(scaleX), Math.abs(scaleY)) / 2,
+  };
 
-  return { origin, scaleX, scaleY, width, height, rotation, cos, sin, cornerX, cornerY };
+  return { origin, scaleX, scaleY, width, height, rotation, cos, sin, cornerX, cornerY, line };
 }
 
 export function projectOntoObjectAxes(geometry: ReturnType<typeof getViewportGeometry>, x: number, y: number) {
@@ -28,7 +42,17 @@ export function projectOntoObjectAxes(geometry: ReturnType<typeof getViewportGeo
   return { x: dx * geometry.cos + dy * geometry.sin, y: -dx * geometry.sin + dy * geometry.cos };
 }
 
-export function containsViewportPoint(object: GameObject, geometry: ReturnType<typeof getViewportGeometry>, x: number, y: number): boolean {
+export function containsViewportPoint(object: GameObject, geometry: ReturnType<typeof getViewportGeometry>,
+  x: number, y: number, lineTolerance: number): boolean {
+  const { line } = geometry;
+  if (line) {
+    const dx = line.x2 - line.x1;
+    const dy = line.y2 - line.y1;
+    const lengthSquared = dx * dx + dy * dy;
+    if (!lengthSquared) return false;
+    const t = Math.max(0, Math.min(1, ((x - line.x1) * dx + (y - line.y1) * dy) / lengthSquared));
+    return Math.hypot(x - line.x1 - t * dx, y - line.y1 - t * dy) <= Math.max(line.radius, lineTolerance);
+  }
   const point = projectOntoObjectAxes(geometry, x, y);
   if (object.getComponent?.(ShapeComponent)?.type === 'circle' && object.bounds) {
     const radius = object.bounds.width / 2;

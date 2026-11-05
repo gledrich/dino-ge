@@ -51,10 +51,10 @@ export default class Input {
   private static getHoveredResizeHandle(object: GameObject, x: number, y: number) {
     if (!object.bounds) return null;
     const geometry = getViewportGeometry(object);
-    const { cornerX, cornerY, width, height } = geometry;
+    const { cornerX, cornerY, width, height, line } = geometry;
     const halfSize = 4 / Engine.camera.zoom;
     const isInside = Math.abs(x - cornerX) < halfSize && Math.abs(y - cornerY) < halfSize;
-    return width !== 0 && height !== 0 && isInside ? geometry : null;
+    return !line && width !== 0 && height !== 0 && isInside ? geometry : null;
   }
 
   /**
@@ -175,7 +175,7 @@ export default class Input {
           if (!obj.bounds || obj.getComponent?.(VisibilityComponent)?.visible === false) continue;
           
           const geometry = getViewportGeometry(obj);
-          if (containsViewportPoint(obj, geometry, worldPos.x, worldPos.y)) {
+          if (containsViewportPoint(obj, geometry, worldPos.x, worldPos.y, 5 / Engine.camera.zoom)) {
             Engine.selectedObject = obj;
             this.gesture = {
               kind: 'drag',

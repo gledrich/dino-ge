@@ -6,6 +6,7 @@ import LineComponent from '../components/LineComponent.js';
 import BoundsComponent from '../components/BoundsComponent.js';
 import Engine from '../core/Engine.js';
 import Registry from '../core/Registry.js';
+import { containsViewportPoint, getViewportGeometry } from '../core/ViewportGeometry.js';
 
 describe('Line', () => {
   const mockProps: LineProperties = {
@@ -83,6 +84,20 @@ describe('Line', () => {
     expect(pc?.restitution).toBe(0.5);
     expect(pc?.friction).toBe(0.2);
     expect(pc?.isSensor).toBe(false);
+  });
+
+  it('picks the rendered stroke after moving and rotating its explicit origin', () => {
+    const line = new Line({
+      position: new Vector2(120, 50),
+      p1: new Vector2(10, 0),
+      p2: new Vector2(-20, 0),
+      width: 4,
+    });
+    line.transform.rotation = Math.PI / 2;
+    line.transform.scale.set(10, 1);
+    const geometry = getViewportGeometry(line);
+    expect(containsViewportPoint(line, geometry, 123, 30, 5)).toBe(true);
+    expect(containsViewportPoint(line, geometry, 130, 30, 5)).toBe(false);
   });
 
   it('initialises with isSensor set to true', () => {
