@@ -846,7 +846,7 @@ const Viewport: React.FC = () => {
         style={isEditingScene ? { touchAction: 'none' } : undefined}
         role={isEditingScene || keyboardPlacement ? 'region' : undefined}
         aria-label={isEditingScene || keyboardPlacement ? 'Scene viewport' : undefined}
-        aria-describedby={keyboardPlacement ? 'scene-placement-keyboard-hint' : isEditingScene ? 'scene-keyboard-hint' : undefined}
+        aria-describedby={keyboardPlacement ? 'scene-placement-keyboard-hint' : isEditingScene ? 'scene-edit-zoom scene-keyboard-hint' : undefined}
         tabIndex={isEditingScene ? 0 : -1}
         onBlur={event => {
           if (event.currentTarget.contains(event.relatedTarget)) return;
@@ -1028,12 +1028,21 @@ const Viewport: React.FC = () => {
                 aria-pressed={isAlignmentSnapping} title="Snap moves and drops to visible edges and centres"
                 onClick={() => setSnapMode(mode => mode === 'objects' ? 'off' : 'objects')}>Align</button>
             </div>
-            {!keyboardPlacement && <span id="scene-keyboard-hint" className="scene-edit-hint">
-              {isPanTool ? 'Hand tool · Drag to pan · Pinch to zoom' : 'Space or middle drag pans'} · {isGridSnapping ? 'Arrows move 1 cell · Shift moves 10 cells' : 'Arrows move 1 px · Shift moves 10 px'}<br />
-              F frames selection · Alt/Option-click cycles overlapping objects<br />
-              Round handle rotates · Square resizes · Shift constrains · Esc cancels<br />
-              Zoom {zoomPercent ?? Math.round(Engine.camera.zoom * 100)}% · Wheel zooms at pointer · {historyBlockedReason || 'Ctrl/⌘+Z undoes · Add Shift to redo'}
-            </span>}
+            <div className="scene-edit-reference">
+              <span id="scene-edit-zoom">Zoom {zoomPercent ?? Math.round(Engine.camera.zoom * 100)}%</span>
+              {!keyboardPlacement && <details className="scene-edit-shortcuts">
+                <summary>Shortcuts</summary>
+                <div id="scene-keyboard-hint" className="scene-edit-hint">
+                  {isPanTool ? 'Drag to pan · Pinch to zoom' : 'Hold Space and drag to pan, or use the middle mouse button'}<br />
+                  Wheel zooms at the pointer · F frames the selection<br />
+                  {isGridSnapping ? 'Arrows move 1 cell · Shift moves 10 cells' : 'Arrows move 1 px · Shift moves 10 px'}<br />
+                  Alt/Option-click cycles overlapping objects<br />
+                  Round handle rotates · Square handle resizes · Shift constrains · Esc cancels<br />
+                  Ctrl/⌘+Z undoes · Add Shift to redo
+                </div>
+              </details>}
+            </div>
+            {!keyboardPlacement && historyBlockedReason && <span className="scene-edit-hint">{historyBlockedReason}</span>}
             {!isInspectorVisible && selectedObject && pendingCanvasPlacements.has(selectedObject) && (
               <button type="button" className="scene-control scene-review-changes" onClick={() => {
                 setIsInspectorVisible(true);

@@ -91,6 +91,35 @@
 .scene-pan-ready canvas { cursor: grab !important; }
 .scene-panning canvas { cursor: grabbing !important; }
 .scene-edit-hint { color: var(--text-secondary); font-size: 11px; line-height: 1.45; }
+
+.scene-edit-reference {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  border-top: 1px solid var(--border-color);
+  padding-top: 4px;
+  font-size: 11px;
+  line-height: 24px;
+}
+
+#scene-edit-zoom {
+  grid-area: 1 / 2;
+  color: var(--text-secondary);
+  font-variant-numeric: tabular-nums;
+}
+
+.scene-edit-shortcuts { grid-area: 1 / 1 / 2 / 3; }
+
+.scene-edit-shortcuts summary {
+  width: fit-content;
+  padding-inline: 5px;
+  border-radius: var(--scene-control-radius);
+  cursor: pointer;
+  pointer-events: auto;
+}
+
+.scene-edit-shortcuts summary:hover { background: var(--bg-tertiary); }
+.scene-edit-shortcuts summary:focus-visible { outline: 2px solid var(--accent-primary); }
+.scene-edit-shortcuts .scene-edit-hint { padding: 4px 5px 2px; }
 .scene-review-changes { justify-self: start; pointer-events: auto; }
 
 .canvas-changes-dialog {

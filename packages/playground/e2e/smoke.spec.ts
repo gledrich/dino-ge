@@ -92,6 +92,20 @@ new Engine({
     await expect(inspectorPanel).toBeVisible();
   });
 
+  test('keeps scene shortcuts available on demand in a narrow viewport', async ({ page }) => {
+    await page.setViewportSize({ width: 768, height: 900 });
+    await page.getByRole('button', { name: 'Edit scene', exact: true }).click();
+
+    const viewport = page.getByRole('region', { name: 'Scene viewport' });
+    const reference = page.getByText(/F frames (?:the )?selection/);
+    await expect(viewport).toHaveAccessibleDescription(/Zoom 100%/);
+    await expect(reference).toBeHidden();
+    await page.getByText('Shortcuts', { exact: true }).press('Enter');
+    await expect(reference).toBeVisible();
+    await page.getByText('Shortcuts', { exact: true }).press('Enter');
+    await expect(reference).toBeHidden();
+  });
+
   test('should toggle Explorer panel', async ({ page }) => {
     const explorerHeader = page.locator('.panel-header').filter({ hasText: 'Explorer' });
     await expect(explorerHeader).toBeVisible();
