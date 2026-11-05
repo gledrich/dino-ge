@@ -2,6 +2,7 @@ import Canvas from './Canvas.js';
 import GameObject from './GameObject.js';
 import Input from './Input.js';
 import Scene from './Scene.js';
+import SceneEffects, { type SceneTransitionOptions } from './SceneEffects.js';
 import ParticleEmitter from '../objects/ParticleEmitter.js';
 import ScreenUI, { type ScreenUIEditing, type ScreenUISnapshot } from './ScreenUI.js';
 import Camera from './Camera.js';
@@ -320,6 +321,12 @@ export default class Engine {
    * Sets the active scene, resetting the camera and calling the scene's onLoad.
    */
   public static set currentScene(scene: Scene | null) {
+    const global = globalThis as unknown as { __DINO_ENGINE_INSTANCE__?: Engine | null };
+    global.__DINO_ENGINE_INSTANCE__?.effects.cancel();
+    this.activateScene(scene);
+  }
+
+  private static activateScene(scene: Scene | null): void {
     this._state.currentScene = scene;
     notifySceneObjectsChanged();
     if (scene) {
@@ -328,6 +335,7 @@ export default class Engine {
     }
   }
 
+  private readonly effects = new SceneEffects();
   private _canvas: Canvas;
   private readonly screenUI?: ScreenUI;
   private readonly timers = new Set<number>();
@@ -479,10 +487,31 @@ export default class Engine {
     global.__DINO_ENGINE_INSTANCE__?.terminate();
   }
 
+  /** Switches scenes at the midpoint of a visual transition. */
+  public transitionTo(scene: Scene | null, options: SceneTransitionOptions): void {
+    if (this._destroyed) return;
+    if (options.duration !== undefined && (!Number.isFinite(options.duration) || options.duration <= 0)) {
+      Engine.currentScene = scene;
+      return;
+    }
+    this.effects.startTransition(scene, options);
+  }
+
+  /** Shakes the world in screen pixels for a duration in seconds. */
+  public shakeScreen(strength: number, duration = 0.25): void {
+    if (!this._destroyed) this.effects.startShake(strength, duration);
+  }
+
+  /** Separates the world's colour channels in screen pixels. */
+  public chromaticAberration(strength: number, duration = 0.25): void {
+    if (!this._destroyed) this.effects.startAberration(strength, duration);
+  }
+
   /** Completely stops this engine and cleans up its resources. */
   public terminate() {
     if (this._destroyed) return;
     this._destroyed = true;
+    this.effects.cancel();
     this.screenUI?.dispose();
     this.timers.forEach(timer => window.clearTimeout(timer));
     this.timers.clear();
@@ -537,6 +566,10 @@ export default class Engine {
 
     try {
       if (!Engine.paused) {
+        this.effects.advance(this._secondsPassed, scene => Engine.activateScene(scene));
+      }
+      if (this._destroyed) return;
+      if (!Engine.paused) {
         // Fixed update loop
         this._accumulator += this._secondsPassed;
         while (this._accumulator >= this._fixedDelta) {
@@ -582,13 +615,13 @@ export default class Engine {
   }
 
   private _draw() {
+    this.effects.prepareFrame(this._ctx);
     this._setBackground();
 
     const objects = Engine.currentScene ? Engine.currentScene.objects : Engine.objects;
 
-    if (Engine.renderingSystem) {
-      Engine.renderingSystem.update(objects, 0, Engine.debug);
-    }
+    this.effects.drawWorld(this._ctx, () => Engine.renderingSystem?.update(objects, 0, Engine.debug));
+    this.effects.drawOverlays(this._ctx);
 
     if (Engine.debug && Engine.debugPositionGridSize > 0) this._drawPositionGrid();
     if (Engine.debug && Engine.paused && Engine.debugSnapAlignment) this._drawAlignmentGuides();

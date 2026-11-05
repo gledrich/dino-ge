@@ -284,6 +284,10 @@ function checkSpikeDamage(now) {
     health--;
     sounds.damage?.play();
     emitBurst('#ff9474');
+    if (!reducedMotion.matches) {
+      game.shakeScreen(6, 0.22);
+      game.chromaticAberration(3, 0.18);
+    }
     healthPulse = now + 260;
     hint = 'Watch out for the obsidian spikes!';
     if (health === 0) finish(false);

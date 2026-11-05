@@ -47,8 +47,8 @@ This document outlines the planned features and milestones for the **Dino Game E
 - **Spatial Partitioning:**
   - [x] Implement a Quadtree to handle hundreds of active objects efficiently during collision checks.
 - **Scene Effects:**
-  - [ ] Add built-in scene transitions (e.g., Fade, Slide).
-  - [ ] Implement basic post-processing effects (e.g., Screen Shake, Chromatic Aberration).
+  - [x] Add built-in scene transitions (e.g., Fade, Slide).
+  - [x] Implement basic post-processing effects (e.g., Screen Shake, Chromatic Aberration).
 
 ---
 

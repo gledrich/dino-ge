@@ -76,6 +76,8 @@ describe('Engine', () => {
       fill: jest.fn(),
       setLineDash: jest.fn(),
       closePath: jest.fn(),
+      rect: jest.fn(),
+      clip: jest.fn(),
       drawImage: jest.fn(),
       translate: jest.fn(),
       rotate: jest.fn(),
@@ -294,6 +296,82 @@ describe('Engine', () => {
     (mockCtx.arc as jest.Mock).mockClear();
     jest.advanceTimersByTime(32);
     expect(mockCtx.arc).not.toHaveBeenCalled();
+    game.terminate();
+  });
+
+  it.each(['fade', 'slide'] as const)('switches scenes at the midpoint of a %s transition', type => {
+    const game = new Engine(callbacks);
+    jest.advanceTimersByTime(32);
+    const oldScene = new MockScene();
+    const next = new MockScene();
+    Engine.currentScene = oldScene;
+    jest.clearAllMocks();
+    game.transitionTo(next, { type, duration: 0.4, colour: '#334455' });
+    jest.advanceTimersByTime(128);
+    expect(Engine.currentScene).toBe(oldScene);
+    if (type === 'slide') {
+      expect((mockCtx.translate as jest.Mock).mock.calls.some(([x]) => x < 0)).toBe(true);
+    } else {
+      const worldFrames = (mockCtx.translate as jest.Mock).mock.calls.length;
+      expect((mockCtx.fillRect as jest.Mock).mock.calls.length).toBe(worldFrames * 2);
+    }
+
+    Engine.paused = true;
+    jest.advanceTimersByTime(400);
+    expect(next.onLoad).not.toHaveBeenCalled();
+    Engine.paused = false;
+    jest.advanceTimersByTime(128);
+    expect(Engine.currentScene).toBe(next);
+    expect(next.onLoad).toHaveBeenCalledTimes(1);
+    game.terminate();
+  });
+
+  it('honours a pause requested by the destination scene on load', () => {
+    const game = new Engine(callbacks);
+    const next = new MockScene();
+    next.onLoad.mockImplementation(() => { Engine.paused = true; });
+    game.transitionTo(next, { type: 'fade', duration: 0.1 });
+    jest.advanceTimersByTime(250);
+    expect(Engine.currentScene).toBe(next);
+    expect(next.update).not.toHaveBeenCalled();
+    game.terminate();
+  });
+
+  it('cancels a pending transition on immediate scene assignment', () => {
+    const game = new Engine(callbacks);
+    const pending = new MockScene();
+    const immediate = new MockScene();
+    game.transitionTo(pending, { type: 'slide', duration: 0.2 });
+    Engine.currentScene = immediate;
+    jest.advanceTimersByTime(500);
+    expect(Engine.currentScene).toBe(immediate);
+    expect(pending.onLoad).not.toHaveBeenCalled();
+    game.terminate();
+  });
+
+  it('discards pending effects when the engine is replaced', () => {
+    const game = new Engine(callbacks);
+    const pending = new MockScene();
+    game.transitionTo(pending, { type: 'fade' });
+    const replacement = new Engine(callbacks);
+    jest.advanceTimersByTime(600);
+    expect(pending.onLoad).not.toHaveBeenCalled();
+    replacement.terminate();
+  });
+
+  it('shakes the world without changing camera coordinates and then stops', () => {
+    const game = new Engine(callbacks);
+    Engine.camera.position.set(40, 60);
+    const translate = mockCtx.translate as jest.Mock;
+    game.shakeScreen(10, 0.2);
+    jest.advanceTimersByTime(64);
+    expect(translate.mock.calls.some(([x, y]) => x !== -40 || y !== -60)).toBe(true);
+    expect(Engine.camera.position).toEqual(expect.objectContaining({ x: 40, y: 60 }));
+
+    jest.advanceTimersByTime(300);
+    translate.mockClear();
+    jest.advanceTimersByTime(32);
+    expect(translate.mock.calls).toEqual([[-40, -60], [-40, -60]]);
     game.terminate();
   });
 

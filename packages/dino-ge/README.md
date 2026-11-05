@@ -111,3 +111,15 @@ colliders before running shape-specific tests. Collisions retain their pair
 order, and later pairs see position changes made by earlier resolution and
 collision handlers. The Bouncy Physics example at `/bouncy.html` exercises
 the broad phase with a field of 216 static bumpers.
+
+### Scene transitions and effects
+
+Use `game.transitionTo(nextScene, { type: 'fade', duration: 0.4 })` to fade
+through black, or use `type: 'slide'` to slide the old world off screen and
+the next world in. The engine loads the next scene at the midpoint. Use
+`Engine.currentScene = nextScene` for an immediate switch.
+
+`game.shakeScreen(8, 0.25)` and `game.chromaticAberration(4, 0.18)` take a
+strength in screen pixels and a duration in seconds. Effects decay over
+their duration and freeze when paused. They affect the world before
+`drawUI`, so the camera coordinates and screen-space HUD stay stable.

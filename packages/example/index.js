@@ -14,6 +14,8 @@ import {
   Loader as ResourceLoader
 } from 'dino-ge';
 
+const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)');
+
 class MenuScene extends Scene {
   constructor(game, onStart) {
     super();
@@ -88,9 +90,6 @@ class PlayScene extends Scene {
     this.meteors = [];
     this.starsMid = [];
     this.starsNear = [];
-
-    this.shakeIntensity = 0;
-    this.shakeDecay = 0.9;
   }
 
   onLoad() {
@@ -163,16 +162,14 @@ class PlayScene extends Scene {
     // Auto-collision handling for player
     this.player.on('collision', (e) => {
       const { other } = e.detail;
-      if (other.metadata.tag === 'meteor' && !this.isInvulnerable) {
+      if (other.metadata.tag === 'meteor' && !this.isInvulnerable && this.endingScore === undefined) {
         this.lives -= 1;
         console.log(`Player hit! Lives remaining: ${this.lives}`);
-        this.livesText.text = `Lives: ${this.lives}`;
-        this.shakeIntensity = 20;
+        this.impact(10, 4);
 
         if (this.lives <= 0) {
-          const finalScore =
-            this.score + Math.floor((Date.now() - this.startTime) / 1000);
-          this.onGameOver(finalScore);
+          this.endingScore = this.currentScore();
+          this.onGameOver(this.endingScore);
         } else {
           this.isInvulnerable = true;
           this.player.getComponent(PhysicsComponent).isSensor = true;
@@ -198,35 +195,20 @@ class PlayScene extends Scene {
     this.nameTag.transform.scale = new Vector2(0.333, 0.333); // Keep size absolute
     this.player.transform.addChild(this.nameTag.transform);
 
-    // Group UI elements under a container
-    this.uiContainer = new GameObject('ui-root', 10);
-    this.add(this.uiContainer);
+  }
 
-    this.scoreText = new Text({
-      tag: 'score',
-      text: 'Score: 0',
-      fontSize: '24',
-      colour: 'white',
-      position: new Vector2(this.game.width / 2 - 75, 20),
-      width: 150,
-      zIndex: 11
-    });
-    this.uiContainer.transform.addChild(this.scoreText.transform);
+  currentScore() {
+    return this.endingScore ?? this.score + Math.floor((Date.now() - this.startTime) / 1000);
+  }
 
-    this.livesText = new Text({
-      tag: 'lives',
-      text: `Lives: ${this.lives}`,
-      fontSize: '24',
-      colour: '#F94144',
-      position: new Vector2(20, 20),
-      width: 150,
-      zIndex: 11,
-      horizontalAlign: 'left'
-    });
-    this.uiContainer.transform.addChild(this.livesText.transform);
+  drawHud(ui) {
+    ui.label({ x: ui.width / 2, y: 32, text: `Score: ${this.currentScore()}`,
+      font: '24px sans-serif', align: 'center', colour: 'white' });
+    ui.label({ x: 20, y: 32, text: `Lives: ${this.lives}`, font: '24px sans-serif', colour: '#F94144' });
   }
 
   update() {
+    if (this.endingScore !== undefined) return;
     const playerTransform = this.player.transform;
     const now = Date.now();
 
@@ -286,7 +268,7 @@ class PlayScene extends Scene {
 
       fireball.on('collision', (e) => {
         const { other } = e.detail;
-        if (other.metadata.tag === 'meteor') {
+        if (other.metadata.tag === 'meteor' && this.endingScore === undefined) {
           this.spawnExplosion(
             other.transform.position,
             other.radius,
@@ -295,7 +277,7 @@ class PlayScene extends Scene {
           other.destroySelf();
           fireball.destroySelf();
           this.score += 10;
-          this.shakeIntensity = Math.max(this.shakeIntensity, 5);
+          this.impact(4, 2);
           this.meteors = this.meteors.filter((m) => m !== other);
           this.fireballs = this.fireballs.filter((fb) => fb !== fireball);
         }
@@ -317,15 +299,6 @@ class PlayScene extends Scene {
     // Camera follows player
     Engine.camera.follow(this.player, this.game.width, this.game.height);
 
-    // Apply Screen Shake
-    if (this.shakeIntensity > 0.1) {
-      Engine.camera.position.x += (Math.random() - 0.5) * this.shakeIntensity;
-      Engine.camera.position.y += (Math.random() - 0.5) * this.shakeIntensity;
-      this.shakeIntensity *= this.shakeDecay;
-    } else {
-      this.shakeIntensity = 0;
-    }
-
     // Update Invulnerability
     if (this.isInvulnerable) {
       const visibility = this.player.getComponent(VisibilityComponent);
@@ -338,10 +311,6 @@ class PlayScene extends Scene {
         if (visibility) visibility.visible = true;
       }
     }
-
-    // Fixed UI container
-    this.uiContainer.transform.position.x = Engine.camera.position.x;
-    this.uiContainer.transform.position.y = Engine.camera.position.y;
 
     // Parallax
     this.starsMid.forEach((s) => {
@@ -383,9 +352,12 @@ class PlayScene extends Scene {
       }
       return true;
     });
+  }
 
-    const timeScore = Math.floor((now - this.startTime) / 1000);
-    this.scoreText.text = `Score: ${this.score + timeScore}`;
+  impact(shake, aberration) {
+    if (reducedMotion.matches) return;
+    this.game.shakeScreen(shake, 0.24);
+    this.game.chromaticAberration(aberration, 0.18);
   }
 
   spawnExplosion(pos, radius, colour) {
@@ -511,7 +483,7 @@ class DinoSurvival {
           Engine.off('START_GAME', onStart);
           Engine.off('SHOW_MENU', onMenu);
         },
-        update: () => {}
+        drawUI: ui => Engine.currentScene?.drawHud?.(ui)
       },
       {
         title: 'Dino Survival',
@@ -522,21 +494,28 @@ class DinoSurvival {
   }
 
   showMenu() {
+    this.requestedScene = undefined;
     Engine.currentScene = new MenuScene(this.game, () =>
       Engine.emit('START_GAME')
     );
   }
 
   startGame() {
-    Engine.currentScene = new PlayScene(this.game, (score) =>
-      Engine.emit('GAME_OVER', score)
-    );
+    this.switchScene(new PlayScene(this.game, score => Engine.emit('GAME_OVER', score)), 'slide');
   }
 
   showGameOver(score) {
-    Engine.currentScene = new GameOverScene(this.game, score, () =>
-      Engine.emit('SHOW_MENU')
-    );
+    this.switchScene(new GameOverScene(this.game, score, () => Engine.emit('SHOW_MENU')), 'fade');
+  }
+
+  switchScene(scene, type) {
+    if (this.requestedScene?.constructor === scene.constructor) return;
+    this.requestedScene = scene;
+    if (reducedMotion.matches) {
+      Engine.currentScene = scene;
+    } else {
+      this.game.transitionTo(scene, { type, duration: 0.32 });
+    }
   }
 }
 
