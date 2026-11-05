@@ -2,6 +2,13 @@ import type GameObject from './GameObject.js';
 import ShapeComponent from '../components/ShapeComponent.js';
 import LineComponent from '../components/LineComponent.js';
 
+/** Round a world coordinate to the nearest grid line. A zero step leaves it unchanged. */
+export function snapToGrid(coordinate: number, step: number): number {
+  if (step <= 0 || !Number.isFinite(step)) return coordinate;
+  const snapped = Math.round(coordinate / step) * step;
+  return Number.isFinite(snapped) ? snapped : coordinate;
+}
+
 /** Back to front, with the first registered object on top when layers tie. */
 export function getViewportDrawOrder(objects: Iterable<GameObject>): GameObject[] {
   return Array.from(objects).reverse().sort((a, b) => a.metadata.zIndex - b.metadata.zIndex);

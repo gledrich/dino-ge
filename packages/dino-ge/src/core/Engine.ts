@@ -61,6 +61,7 @@ const createInitialState = (): EngineState => ({
   currentScene: null,
   debugCollisions: [],
   showDebugHud: true,
+  debugPositionGridSize: 0,
   showPhysicsVectors: false,
   showCollisionLines: false,
   zOrderDirty: true,
@@ -119,6 +120,12 @@ export default class Engine {
    */
   public static get showDebugHud(): boolean { return this._state.showDebugHud !== false; }
   public static set showDebugHud(val: boolean) { this._state.showDebugHud = val; }
+
+  /** World units per cell for debug dragging and the viewport grid. Zero disables snapping. */
+  public static get debugPositionGridSize(): number { return this._state.debugPositionGridSize ?? 0; }
+  public static set debugPositionGridSize(val: number) {
+    this._state.debugPositionGridSize = Number.isFinite(val) && val > 0 ? val : 0;
+  }
 
   /**
    * Whether to show velocity/acceleration vectors in debug mode.
@@ -498,10 +505,38 @@ export default class Engine {
       Engine.renderingSystem.update(objects, 0, Engine.debug);
     }
 
+    if (Engine.debug && Engine.debugPositionGridSize > 0) this._drawPositionGrid();
     if (Engine.debug && Engine.showDebugHud) {
       this._drawDebug(objects);
     }
     if (this.screenUI && this.callbacks.drawUI) this.screenUI.render(this.callbacks.drawUI);
+  }
+
+  private _drawPositionGrid() {
+    const { position, zoom } = Engine.camera;
+    const cell = Engine.debugPositionGridSize * zoom;
+    if (!Number.isFinite(cell) || cell < 5) return;
+    const { width, height } = this._canvas.canvas;
+    const startX = ((-position.x * zoom) % cell + cell) % cell;
+    const startY = ((-position.y * zoom) % cell + cell) % cell;
+
+    this._ctx.save();
+    this._ctx.setTransform(1, 0, 0, 1, 0, 0);
+    this._ctx.strokeStyle = 'rgba(110, 143, 174, 0.38)';
+    this._ctx.lineWidth = 1;
+    this._ctx.beginPath();
+    for (let x = startX; x < width; x += cell) {
+      const pixel = Math.floor(x) + 0.5;
+      this._ctx.moveTo(pixel, 0);
+      this._ctx.lineTo(pixel, height);
+    }
+    for (let y = startY; y < height; y += cell) {
+      const pixel = Math.floor(y) + 0.5;
+      this._ctx.moveTo(0, pixel);
+      this._ctx.lineTo(width, pixel);
+    }
+    this._ctx.stroke();
+    this._ctx.restore();
   }
 
   /**

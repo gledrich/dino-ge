@@ -5,7 +5,7 @@ import ShapeComponent from '../components/ShapeComponent.js';
 import TextComponent from '../components/TextComponent.js';
 import VisibilityComponent from '../components/VisibilityComponent.js';
 import type GameObject from './GameObject.js';
-import { containsViewportPoint, getViewportDrawOrder, getViewportGeometry, projectOntoObjectAxes } from './ViewportGeometry.js';
+import { containsViewportPoint, getViewportDrawOrder, getViewportGeometry, projectOntoObjectAxes, snapToGrid } from './ViewportGeometry.js';
 
 /** Detail of an objectManipulationPreview event. A null detail ends the preview. */
 export interface ObjectManipulationPreview {
@@ -142,8 +142,9 @@ export default class Input {
 
       if (gesture?.kind === 'drag') {
         const { parent, position } = gesture.object.transform;
-        const worldX = this.mouseX - gesture.offset.x;
-        const worldY = this.mouseY - gesture.offset.y;
+        const step = Engine.debugPositionGridSize;
+        const worldX = snapToGrid(this.mouseX - gesture.offset.x, step);
+        const worldY = snapToGrid(this.mouseY - gesture.offset.y, step);
         if (parent) {
           const origin = parent.worldPosition;
           const scale = parent.worldScale;
