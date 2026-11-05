@@ -125,6 +125,14 @@ function getInspectorBaseline(object: Dino.GameObject, path: string) {
   return resolved?.target?.[resolved.prop];
 }
 
+export function clearInspectorPlacementBaselines(object: Dino.GameObject, state: SceneTransformState) {
+  const baselines = inspectorBaselines.get(object);
+  if (!baselines) return;
+  for (const path of baselines.keys()) {
+    if (isCanvasTransformProperty(path, state)) baselines.delete(path);
+  }
+}
+
 export function restoreInspectorProperty(object: Dino.GameObject, path: string, value: unknown) {
   const resolved = resolveComponentPath(object, path);
   if (!resolved?.target) return;

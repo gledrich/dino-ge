@@ -1309,6 +1309,45 @@ new Engine({ onLoad() {
   });
 }
 
+test('uses a saved canvas position as the Inspector undo baseline for an unselected object', async ({ page }) => {
+  await page.route('**/files', route => route.fulfill({ json: ['script'] }));
+  await page.route('**/api/scripts/script', route => route.fulfill({ json: `
+import { Engine, Rectangle, Vector2 } from 'dino-ge';
+new Engine({ onLoad() {
+  new Rectangle({ tag: 'Platform', position: new Vector2(300, 220), width: 64, height: 48 });
+  new Rectangle({ tag: 'Wall', position: new Vector2(500, 220), width: 25, height: 100 });
+} }, { containerId: 'playground-canvas-container' });` }));
+  await page.goto('/');
+  const platform = page.getByRole('button', { name: 'Platform', exact: true });
+  const wall = page.getByRole('button', { name: 'Wall', exact: true });
+  const x = page.getByRole('spinbutton', { name: 'X', exact: true });
+  const readSource = () => page.evaluate(() => {
+    const { monaco } = window as typeof window & { monaco: Monaco };
+    return monaco.editor.getEditors()[0].getValue();
+  });
+
+  await expect(platform).toBeVisible();
+  await page.getByRole('button', { name: 'Edit scene', exact: true }).click();
+  await platform.click();
+  await expect(x).toHaveValue('300.00');
+  await x.fill('305');
+  await platform.press('Shift+ArrowRight');
+  await expect(x).toHaveValue('315.00');
+  await wall.click();
+  await wall.press('Shift+ArrowDown');
+  await page.getByRole('button', { name: 'Apply all canvas changes', exact: true }).click();
+  await expect.poll(readSource).toContain('new Vector2(315, 220)');
+
+  await platform.click();
+  await expect(x).toHaveValue('315.00');
+  await x.fill('330');
+  await page.getByRole('button', { name: 'Save X to code', exact: true }).click();
+  await expect.poll(readSource).toContain('new Vector2(330, 220)');
+  await page.getByRole('button', { name: 'Undo code edit', exact: true }).click();
+  await expect.poll(readSource).toContain('new Vector2(315, 220)');
+  await expect(x).toHaveValue('315.00');
+});
+
 test('shows pending canvas changes on objects and their collapsed branches', async ({ page }) => {
   await page.route('**/files', route => route.fulfill({ json: ['script'] }));
   await page.route('**/api/scripts/script', route => route.fulfill({ json: `

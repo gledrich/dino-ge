@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import * as Dino from 'dino-ge';
-import InspectorRow, { InspectableObject, PropertyRowDef, resolveComponentPath } from './InspectorRow';
+import InspectorRow, { clearInspectorPlacementBaselines, InspectableObject, PropertyRowDef, resolveComponentPath } from './InspectorRow';
 import { applyEditsToSource, findObjectConstructor, getLineOriginEdit, getStandaloneSceneObject, getSurgicalEdit, getSourceMapping, readObjectSourceMappings, type CanvasPlacementTransaction, type Edit } from '../utils/ast-utils';
 import { usePlayground } from '../context/PlaygroundContext';
 import { getProjectObjectLocation, getProjectObjectSource, openProjectObjectSourceEvent, type ProjectObjectSourceRequest } from '../utils/project-object-source';
@@ -233,6 +233,11 @@ const Inspector: React.FC<InspectorProps> = ({ visible }) => {
       const { object } = (event as CustomEvent<{ object: Dino.GameObject }>).detail;
       if (Engine.selectedObject === object) clearStatus();
     };
+    const onPlacementHistory = (event: Event) => {
+      const { object, state } = (event as CustomEvent<{ object: Dino.GameObject; state: SceneTransformState }>).detail;
+      clearInspectorPlacementBaselines(object, state);
+      onPlacementChanged(event);
+    };
 
     const onSyntaxError = (e: Event) => {
       const customEvent = e as CustomEvent<string | null>;
@@ -247,7 +252,7 @@ const Inspector: React.FC<InspectorProps> = ({ visible }) => {
     Engine.on('selectedObjectChanged', clearStatus);
     Engine.on('objectManipulated', onPlacementChanged);
     window.addEventListener('playground-syntax-error', onSyntaxError);
-    window.addEventListener('playground-placement-history', onPlacementChanged);
+    window.addEventListener('playground-placement-history', onPlacementHistory);
     window.addEventListener('playground-scene-history', clearStatus);
     window.addEventListener('playground-before-run', clearStatus);
     window.addEventListener('playground-update-inspector', onEngineUpdate);
@@ -256,7 +261,7 @@ const Inspector: React.FC<InspectorProps> = ({ visible }) => {
       Engine.off('selectedObjectChanged', clearStatus);
       Engine.off('objectManipulated', onPlacementChanged);
       window.removeEventListener('playground-syntax-error', onSyntaxError);
-      window.removeEventListener('playground-placement-history', onPlacementChanged);
+      window.removeEventListener('playground-placement-history', onPlacementHistory);
       window.removeEventListener('playground-scene-history', clearStatus);
       window.removeEventListener('playground-before-run', clearStatus);
       window.removeEventListener('playground-update-inspector', onEngineUpdate);
