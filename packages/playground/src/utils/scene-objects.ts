@@ -25,6 +25,8 @@ export function isReplaceableSprite(object: Dino.GameObject | null): object is D
 
 export interface ScenePoint { x: number; y: number }
 
+export type CanvasPlacement = ReadonlyMap<Dino.ObjectManipulationPreview['kind'], ScenePoint>;
+
 export interface SceneTransformState {
   position?: ScenePoint;
   rotation?: number;
@@ -32,6 +34,25 @@ export interface SceneTransformState {
   size?: ScenePoint;
   p1?: ScenePoint;
   p2?: ScenePoint;
+}
+
+export function getCanvasPlacementBaseline(object: Dino.GameObject, placement: CanvasPlacement): SceneTransformState {
+  const resize = placement.get('resize');
+  const isSprite = object.hasComponent(Dino.SpriteComponent);
+  return {
+    position: placement.get('drag'),
+    rotation: placement.get('rotate')?.x,
+    scale: isSprite ? resize : undefined,
+    size: isSprite ? undefined : resize,
+    p1: placement.get('p1'),
+    p2: placement.get('p2'),
+  };
+}
+
+export function isCanvasTransformProperty(path: string, state: SceneTransformState): boolean {
+  const [property] = path.split('.');
+  const key = property === 'width' || property === 'height' || property === 'radius' ? 'size' : property;
+  return Object.hasOwn(state, key) && state[key as keyof SceneTransformState] !== undefined;
 }
 
 function gridNudge(coordinate: number, steps: number, cellSize: number): number {

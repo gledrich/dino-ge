@@ -1,7 +1,7 @@
 import React, { useEffect, useId, useRef } from 'react';
 import * as Dino from 'dino-ge';
 import { getSurgicalEdit } from '../utils/ast-utils';
-import type { SceneTransformState } from '../utils/scene-objects';
+import { isCanvasTransformProperty, type SceneTransformState } from '../utils/scene-objects';
 
 export interface PropertyRowDef {
   label: string;
@@ -90,8 +90,6 @@ const InspectorRow: React.FC<{
   const inputRef = useRef<HTMLInputElement>(null);
   const inputId = useId();
   const isRotation = def.propertyPath === 'rotation';
-  const [property, axis] = def.propertyPath.split('.');
-  const endpoint = property === 'p1' || property === 'p2' ? property : undefined;
   const [prevSelectedObject, setPrevSelectedObject] = React.useState(selectedObject);
   const [lastSyncedValue, setLastSyncedValue] = React.useState<any>(() => {
     const resolved = resolveComponentPath(selectedObject, def.propertyPath);
@@ -116,19 +114,17 @@ const InspectorRow: React.FC<{
     };
     const onPlacementHistory = (event: Event) => {
       const { object, state } = (event as CustomEvent<{ object: Dino.GameObject; state: SceneTransformState }>).detail;
-      if (object !== selectedObject) return;
-      if (isRotation && state.rotation !== undefined) setLastSyncedValue(state.rotation);
-      if (endpoint && state[endpoint] && (axis === 'x' || axis === 'y')) setLastSyncedValue(state[endpoint][axis]);
+      if (object === selectedObject && isCanvasTransformProperty(def.propertyPath, state)) handleUpdate();
     };
     window.addEventListener('playground-update-code', handleUpdate);
     window.addEventListener('playground-script-selected', handleUpdate);
-    if (isRotation || endpoint) window.addEventListener('playground-placement-history', onPlacementHistory);
+    window.addEventListener('playground-placement-history', onPlacementHistory);
     return () => {
       window.removeEventListener('playground-update-code', handleUpdate);
       window.removeEventListener('playground-script-selected', handleUpdate);
-      if (isRotation || endpoint) window.removeEventListener('playground-placement-history', onPlacementHistory);
+      window.removeEventListener('playground-placement-history', onPlacementHistory);
     };
-  }, [selectedObject, def.propertyPath, isRotation, endpoint, axis]);
+  }, [selectedObject, def.propertyPath]);
 
   // Sync runtime value to the input box and check for modifications
   useEffect(() => {

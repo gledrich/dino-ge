@@ -3,7 +3,7 @@ import * as Dino from 'dino-ge';
 import InspectorRow, { InspectableObject, PropertyRowDef, resolveComponentPath } from './InspectorRow';
 import { getLineOriginEdit, getSurgicalEdit, getSourceMapping, Edit } from '../utils/ast-utils';
 import { usePlayground } from '../context/PlaygroundContext';
-import type { ScenePoint, SceneTransformState } from '../utils/scene-objects';
+import { getCanvasPlacementBaseline, isCanvasTransformProperty, restoreSceneTransform, type CanvasPlacement, type ScenePoint, type SceneTransformState } from '../utils/scene-objects';
 import '../styles/inspector.css';
 
 const { Engine } = Dino;
@@ -82,14 +82,14 @@ const getInspectorSections = (object: InspectableObject) => Object.entries(SECTI
   });
 
 const Inspector: React.FC<InspectorProps> = ({ visible }) => {
-  const { isDebug, isPaused } = usePlayground();
+  const { isDebug, isPaused, canvasPlacement: placement, setCanvasPlacement: setPlacement } = usePlayground();
   const [selectedObject, setSelectedObject] = useState<InspectableObject | null>(Engine.selectedObject as InspectableObject | null);
   const [isApplying, setIsApplying] = useState(false);
   const [syntaxError, setSyntaxError] = useState<string | null>(null);
   const [, setTick] = useState(0);
-  const pendingPlacement = useRef(new WeakMap<Dino.GameObject, Map<Manipulation, ScenePoint>>());
-  const [placement, setPlacement] = useState<Map<Manipulation, ScenePoint>>();
+  const pendingPlacement = useRef(new WeakMap<Dino.GameObject, CanvasPlacement>());
   const [placementStatus, setPlacementStatus] = useState('');
+  const baseline = selectedObject && placement ? getCanvasPlacementBaseline(selectedObject, placement) : undefined;
   const canEditPaletteObject = isPaused && !syntaxError && selectedObject?.metadata.sourceId?.startsWith('DinoPlace');
 
   const deleteObject = () => {
@@ -164,10 +164,21 @@ const Inspector: React.FC<InspectorProps> = ({ visible }) => {
       window.removeEventListener('playground-placement-history', onPlacementHistory);
       window.removeEventListener('playground-update-inspector', onEngineUpdate);
     };
-  }, []);
+  }, [setPlacement]);
+
+  const finishPlacement = (object: Dino.GameObject, state: SceneTransformState, message: string) => {
+    window.dispatchEvent(new CustomEvent('playground-placement-history', { detail: { object, state } }));
+    setPlacementStatus(message);
+  };
+
+  const discardPlacement = () => {
+    if (!selectedObject || !baseline || Engine.selectedObject !== selectedObject) return;
+    restoreSceneTransform(selectedObject, baseline);
+    finishPlacement(selectedObject, baseline, 'Discarded canvas changes.');
+  };
 
   const applyPlacement = () => {
-    if (!selectedObject || !placement) return;
+    if (!selectedObject || !placement || !baseline) return;
     const sourceId = selectedObject.metadata.sourceId;
     const objects = Engine.currentScene?.objects ?? Engine.objects;
     if (!sourceId || Array.from(objects).filter(object => object.metadata.sourceId === sourceId).length !== 1) {
@@ -227,11 +238,10 @@ const Inspector: React.FC<InspectorProps> = ({ visible }) => {
       }
       edits.push(origin);
     }
-    const before: SceneTransformState = { position: placement.get('drag'), rotation: placement.get('rotate')?.x };
+    const before = baseline;
     const after: SceneTransformState = {};
     if (selectedObject instanceof Dino.Line) {
       for (const endpoint of endpoints) {
-        before[endpoint] = placement.get(endpoint);
         after[endpoint] = endpoint === 'p1'
           ? { x: selectedObject.x1, y: selectedObject.y1 }
           : { x: selectedObject.x2, y: selectedObject.y2 };
@@ -242,15 +252,11 @@ const Inspector: React.FC<InspectorProps> = ({ visible }) => {
       after.position = { x, y };
     }
     if (before.rotation !== undefined) after.rotation = selectedObject.transform.rotation;
-    if (placement.has('resize')) {
-      if (mapping.type === 'Sprite') {
-        before.scale = placement.get('resize');
-        const { x, y } = selectedObject.transform.scale;
-        after.scale = { x, y };
-      } else if (selectedObject.bounds) {
-        before.size = placement.get('resize');
-        after.size = { x: selectedObject.bounds.width, y: selectedObject.bounds.height };
-      }
+    if (before.scale) {
+      const { x, y } = selectedObject.transform.scale;
+      after.scale = { x, y };
+    } else if (before.size && selectedObject.bounds) {
+      after.size = { x: selectedObject.bounds.width, y: selectedObject.bounds.height };
     }
     const applied = !window.dispatchEvent(new CustomEvent('playground-apply-placement', {
       detail: { edits, object: selectedObject, before, after }, cancelable: true,
@@ -259,12 +265,7 @@ const Inspector: React.FC<InspectorProps> = ({ visible }) => {
       setPlacementStatus('The open script could not be updated.');
       return;
     }
-    if (after.rotation !== undefined || endpoints.length) {
-      window.dispatchEvent(new CustomEvent('playground-placement-history', { detail: { object: selectedObject, state: after } }));
-    }
-    pendingPlacement.current.delete(selectedObject);
-    setPlacement(undefined);
-    setPlacementStatus('Applied to code. Save the script to keep it.');
+    finishPlacement(selectedObject, after, 'Applied to code. Save the script to keep it.');
   };
 
   const handleApplyToCode = useCallback(() => {
@@ -335,19 +336,28 @@ const Inspector: React.FC<InspectorProps> = ({ visible }) => {
           <div className="no-selection">Toggle Debug Mode to inspect objects.</div>
         ) : (
           <div className="inspector-form" style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-            {(placement || placementStatus || canEditPaletteObject) && (
+            {placement && (
+              <section id="canvas-changes" className="inspector-section" aria-labelledby="canvas-changes-title" tabIndex={-1}>
+                <h3 id="canvas-changes-title">Canvas changes</h3>
+                <p className="inspector-section-description">Changes are live in the scene.</p>
+                <button type="button" className="scene-control inspector-apply" onClick={applyPlacement}>
+                  <i className="fa-solid fa-code" aria-hidden="true" /> Apply placement to code
+                </button>
+                <button type="button" className="scene-control" onClick={discardPlacement}>
+                  <i className="fa-solid fa-rotate-left" aria-hidden="true" /> Discard canvas changes
+                </button>
+              </section>
+            )}
+            {placementStatus && <span className="inspector-action-status" role="status">{placementStatus}</span>}
+            {canEditPaletteObject && (
               <div className="inspector-section">
                 <h3>Object actions</h3>
-                {placement && <button type="button" className="scene-control inspector-apply" onClick={applyPlacement}>
-                  <i className="fa-solid fa-code" aria-hidden="true" /> Apply placement to code
-                </button>}
-                {canEditPaletteObject && <button type="button" className="scene-control" onClick={duplicateObject}>
+                <button type="button" className="scene-control" onClick={duplicateObject}>
                   <i className="fa-solid fa-copy" aria-hidden="true" /> Duplicate object
-                </button>}
-                {canEditPaletteObject && <button type="button" className="scene-control inspector-delete" onClick={deleteObject}>
+                </button>
+                <button type="button" className="scene-control inspector-delete" onClick={deleteObject}>
                   <i className="fa-solid fa-trash" aria-hidden="true" /> Delete object
-                </button>}
-                {placementStatus && <span className="inspector-action-status" role="status">{placementStatus}</span>}
+                </button>
               </div>
             )}
             <div className="inspector-section">
@@ -391,8 +401,7 @@ const Inspector: React.FC<InspectorProps> = ({ visible }) => {
                         key={def.propertyPath} 
                         def={def} 
                         selectedObject={selectedObject} 
-                        deferSave={(def.propertyPath.startsWith('p1.') && placement?.has('p1')) ||
-                          (def.propertyPath.startsWith('p2.') && placement?.has('p2'))}
+                        deferSave={baseline && isCanvasTransformProperty(def.propertyPath, baseline)}
                       />
                     ))}
                   </div>

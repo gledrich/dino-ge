@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useState, useCallback, useEffect } from 'react';
 import * as Dino from 'dino-ge';
 import { getCurrentScriptId } from '../utils/helpers';
+import type { CanvasPlacement } from '../utils/scene-objects';
 
 const { Engine } = Dino;
 
@@ -13,6 +14,8 @@ interface PlaygroundContextType {
   setIsDebug: (debug: boolean) => void;
   isInspectorVisible: boolean;
   setIsInspectorVisible: (visible: boolean) => void;
+  canvasPlacement: CanvasPlacement | undefined;
+  setCanvasPlacement: (placement: CanvasPlacement | undefined) => void;
   isExplorerVisible: boolean;
   setIsExplorerVisible: (visible: boolean) => void;
   isEditorVisible: boolean;
@@ -35,6 +38,7 @@ export const PlaygroundProvider: React.FC<{ children: React.ReactNode }> = ({ ch
   const [isPaused, setIsPausedState] = useState(false);
   const [isDebug, setIsDebugState] = useState(false);
   const [isInspectorVisible, setIsInspectorVisible] = useState(true);
+  const [canvasPlacement, setCanvasPlacement] = useState<CanvasPlacement>();
   const [isExplorerVisible, setIsExplorerVisible] = useState(true);
   const [isEditorVisible, setIsEditorVisible] = useState(true);
   const [activeTab, setActiveTab] = useState<'editor' | 'console'>('editor');
@@ -94,6 +98,8 @@ export const PlaygroundProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     setIsDebug,
     isInspectorVisible,
     setIsInspectorVisible,
+    canvasPlacement,
+    setCanvasPlacement,
     isExplorerVisible,
     setIsExplorerVisible,
     isEditorVisible,
