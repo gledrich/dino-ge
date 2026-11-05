@@ -50,7 +50,7 @@ floor.addComponent(floorPhys);` }
 type TabType = 'library' | 'assets';
 
 const Sidebar: React.FC<{ mobileDock?: boolean }> = ({ mobileDock = false }) => {
-  const { currentScriptId } = usePlayground();
+  const { currentScriptId, setMobileDockTab } = usePlayground();
   const [activeTab, setActiveTab] = useState<TabType>('library');
   const [feedback, setFeedback] = useState<{ scriptId: string; message: string; error: boolean }>();
   const assetsTab = useRef<HTMLButtonElement>(null);
@@ -58,6 +58,10 @@ const Sidebar: React.FC<{ mobileDock?: boolean }> = ({ mobileDock = false }) => 
 
   const insertSnippet = (code: string) => {
     window.dispatchEvent(new CustomEvent('playground-insert-text', { detail: code }));
+    if (mobileDock) {
+      setMobileDockTab('editor');
+      requestAnimationFrame(() => document.getElementById('playground-tab-editor')?.focus());
+    }
   };
 
   const insertShapeCode = (kind: SceneObjectKind) => {

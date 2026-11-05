@@ -1814,6 +1814,15 @@ new Engine({ onLoad() {} }, { containerId: 'playground-canvas-container' });` })
   await insert.click();
   await expect(editor).toBeVisible();
   await expect(editor).toContainText('new Rectangle');
+  await page.getByRole('tab', { name: 'Explorer', exact: true }).click();
+  await page.getByRole('button', { name: 'Vector2', exact: true }).press('Enter');
+  const editorTab = page.getByRole('tab', { name: 'Editor', exact: true });
+  await expect(editorTab).toHaveAttribute('aria-selected', 'true');
+  await expect(editorTab).toBeFocused();
+  await expect.poll(() => page.evaluate(() => {
+    const { monaco } = window as typeof window & { monaco: Monaco };
+    return monaco.editor.getEditors()[0]?.getValue();
+  })).toContain('new Vector2(0, 0)');
 });
 
 test('runs Library shape snippets without pre-imported constructors and matches canvas drops', async ({ page }) => {
