@@ -4,6 +4,7 @@ export const sceneObjectKinds = ['Rectangle', 'Circle', 'Text', 'Line'] as const
 export type SceneObjectKind = typeof sceneObjectKinds[number];
 export const sceneObjectDragType = 'application/x-dino-scene-object';
 export const scenePointerDragEvent = 'playground-pointer-drag-scene-item';
+export const sceneKeyboardPlacementEvent = 'playground-position-scene-item';
 export const sceneAssetDragType = 'application/x-dino-scene-asset';
 export const sceneSourceKey = '__dinoPlaygroundSceneSource';
 
@@ -32,6 +33,11 @@ export type ScenePointerDrag = ScenePointerDragItem & {
   phase: 'preview' | 'drop';
   point: ScenePoint;
 };
+
+export interface SceneKeyboardPlacementRequest {
+  item: ScenePointerDragItem;
+  source: HTMLButtonElement;
+}
 
 export type CanvasPlacement = ReadonlyMap<Dino.ObjectManipulationPreview['kind'], ScenePoint>;
 
@@ -77,21 +83,25 @@ function gridNudge(coordinate: number, steps: number, cellSize: number): number 
   return (boundary + steps) * cellSize - coordinate;
 }
 
-/** Move the selection in viewport axes while retaining its local transform. */
-export function nudgeSceneSelection(event: Pick<KeyboardEvent, 'key' | 'shiftKey' | 'altKey' | 'ctrlKey' | 'metaKey'>): boolean {
-  const { key, shiftKey, altKey, ctrlKey, metaKey } = event;
-  if (altKey || ctrlKey || metaKey) return false;
-  const step = shiftKey ? 10 : 1;
-  let x = 0;
-  let y = 0;
-  switch (key) {
-    case 'ArrowLeft': x = -step; break;
-    case 'ArrowRight': x = step; break;
-    case 'ArrowUp': y = -step; break;
-    case 'ArrowDown': y = step; break;
-    default: return false;
-  }
+type SceneArrowEvent = Pick<KeyboardEvent, 'key' | 'shiftKey' | 'altKey' | 'ctrlKey' | 'metaKey'>;
 
+export function getSceneArrowMovement(event: SceneArrowEvent): ScenePoint | undefined {
+  const { key, shiftKey, altKey, ctrlKey, metaKey } = event;
+  if (altKey || ctrlKey || metaKey) return;
+  const step = shiftKey ? 10 : 1;
+  switch (key) {
+    case 'ArrowLeft': return { x: -step, y: 0 };
+    case 'ArrowRight': return { x: step, y: 0 };
+    case 'ArrowUp': return { x: 0, y: -step };
+    case 'ArrowDown': return { x: 0, y: step };
+  }
+}
+
+/** Move the selection in viewport axes while retaining its local transform. */
+export function nudgeSceneSelection(event: SceneArrowEvent): boolean {
+  const movement = getSceneArrowMovement(event);
+  if (!movement) return false;
+  let { x, y } = movement;
   const { Engine } = Dino;
   const object = Engine.selectedObject;
   if (!object || !(Engine.currentScene?.objects ?? Engine.objects).has(object)) return true;

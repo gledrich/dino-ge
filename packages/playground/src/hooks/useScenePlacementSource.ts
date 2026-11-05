@@ -1,11 +1,11 @@
-import { useCallback, useEffect, useRef, type MouseEvent, type PointerEvent } from 'react';
-import { scenePointerDragEvent, type ScenePoint, type ScenePointerDrag, type ScenePointerDragItem } from '../utils/scene-objects';
+import { useCallback, useEffect, useRef, type KeyboardEvent as ReactKeyboardEvent, type MouseEvent, type PointerEvent } from 'react';
+import { sceneKeyboardPlacementEvent, scenePointerDragEvent, type SceneKeyboardPlacementRequest, type ScenePoint, type ScenePointerDrag, type ScenePointerDragItem } from '../utils/scene-objects';
 
 function reportPointerDrag(detail: ScenePointerDrag | null) {
   window.dispatchEvent(new CustomEvent(scenePointerDragEvent, { detail }));
 }
 
-export function useScenePointerDrag(enabled: boolean) {
+export function useScenePlacementSource(enabled: boolean) {
   const pointerDrag = useRef<{
     id: number; item: ScenePointerDragItem; button: HTMLButtonElement; startX: number; dragging: boolean;
   } | null>(null);
@@ -41,6 +41,15 @@ export function useScenePointerDrag(enabled: boolean) {
   };
 
   const forItem = (item?: ScenePointerDragItem) => ({
+    'aria-keyshortcuts': enabled && item ? 'Shift+Enter' : undefined,
+    onKeyDown(event: ReactKeyboardEvent<HTMLButtonElement>) {
+      if (!enabled || !item || event.key !== 'Enter' || !event.shiftKey || event.altKey || event.ctrlKey || event.metaKey) return;
+      event.preventDefault();
+      event.stopPropagation();
+      window.dispatchEvent(new CustomEvent<SceneKeyboardPlacementRequest>(sceneKeyboardPlacementEvent, {
+        detail: { item, source: event.currentTarget },
+      }));
+    },
     onPointerDown(event: PointerEvent<HTMLButtonElement>) {
       if (!enabled || !event.isPrimary || event.button !== 0 || pointerDrag.current) return;
       suppressClick.current = false;

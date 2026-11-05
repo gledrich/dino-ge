@@ -3,7 +3,7 @@ import { Engine, SpriteComponent, snapToGrid, type ObjectManipulationPreview } f
 import { usePlayground } from '../context/PlaygroundContext';
 import Toolbar from './Toolbar';
 import Logo from './Logo';
-import { getAssetSource, getSceneAssetPreviewType, getSceneSource, getSceneSpriteScale, isReplaceableSprite, nudgeSceneSelection, sceneAssetDragType, sceneObjectDefaults, sceneObjectDragType, sceneObjectKinds, scenePointerDragEvent, type SceneImageAsset, type SceneObjectKind, type SceneObjectPlacement, type ScenePointerDrag, type ScenePoint } from '../utils/scene-objects';
+import { getAssetSource, getSceneArrowMovement, getSceneAssetPreviewType, getSceneSource, getSceneSpriteScale, isReplaceableSprite, nudgeSceneSelection, sceneAssetDragType, sceneKeyboardPlacementEvent, sceneObjectDefaults, sceneObjectDragType, sceneObjectKinds, scenePointerDragEvent, type SceneImageAsset, type SceneKeyboardPlacementRequest, type SceneObjectKind, type SceneObjectPlacement, type ScenePointerDrag, type ScenePoint } from '../utils/scene-objects';
 import { maxSpriteImageBytes, spriteImageTypes, storeSpriteImage } from '../utils/helpers';
 
 const shapePreviewDimensions: Partial<Record<SceneObjectKind, { width: number; height: number }>> = {
@@ -25,16 +25,44 @@ function TextDropPreview() {
   );
 }
 
-function getCanvasPlacement(canvas: HTMLCanvasElement, step: number, clientX?: number, clientY?: number) {
+function getCanvasProjection(canvas: HTMLCanvasElement) {
   const bounds = canvas.getBoundingClientRect();
   const { zoom, position } = Engine.camera;
   if (!bounds.width || !bounds.height || !canvas.width || !canvas.height || zoom <= 0) return;
   const scaleX = bounds.width / canvas.width * zoom;
   const scaleY = bounds.height / canvas.height * zoom;
-  const x = snapToGrid(((clientX ?? bounds.left + bounds.width / 2) - bounds.left) / scaleX + position.x, step);
-  const y = snapToGrid(((clientY ?? bounds.top + bounds.height / 2) - bounds.top) / scaleY + position.y, step);
+  return { bounds, position, scaleX, scaleY };
+}
+
+type CanvasProjection = NonNullable<ReturnType<typeof getCanvasProjection>>;
+
+function projectCanvasPoint({ x, y }: ScenePoint, { bounds, position, scaleX, scaleY }: CanvasProjection) {
   return { x, y, scaleX, scaleY, left: bounds.left + (x - position.x) * scaleX,
     top: bounds.top + (y - position.y) * scaleY };
+}
+
+function getCanvasPlacement(canvas: HTMLCanvasElement, step: number, clientX?: number, clientY?: number) {
+  const projection = getCanvasProjection(canvas);
+  if (!projection) return;
+  const { bounds, position, scaleX, scaleY } = projection;
+  const x = snapToGrid(((clientX ?? bounds.left + bounds.width / 2) - bounds.left) / scaleX + position.x, step);
+  const y = snapToGrid(((clientY ?? bounds.top + bounds.height / 2) - bounds.top) / scaleY + position.y, step);
+  return projectCanvasPoint({ x, y }, projection);
+}
+
+function keepPointOnCanvas(point: ScenePoint, { bounds, position, scaleX, scaleY }: CanvasProjection, step: number) {
+  const clamp = (value: number, start: number, span: number) => {
+    const min = Math.ceil(start / step) * step;
+    const max = Math.floor((start + span) / step) * step;
+    return min <= max ? Math.min(max, Math.max(min, value)) : snapToGrid(start + span / 2, step);
+  };
+  return { x: clamp(point.x, position.x, bounds.width / scaleX), y: clamp(point.y, position.y, bounds.height / scaleY) };
+}
+
+interface KeyboardPlacement extends SceneKeyboardPlacementRequest {
+  canvas: HTMLCanvasElement;
+  scene: typeof Engine.currentScene;
+  point: ScenePoint;
 }
 
 const Viewport: React.FC = () => {
@@ -69,6 +97,7 @@ const Viewport: React.FC = () => {
   const importingImage = useRef(false);
   const draggedAsset = useRef<SceneImageAsset | null>(null);
   const [manipulationReadout, setManipulationReadout] = useState('');
+  const [keyboardPlacement, setKeyboardPlacement] = useState<KeyboardPlacement>();
   const [dropGuide, setDropGuide] = useState<{
     x: number; y: number; left: number; top: number; kind?: SceneObjectKind;
     width?: number; height?: number;
@@ -178,9 +207,8 @@ const Viewport: React.FC = () => {
     if (addObject(kind, getPlacementPoint(x, y))) enterSceneEditing();
   }, [addObject, enterSceneEditing, getPlacementPoint]);
 
-  const showDropGuide = useCallback((canvas: HTMLCanvasElement, x: number, y: number,
+  const showDropGuide = useCallback((point: ReturnType<typeof getCanvasPlacement>,
     { kind, asset, importingImage }: { kind?: SceneObjectKind; asset?: SceneImageAsset; importingImage?: boolean }) => {
-    const point = getCanvasPlacement(canvas, placementStep, x, y);
     const rect = viewportContainerRef.current?.getBoundingClientRect();
     if (!point || !rect) {
       setDropGuide(undefined);
@@ -194,7 +222,84 @@ const Viewport: React.FC = () => {
       width: width && width * point.scaleX, height: height && height * point.scaleY,
       importingImage,
       asset: asset && { tag: asset.tag, src: asset.image.src } });
-  }, [placementStep]);
+  }, []);
+
+  const cancelKeyboardPlacement = useCallback(() => {
+    setKeyboardPlacement(undefined);
+    setDropGuide(undefined);
+  }, []);
+
+  useEffect(() => {
+    const startKeyboardPlacement = (event: Event) => {
+      const { item, source } = (event as CustomEvent<SceneKeyboardPlacementRequest>).detail;
+      if ('asset' in item && !isEditingScene) return;
+      const container = viewportContainerRef.current;
+      const canvas = container?.querySelector<HTMLCanvasElement>('canvas#canvas');
+      const centre = canvas && getCanvasPlacement(canvas, placementStep);
+      if (!canvas || !centre) {
+        setPlacementStatus({ message: 'Run the Dino GE script before adding objects.', error: true });
+        return;
+      }
+      setPlacementStatus(undefined);
+      setKeyboardPlacement({ item, source, canvas, scene: Engine.currentScene, point: { x: centre.x, y: centre.y } });
+      showDropGuide(centre, item);
+      container?.focus();
+    };
+    window.addEventListener(sceneKeyboardPlacementEvent, startKeyboardPlacement);
+    return () => window.removeEventListener(sceneKeyboardPlacementEvent, startKeyboardPlacement);
+  }, [isEditingScene, placementStep, showDropGuide]);
+
+  const placementCanvas = keyboardPlacement?.canvas;
+  const placementScene = keyboardPlacement?.scene;
+  useEffect(() => {
+    if (!placementCanvas) return;
+    const onSceneChange = () => {
+      if (Engine.currentScene !== placementScene) cancelKeyboardPlacement();
+    };
+    Engine.on('sceneHierarchyChanged', onSceneChange);
+    Engine.on('paused', cancelKeyboardPlacement);
+    window.addEventListener('blur', cancelKeyboardPlacement);
+    window.addEventListener('playground-before-run', cancelKeyboardPlacement);
+    return () => {
+      Engine.off('sceneHierarchyChanged', onSceneChange);
+      Engine.off('paused', cancelKeyboardPlacement);
+      window.removeEventListener('blur', cancelKeyboardPlacement);
+      window.removeEventListener('playground-before-run', cancelKeyboardPlacement);
+    };
+  }, [cancelKeyboardPlacement, placementCanvas, placementScene]);
+
+  const handleKeyboardPlacement = (event: React.KeyboardEvent) => {
+    if (!keyboardPlacement) return false;
+    const { item, source, canvas, scene, point } = keyboardPlacement;
+    if (event.key === 'Escape') {
+      cancelKeyboardPlacement();
+      source.focus();
+      return true;
+    }
+    if (event.key === 'Enter' && !event.ctrlKey && !event.altKey && !event.metaKey) {
+      cancelKeyboardPlacement();
+      if (canvas.isConnected && scene === Engine.currentScene) {
+        if ('asset' in item) {
+          if (isEditingScene) addObject('Sprite', point, item.asset);
+        } else if (addObject(item.kind, point)) {
+          enterSceneEditing();
+        }
+      }
+      return true;
+    }
+    const movement = getSceneArrowMovement(event);
+    if (!movement) return false;
+    const projection = getCanvasProjection(canvas);
+    if (projection) {
+      const next = keepPointOnCanvas({
+        x: point.x + movement.x * placementStep,
+        y: point.y + movement.y * placementStep,
+      }, projection, placementStep);
+      setKeyboardPlacement({ ...keyboardPlacement, point: next });
+      showDropGuide(projectCanvasPoint(next, projection), item);
+    }
+    return true;
+  };
 
   const placeLoadedImage = useCallback((asset: SceneImageAsset, x?: number, y?: number) => {
     addObject('Sprite', getPlacementPoint(x, y), asset);
@@ -208,11 +313,12 @@ const Viewport: React.FC = () => {
         return;
       }
       const { phase, point: { x, y } } = detail;
+      setKeyboardPlacement(undefined);
       const target = document.elementFromPoint(x, y);
       const isOverCanvas = target instanceof HTMLCanvasElement && target.id === 'canvas' &&
         viewportContainerRef.current?.contains(target);
       if (isOverCanvas && phase === 'preview') {
-        showDropGuide(target, x, y, detail);
+        showDropGuide(getCanvasPlacement(target, placementStep, x, y), detail);
       } else {
         setDropGuide(undefined);
         if (isOverCanvas && phase === 'drop') {
@@ -223,7 +329,7 @@ const Viewport: React.FC = () => {
     };
     window.addEventListener(scenePointerDragEvent, updatePointerDrag);
     return () => window.removeEventListener(scenePointerDragEvent, updatePointerDrag);
-  }, [isEditingScene, placeLibraryObject, placeLoadedImage, showDropGuide]);
+  }, [isEditingScene, placeLibraryObject, placeLoadedImage, placementStep, showDropGuide]);
 
   const placeImageFile = useCallback(async (files: File[], x?: number, y?: number) => {
     const reject = (message: string) => setPlacementStatus({ message, error: true });
@@ -423,11 +529,15 @@ const Viewport: React.FC = () => {
       <div id="playground-canvas-container" ref={viewportContainerRef}
         className={isPanning ? 'scene-panning' : undefined}
         style={isEditingScene ? { touchAction: 'none' } : undefined}
-        role={isEditingScene ? 'region' : undefined}
-        aria-label={isEditingScene ? 'Scene viewport' : undefined}
-        aria-describedby={isEditingScene ? 'scene-keyboard-hint' : undefined}
+        role={isEditingScene || keyboardPlacement ? 'region' : undefined}
+        aria-label={isEditingScene || keyboardPlacement ? 'Scene viewport' : undefined}
+        aria-describedby={keyboardPlacement ? 'scene-placement-keyboard-hint' : isEditingScene ? 'scene-keyboard-hint' : undefined}
         tabIndex={isEditingScene ? 0 : -1}
+        onBlur={event => {
+          if (keyboardPlacement && !event.currentTarget.contains(event.relatedTarget)) cancelKeyboardPlacement();
+        }}
         onPointerDownCapture={event => {
+          if (keyboardPlacement) cancelKeyboardPlacement();
           if (!isEditingScene || event.button !== 1 || !(event.target instanceof HTMLCanvasElement)) return;
           event.preventDefault();
           event.stopPropagation();
@@ -460,10 +570,11 @@ const Viewport: React.FC = () => {
               !(event.target instanceof HTMLCanvasElement)) return;
           event.preventDefault();
           event.dataTransfer.dropEffect = 'copy';
+          setKeyboardPlacement(undefined);
           const kind = sceneObjectKinds.find(item => types.includes(`${sceneObjectDragType}-${item.toLowerCase()}`));
           const dragged = draggedAsset.current;
           const asset = dragged && types.includes(getSceneAssetPreviewType(dragged.tag)) ? dragged : undefined;
-          showDropGuide(event.target, event.clientX, event.clientY, { kind, asset, importingImage });
+          showDropGuide(getCanvasPlacement(event.target, placementStep, event.clientX, event.clientY), { kind, asset, importingImage });
         }}
         onDragLeave={() => setDropGuide(undefined)}
         onDrop={event => {
@@ -490,6 +601,11 @@ const Viewport: React.FC = () => {
         }}
         onClickCapture={suppressGameActivation}
         onKeyDownCapture={event => {
+          if (handleKeyboardPlacement(event)) {
+            event.preventDefault();
+            event.stopPropagation();
+            return;
+          }
           if (isEditingScene && (event.target === event.currentTarget || event.target instanceof HTMLCanvasElement) &&
               nudgeSceneSelection(event)) {
             event.preventDefault();
@@ -499,7 +615,7 @@ const Viewport: React.FC = () => {
           if (event.key === 'Enter' || event.key === ' ') suppressGameActivation(event);
         }}
       />
-      {(isEditingScene || placementStatus?.error || placementStatus?.pending) && (
+      {(isEditingScene || keyboardPlacement || placementStatus?.error || placementStatus?.pending) && (
         <div className="scene-edit-controls" role={isEditingScene ? 'group' : undefined}
           aria-label={isEditingScene ? 'Scene editing' : undefined}>
           {isEditingScene && <>
@@ -524,11 +640,11 @@ const Viewport: React.FC = () => {
                 {sceneGridSizes.map(size => <option key={size} value={size}>{size} px</option>)}
               </select>
             </div>
-            <span id="scene-keyboard-hint" className="scene-edit-hint">
+            {!keyboardPlacement && <span id="scene-keyboard-hint" className="scene-edit-hint">
               Middle drag pans · {isGridSnapping ? 'Arrows move 1 cell · Shift moves 10 cells' : 'Arrows move 1 px · Shift moves 10 px'}<br />
               Drag the round handle to rotate · Hold Shift to snap to 15°<br />
               Esc cancels the current edit
-            </span>
+            </span>}
             {!isInspectorVisible && selectedObject && pendingCanvasPlacements.has(selectedObject) && (
               <button type="button" className="scene-control scene-review-changes" onClick={() => {
                 setIsInspectorVisible(true);
@@ -538,6 +654,10 @@ const Viewport: React.FC = () => {
               </button>
             )}
           </>}
+          {keyboardPlacement && <span id="scene-placement-keyboard-hint" className="scene-edit-hint">
+            Arrows position · {isGridSnapping ? 'Shift moves 10 cells' : 'Shift moves 10 px'}<br />
+            Enter places the object · Esc cancels
+          </span>}
           {placementStatus?.error ? (
             <div className="scene-placement-error">
               <span role="alert">{placementStatus.message}</span>
@@ -551,16 +671,16 @@ const Viewport: React.FC = () => {
           )}
         </div>
       )}
-      {dropGuide && <div className="scene-drop-preview" aria-hidden="true">
+      {dropGuide && <div className="scene-drop-preview" aria-hidden={keyboardPlacement ? undefined : true}>
         {dropGuide.width && dropGuide.height && <div className={dropGuide.kind === 'Line' ? 'scene-drop-line' : 'scene-drop-outline'} style={{
           left: dropGuide.left, top: dropGuide.top, width: dropGuide.width, height: dropGuide.height,
           borderRadius: dropGuide.kind === 'Circle' ? '50%' : undefined,
-        }}>
+        }} aria-hidden="true">
           {dropGuide.asset && <img className="scene-drop-image" src={dropGuide.asset.src} alt="" />}
           {dropGuide.kind === 'Text' && <TextDropPreview />}
         </div>}
-        <div className="scene-drop-guide" style={{ left: dropGuide.left, top: dropGuide.top }} />
-        <div className="scene-drop-position">
+        <div className="scene-drop-guide" style={{ left: dropGuide.left, top: dropGuide.top }} aria-hidden="true" />
+        <div className="scene-drop-position" role={keyboardPlacement ? 'status' : undefined}>
           {dropGuide.asset?.tag ?? dropGuide.kind ?? (dropGuide.importingImage ? 'Import image' : 'Drop position')} · X {dropGuide.x} · Y {dropGuide.y}
         </div>
       </div>}

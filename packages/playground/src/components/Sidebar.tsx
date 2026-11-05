@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import AssetPanel from './AssetPanel';
 import { sceneObjectDragType, type SceneObjectKind } from '../utils/scene-objects';
-import { useScenePointerDrag } from '../hooks/useScenePointerDrag';
+import { useScenePlacementSource } from '../hooks/useScenePlacementSource';
 import '../styles/sidebar.css';
 
 interface Snippet {
@@ -81,7 +81,7 @@ type TabType = 'library' | 'assets';
 
 const Sidebar: React.FC = () => {
   const [activeTab, setActiveTab] = useState<TabType>('library');
-  const pointerDrag = useScenePointerDrag(activeTab === 'library');
+  const placementSource = useScenePlacementSource(activeTab === 'library');
 
   const insertSnippet = (code: string) => {
     window.dispatchEvent(new CustomEvent('playground-insert-text', { detail: code }));
@@ -112,16 +112,16 @@ const Sidebar: React.FC = () => {
             <section className="library-section" aria-labelledby="library-objects" aria-describedby="library-placement-hint">
               <h3 id="library-objects">Scene objects</h3>
               <p id="library-placement-hint" className="library-hint">
-                Drag or click to place. Use Insert to add code.
+                Drag or click to place. Shift+Enter positions with keys. Use Insert to add code.
               </p>
               {snippets.filter(item => item.kind || item.label === 'Sprite').map(({ label, icon, code, kind }) => (
                 <div className="library-row" key={label}>
                   <button type="button" className="scene-control snippet-btn" draggable={!!kind}
                     aria-label={kind ? `Add ${label.toLowerCase()}` : 'Choose sprite image'}
                     title={kind ? `Drag ${label.toLowerCase()} onto the scene or click to add at the centre` : 'Choose an image in Assets'}
-                    {...pointerDrag.forItem(kind ? { kind } : undefined)}
+                    {...placementSource.forItem(kind ? { kind } : undefined)}
                     onDragStart={event => {
-                      if (pointerDrag.isActive()) {
+                      if (placementSource.isActive()) {
                         event.preventDefault();
                         return;
                       }
@@ -131,7 +131,7 @@ const Sidebar: React.FC = () => {
                       event.dataTransfer.effectAllowed = 'copy';
                     }}
                     onClick={event => {
-                      if (pointerDrag.consumeClick(event)) return;
+                      if (placementSource.consumeClick(event)) return;
                       if (kind) window.dispatchEvent(new CustomEvent('playground-place-object', { detail: kind }));
                       else setActiveTab('assets');
                     }}

@@ -179,6 +179,62 @@ new Engine({
   await expect(page.locator('body')).toHaveAttribute('data-game-action', 'pressed');
 });
 
+test('positions Library objects and sprites with the keyboard before placing them', async ({ page }) => {
+  await page.route('**/files', route => route.fulfill({ json: ['script'] }));
+  await page.route('**/api/scripts/script', route => route.fulfill({ json: `
+import { Engine, Loader } from 'dino-ge';
+new Engine({ async onLoad() {
+  Loader.queueImage('gem', '/gem.svg');
+  await Loader.loadAll();
+}, update() {} }, { containerId: 'playground-canvas-container' });` }));
+  await page.route('**/gem.svg', route => route.fulfill({
+    contentType: 'image/svg+xml',
+    body: '<svg xmlns="http://www.w3.org/2000/svg" width="48" height="32"><rect width="48" height="32" fill="orange"/></svg>',
+  }));
+  await page.goto('/');
+  const canvas = page.locator('#canvas');
+  await expect(canvas).toBeVisible();
+  await page.getByRole('button', { name: 'Edit scene', exact: true }).click();
+  await page.getByRole('button', { name: 'Snap to grid' }).click();
+  const viewport = page.getByRole('region', { name: 'Scene viewport' });
+  const add = page.getByRole('button', { name: 'Add rectangle', exact: true });
+  const object = page.getByRole('button', { name: 'New rectangle', exact: true });
+  const preview = page.locator('.scene-drop-preview');
+  const centre = await canvas.evaluate((element: HTMLCanvasElement) => ({
+    x: Math.round(element.width / 32) * 16, y: Math.round(element.height / 32) * 16,
+  }));
+  await add.press('Shift+Enter');
+  await expect(viewport).toBeFocused();
+  await expect(preview.getByRole('status')).toHaveText(`Rectangle · X ${centre.x} · Y ${centre.y}`);
+  await page.keyboard.press('ArrowRight');
+  await expect(preview.getByRole('status')).toHaveText(`Rectangle · X ${centre.x + 16} · Y ${centre.y}`);
+  await page.keyboard.press('Escape');
+  await expect(add).toBeFocused();
+  await expect(preview).toHaveCount(0);
+  await expect(object).toHaveCount(0);
+
+  await add.press('Shift+Enter');
+  await page.keyboard.press('ArrowLeft');
+  await page.keyboard.press('ArrowUp');
+  await page.keyboard.press('Enter');
+  await expect(object).toHaveAttribute('aria-pressed', 'true');
+  await expect(page.getByRole('spinbutton', { name: 'X', exact: true })).toHaveValue((centre.x - 16).toFixed(2));
+  await expect(page.getByRole('spinbutton', { name: 'Y', exact: true })).toHaveValue((centre.y - 16).toFixed(2));
+  await expect(preview).toHaveCount(0);
+
+  await page.getByRole('button', { name: 'Assets', exact: true }).click();
+  const asset = page.getByRole('button', { name: 'Add gem as sprite', exact: true });
+  await expect(asset).toBeEnabled();
+  await asset.press('Shift+Enter');
+  await expect(preview.locator('img')).toHaveAttribute('src', /\/gem\.svg$/);
+  await page.keyboard.press('ArrowDown');
+  await expect(preview.getByRole('status')).toHaveText(`gem · X ${centre.x} · Y ${centre.y + 16}`);
+  await page.keyboard.press('Enter');
+  await expect(page.getByRole('button', { name: 'gem sprite', exact: true })).toHaveAttribute('aria-pressed', 'true');
+  await expect(page.getByRole('spinbutton', { name: 'Y', exact: true })).toHaveValue((centre.y + 16).toFixed(2));
+  await expect(preview).toHaveCount(0);
+});
+
 test('places Library objects by touch and pen with a snapped preview', async ({ page, browserName }) => {
   test.skip(browserName !== 'chromium', 'Native touch and pen input in this test use Chromium’s DevTools protocol.');
   await page.route('**/files', route => route.fulfill({ json: ['script'] }));

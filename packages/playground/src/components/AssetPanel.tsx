@@ -1,7 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { Engine, Loader } from 'dino-ge';
 import { usePlayground } from '../context/PlaygroundContext';
-import { useScenePointerDrag } from '../hooks/useScenePointerDrag';
+import { useScenePlacementSource } from '../hooks/useScenePlacementSource';
 import { getSceneAssetPreviewType, isReplaceableSprite, sceneAssetDragType, type SceneImageAsset } from '../utils/scene-objects';
 import { listSpriteImages, spriteImageTypes, type StoredSpriteImage } from '../utils/helpers';
 import '../styles/asset-panel.css';
@@ -12,11 +12,11 @@ interface AssetEntry {
   image?: HTMLImageElement;
 }
 
-function AssetTile({ asset, isEditing, canReplace, pointerDrag }: {
+function AssetTile({ asset, isEditing, canReplace, placementSource }: {
   asset: AssetEntry;
   isEditing: boolean;
   canReplace: boolean;
-  pointerDrag: ReturnType<typeof useScenePointerDrag>;
+  placementSource: ReturnType<typeof useScenePlacementSource>;
 }) {
   const [thumbnail, setThumbnail] = useState<HTMLImageElement>();
   const [unavailable, setUnavailable] = useState(false);
@@ -25,13 +25,13 @@ function AssetTile({ asset, isEditing, canReplace, pointerDrag }: {
     <div className="asset-tile">
       <button type="button" className="scene-control asset-item" title={asset.url}
         aria-label={`Add ${asset.tag} as sprite`} disabled={!isEditing || !image} draggable={isEditing && !!image}
-        {...pointerDrag.forItem(isEditing && image ? { asset: { tag: asset.tag, image } } : undefined)}
+        {...placementSource.forItem(isEditing && image ? { asset: { tag: asset.tag, image } } : undefined)}
         onClick={event => {
-          if (pointerDrag.consumeClick(event)) return;
+          if (placementSource.consumeClick(event)) return;
           if (image) window.dispatchEvent(new CustomEvent<SceneImageAsset>('playground-place-asset', { detail: { tag: asset.tag, image } }));
         }}
         onDragStart={event => {
-          if (pointerDrag.isActive()) {
+          if (placementSource.isActive()) {
             event.preventDefault();
             return;
           }
@@ -83,7 +83,7 @@ const AssetPanel: React.FC = () => {
   const filePicker = useRef<HTMLInputElement>(null);
   const { currentScriptId, isPaused, isDebug } = usePlayground();
   const isEditing = isPaused && isDebug;
-  const pointerDrag = useScenePointerDrag(isEditing);
+  const placementSource = useScenePlacementSource(isEditing);
   const canReplace = isEditing && isReplaceableSprite(selected);
 
   useEffect(() => {
@@ -152,14 +152,14 @@ const AssetPanel: React.FC = () => {
       <p className="asset-help">Import an image or drop it onto the canvas to place a sprite.</p>
       {assets.length > 0 && (
         <p className="asset-help">
-          {isEditing ? 'Drag a listed image onto the scene or click to place it.' : 'Enter Edit scene to place listed images.'}
+          {isEditing ? 'Drag or click an image to place it. Shift+Enter positions with keys.' : 'Enter Edit scene to place listed images.'}
         </p>
       )}
       {workspace?.error && <p className="asset-help" role="status">{workspace.error}</p>}
       {canReplace && <p className="asset-help">Use the swap button to change the selected sprite’s image.</p>}
       <div className="asset-list">
         {assets.map(asset => <AssetTile key={`${asset.tag}:${asset.url}`} asset={asset} isEditing={isEditing}
-          canReplace={canReplace} pointerDrag={pointerDrag} />)}
+          canReplace={canReplace} placementSource={placementSource} />)}
         {!assets.length && !workspace?.error && (
           <div className="no-assets">{workspace ? 'Imported images and images loaded by the game appear here.' : 'Loading workspace images…'}</div>
         )}
