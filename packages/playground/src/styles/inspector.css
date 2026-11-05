@@ -90,6 +90,12 @@
   gap: 8px;
 }
 
+.inspector-text-section .prop-row {
+  flex-direction: column;
+  align-items: stretch;
+  gap: 4px;
+}
+
 .prop-row label {
   font-size: 12px;
   flex: 1;

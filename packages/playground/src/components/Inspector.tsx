@@ -32,6 +32,14 @@ const SECTIONS: Record<string, { rows: PropertyRowDef[], component: any, descrip
       { label: 'Rotation', type: 'number', propertyPath: 'rotation' }
     ]
   },
+  Text: {
+    component: Dino.TextComponent,
+    rows: [
+      { label: 'Content', type: 'text', propertyPath: 'text' },
+      { label: 'Text colour', type: 'text', propertyPath: 'colour' },
+      { label: 'Background', type: 'text', propertyPath: 'backgroundColour' },
+    ]
+  },
   Bounds: {
     component: Dino.BoundsComponent,
     rows: [
@@ -351,7 +359,7 @@ const Inspector: React.FC<InspectorProps> = ({ visible }) => {
             ) : (
               getInspectorSections(selectedObject).map(([sectionName, config]) => {
                 return (
-                  <div key={sectionName} className="inspector-section">
+                  <div key={sectionName} className={sectionName === 'Text' ? 'inspector-section inspector-text-section' : 'inspector-section'}>
                     <h3>{sectionName}</h3>
                     {config.description && <p className="inspector-section-description">{config.description}</p>}
                     {config.rows.map((def) => (

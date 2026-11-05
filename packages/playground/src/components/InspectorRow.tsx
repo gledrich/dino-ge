@@ -25,6 +25,11 @@ export const resolveComponentPath = (obj: InspectableObject, pathStr: string): {
   const lineProperty = obj instanceof Dino.Line ? lineProperties.get(pathStr) : undefined;
   if (lineProperty) return { target: obj, prop: lineProperty };
 
+  if (pathStr === 'text' || pathStr === 'colour' || pathStr === 'backgroundColour') {
+    const text = obj.getComponent(Dino.TextComponent);
+    if (text) return { target: obj instanceof Dino.Text ? obj : text, prop: pathStr };
+  }
+
   let target: any = obj;
   let propPath = pathStr;
 

@@ -476,6 +476,58 @@ new Engine({ onLoad() {}, update() {} }, { containerId: 'playground-canvas-conta
   await expect(stroke).toHaveValue('12.00');
 });
 
+test('previews a text drop and restores the content edited in the Inspector', async ({ page }) => {
+  let source = `import { Engine } from 'dino-ge';
+new Engine({ onLoad() {}, update() {} }, { containerId: 'playground-canvas-container' });`;
+  await page.route('**/files', route => route.fulfill({ json: ['script'] }));
+  await page.route('**/api/scripts/script', route => {
+    if (route.request().method() === 'PUT') {
+      source = route.request().postDataJSON().data;
+      return route.fulfill({ json: { success: true } });
+    }
+    return route.fulfill({ json: source });
+  });
+  await page.goto('/');
+  const canvas = page.locator('#canvas');
+  await expect(canvas).toBeVisible();
+  await expect(page.locator('.monaco-editor')).toContainText('new Engine');
+  const box = (await canvas.boundingBox())!;
+  const add = page.getByRole('button', { name: 'Add text', exact: true });
+  const transfer = await page.evaluateHandle(() => new DataTransfer());
+  await add.dispatchEvent('dragstart', { dataTransfer: transfer });
+  await canvas.dispatchEvent('dragover', { dataTransfer: transfer, clientX: box.x + 210, clientY: box.y + 170 });
+  const preview = page.locator('.scene-drop-preview');
+  await expect(preview.getByText('New text', { exact: true })).toBeVisible();
+  await expect(preview).toContainText('Text · X 210 · Y 170');
+  await add.dragTo(canvas, { targetPosition: { x: 210, y: 170 } });
+  await expect(preview).toHaveCount(0);
+  const object = page.getByRole('button', { name: 'New text', exact: true });
+  await expect(object).toHaveAttribute('aria-pressed', 'true');
+  const content = page.getByRole('textbox', { name: 'Content', exact: true });
+  await expect(content).toHaveValue('New text');
+  const readTextPixels = () => canvas.evaluate((element: HTMLCanvasElement) =>
+    Array.from(element.getContext('2d')!.getImageData(230, 178, 120, 30).data));
+  const original = await readTextPixels();
+  await content.fill('Ready to play');
+  await expect.poll(readTextPixels).not.toEqual(original);
+  await page.getByRole('button', { name: 'Save Content to code', exact: true }).click();
+  const background = page.getByRole('textbox', { name: 'Background', exact: true });
+  await background.fill('#fff2bc');
+  await expect.poll(() => canvas.evaluate((element: HTMLCanvasElement) =>
+    Array.from(element.getContext('2d')!.getImageData(216, 177, 1, 1).data))).toEqual([255, 242, 188, 255]);
+  await page.getByRole('button', { name: 'Save Background to code', exact: true }).click();
+
+  const saved = page.waitForResponse(response => response.request().method() === 'PUT' &&
+    response.url().endsWith('/api/scripts/script'));
+  await page.getByRole('button', { name: 'Save script', exact: true }).click();
+  await saved;
+  await page.reload();
+  await object.click();
+  await expect(content).toHaveValue('Ready to play');
+  await expect(background).toHaveValue('#fff2bc');
+  await expect(page.getByRole('spinbutton', { name: 'X', exact: true })).toHaveValue('210.00');
+});
+
 test('explains a rejected palette drop without pausing the game or changing the script', async ({ page }) => {
   const source = `import { Engine } from 'dino-ge';
 function setup() {}
