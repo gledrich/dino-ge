@@ -139,7 +139,8 @@
 .scene-drop-image { opacity: 0.65; }
 .scene-drop-text { opacity: 0.85; }
 
-.scene-drop-position {
+.scene-drop-position,
+.scene-manipulation-readout {
   position: absolute;
   inset-inline-end: 12px;
   bottom: 12px;
@@ -153,6 +154,11 @@
   max-width: calc(100% - 24px);
   box-sizing: border-box;
   overflow-wrap: anywhere;
+}
+
+.scene-manipulation-readout {
+  z-index: 9;
+  pointer-events: none;
 }
 
 /* Resize Handles */

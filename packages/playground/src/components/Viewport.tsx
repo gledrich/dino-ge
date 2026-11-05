@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { Engine, Loader } from 'dino-ge';
+import { Engine, Loader, SpriteComponent, type ObjectManipulationPreview } from 'dino-ge';
 import { usePlayground } from '../context/PlaygroundContext';
 import Toolbar from './Toolbar';
 import Logo from './Logo';
@@ -59,6 +59,7 @@ const Viewport: React.FC = () => {
   const pan = useRef<{ id: number; x: number; y: number } | null>(null);
   const [isPanning, setIsPanning] = useState(false);
   const [placementStatus, setPlacementStatus] = useState<{ message: string; error?: boolean }>();
+  const [manipulationReadout, setManipulationReadout] = useState('');
   const [dropGuide, setDropGuide] = useState<{
     x: number; y: number; left: number; top: number; kind?: SceneObjectKind;
     width?: number; height?: number;
@@ -70,6 +71,36 @@ const Viewport: React.FC = () => {
     const previous = Engine.showDebugHud;
     Engine.showDebugHud = false;
     return () => { Engine.showDebugHud = previous; };
+  }, [isEditingScene]);
+
+  useEffect(() => {
+    if (!isEditingScene) return;
+    const clear = () => setManipulationReadout('');
+    const update = ({ detail }: CustomEvent<ObjectManipulationPreview | null>) => {
+      if (!detail) {
+        clear();
+        return;
+      }
+      const { object, kind, value } = detail;
+      const x = Math.round(value.x * 100) / 100;
+      const y = Math.round(value.y * 100) / 100;
+      if (kind === 'drag') {
+        setManipulationReadout(`Move · ${object.transform.parent ? 'Local ' : ''}X ${x} · Y ${y}`);
+      } else if (object.getComponent(SpriteComponent)) {
+        setManipulationReadout(`Resize · Scale X ${x} · Y ${y}`);
+      } else {
+        setManipulationReadout(`Resize · W ${x} · H ${y}`);
+      }
+    };
+    Engine.on('objectManipulationPreview', update);
+    Engine.on('selectedObjectChanged', clear);
+    window.addEventListener('playground-before-run', clear);
+    return () => {
+      Engine.off('objectManipulationPreview', update);
+      Engine.off('selectedObjectChanged', clear);
+      window.removeEventListener('playground-before-run', clear);
+      clear();
+    };
   }, [isEditingScene]);
 
   const addObject = useCallback((kind: SceneObjectKind | 'Sprite', clientX?: number, clientY?: number, assetTag?: string) => {
@@ -367,7 +398,10 @@ const Viewport: React.FC = () => {
         <div className="scene-drop-guide" style={{ left: dropGuide.left, top: dropGuide.top }} />
         <div className="scene-drop-position">{dropGuide.asset?.tag ?? dropGuide.kind ?? 'Drop position'} · X {dropGuide.x} · Y {dropGuide.y}</div>
       </div>}
-      <Logo visible={!isInspectorVisible && isViewportReady} />
+      {isEditingScene && manipulationReadout && (
+        <div className="scene-manipulation-readout" role="group" aria-label="Current scene gesture">{manipulationReadout}</div>
+      )}
+      <Logo visible={!isInspectorVisible && isViewportReady && !isEditingScene} />
       <Toolbar 
         isPaused={isPaused}
         isDebug={isDebug}
