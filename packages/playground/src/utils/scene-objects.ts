@@ -93,19 +93,27 @@ export function nudgeSceneSelection(event: Pick<KeyboardEvent, 'key' | 'shiftKey
     const cos = Math.cos(worldRotation);
     const sin = Math.sin(worldRotation);
     const localX = worldScale.x ? (x * cos + y * sin) / worldScale.x : 0;
-    const localY = worldScale.y ? (-x * sin + y * cos) / worldScale.y : 0;
-    position.set(position.x + localX, position.y + localY);
+    y = worldScale.y ? (-x * sin + y * cos) / worldScale.y : 0;
+    x = localX;
+  }
+  if (object instanceof Dino.Line) {
+    object.setOrigin(position.x + x, position.y + y);
   } else {
     position.set(position.x + x, position.y + y);
   }
-  if (position.x !== initial.x || position.y !== initial.y) {
+  const current = object.transform.position;
+  if (current.x !== initial.x || current.y !== initial.y) {
     Engine.emit('objectManipulated', { object, kind: 'drag', initial });
   }
   return true;
 }
 
 export function restoreSceneTransform(object: Dino.GameObject, state: SceneTransformState) {
-  if (state.position) object.transform.position.set(state.position.x, state.position.y);
+  if (state.position) {
+    const { x, y } = state.position;
+    if (object instanceof Dino.Line) object.setOrigin(x, y);
+    else object.transform.position.set(x, y);
+  }
   if (state.rotation !== undefined) object.transform.rotation = state.rotation;
   if (state.scale) object.transform.scale.set(state.scale.x, state.scale.y);
   if (object instanceof Dino.Line) {

@@ -196,9 +196,11 @@ const Inspector: React.FC<InspectorProps> = ({ visible }) => {
       return;
     }
     const properties = mapping?.properties;
+    const needsLineOrigin = mapping?.type === 'Line' && !properties?.position &&
+      (placement.has('drag') || placement.has('p1'));
     const shape = selectedObject.getComponent(Dino.ShapeComponent);
     const paths: string[] = [];
-    if (placement.has('drag')) paths.push('position.x', 'position.y');
+    if (placement.has('drag') && !needsLineOrigin) paths.push('position.x', 'position.y');
     if (placement.has('rotate')) paths.push('rotation');
     const endpoints = (['p1', 'p2'] as const).filter(endpoint => placement.has(endpoint));
     for (const endpoint of endpoints) paths.push(`${endpoint}.x`, `${endpoint}.y`);
@@ -207,7 +209,7 @@ const Inspector: React.FC<InspectorProps> = ({ visible }) => {
       else if (mapping?.type === 'Circle') paths.push('radius');
       else if (mapping?.type === 'Rectangle' || mapping?.type === 'Text') paths.push('width', 'height');
     }
-    // Movement and resizing require existing numeric options. An absent rotation defaults to zero.
+    // Preserve computed options. A missing line origin is handled separately.
     const valueAt = (path: string): unknown => {
       if (path === 'radius') return shape?.width;
       const resolved = resolveComponentPath(selectedObject, path);
@@ -225,12 +227,12 @@ const Inspector: React.FC<InspectorProps> = ({ visible }) => {
       if (!edit) break;
       edits.push(edit);
     }
-    if (!paths.length || edits.length !== paths.length ||
+    if ((!paths.length && !needsLineOrigin) || edits.length !== paths.length ||
         (placement.has('resize') && !['Sprite', 'Circle', 'Rectangle', 'Text'].includes(mapping?.type))) {
       setPlacementStatus('Use literal transform options in the script to apply this edit.');
       return;
     }
-    if (placement.has('p1') && !properties?.position) {
+    if (needsLineOrigin) {
       const origin = getLineOriginEdit(sourceId, selectedObject.transform.position);
       if (!origin) {
         setPlacementStatus('Give the line an explicit position in the script before applying this edit.');

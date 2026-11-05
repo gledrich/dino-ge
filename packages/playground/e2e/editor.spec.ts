@@ -725,9 +725,10 @@ new Engine({ onLoad() {
     return route.fulfill({ json: script });
   });
   await page.goto('/');
-  await expect(page.getByRole('button', { name: 'Ramp', exact: true })).toBeVisible();
+  const ramp = page.getByRole('button', { name: 'Ramp', exact: true });
+  await expect(ramp).toBeVisible();
   await page.getByRole('button', { name: 'Edit scene', exact: true }).click();
-  await page.getByRole('button', { name: 'Ramp', exact: true }).click();
+  await ramp.click();
   await page.getByRole('button', { name: 'Snap to grid' }).click();
   const canvas = page.locator('#canvas');
   await canvas.evaluate((element: HTMLCanvasElement) => {
@@ -738,6 +739,38 @@ new Engine({ onLoad() {
   const startX = page.getByRole('spinbutton', { name: 'Start X', exact: true });
   const endX = page.getByRole('spinbutton', { name: 'End X', exact: true });
   const readout = page.getByRole('group', { name: 'Current scene gesture' });
+  const originX = page.getByRole('spinbutton', { name: 'X', exact: true });
+  const source = () => page.evaluate(() => {
+    const { monaco } = window as typeof window & { monaco: Monaco };
+    return monaco.editor.getEditors()[0].getValue();
+  });
+  const original = await source();
+
+  await ramp.press('ArrowRight');
+  await expect(originX).toHaveValue('256.00');
+  await expect(startX).toHaveValue('240.00');
+  await page.getByRole('button', { name: 'Apply placement to code' }).click();
+  await expect.poll(source).toContain('p1: new Vec(240, -80), position: new Vec(256, -80)');
+  await page.getByRole('button', { name: 'Undo code edit' }).click();
+  await expect(originX).toHaveValue('240.00');
+  await expect.poll(source).toBe(original);
+
+  await page.mouse.move(box.x + 320, box.y + 208);
+  await page.mouse.down();
+  await page.mouse.move(box.x + 338, box.y + 208, { steps: 4 });
+  await page.mouse.up();
+  await expect(originX).toHaveValue('256.00');
+  await expect(startX).toHaveValue('240.00');
+  await page.mouse.move(box.x + 336, box.y + 160);
+  await page.mouse.down();
+  await page.mouse.move(box.x + 350, box.y + 178, { steps: 4 });
+  await page.mouse.up();
+  await expect(startX).toHaveValue('256.00');
+  await page.getByRole('button', { name: 'Discard canvas changes' }).click();
+  await expect(originX).toHaveValue('240.00');
+  await expect(startX).toHaveValue('240.00');
+  await expect(endX).toHaveValue('336.00');
+  await expect.poll(source).toBe(original);
 
   await page.mouse.move(box.x + 320, box.y + 256);
   await page.mouse.down();
@@ -764,10 +797,6 @@ new Engine({ onLoad() {
   await page.getByRole('button', { name: 'Apply placement to code' }).click();
   await expect(page.getByRole('status').filter({ hasText: 'Applied to code' })).toBeVisible();
 
-  const source = () => page.evaluate(() => {
-    const { monaco } = window as typeof window & { monaco: Monaco };
-    return monaco.editor.getEditors()[0].getValue();
-  });
   await expect.poll(source).toContain('p1: new Vec(256, -112), position: new Vec(240, -80)');
   await expect.poll(source).toContain('p2: new Vec(368, -48)');
   await page.getByRole('button', { name: 'Undo code edit' }).click();

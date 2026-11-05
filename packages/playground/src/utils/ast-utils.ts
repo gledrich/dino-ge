@@ -514,11 +514,12 @@ export function getSceneObjectCreation(source: string, placement: SceneObjectPla
   return { edits, tag, sourceId: `${constructor}-${tag}-0` };
 }
 
-/** Preserve an implicit line origin when editing its start point. */
+/** Save an explicit origin for a line whose constructor defaults to its start point. */
 export function getLineOriginEdit(sourceId: string, { x, y }: ScenePoint): Edit | null {
   const mapping = sourceMappingRegistry[sourceId];
   const start = mapping?.properties.p1;
   if (mapping?.type !== 'Line' || mapping.hasDynamicProperties || mapping.properties.position || !start?.vectorConstructor ||
+      !start.args?.every(argument => argument.numeric) ||
       !Number.isFinite(x) || !Number.isFinite(y)) return null;
   return {
     start: start.nodeEnd,
