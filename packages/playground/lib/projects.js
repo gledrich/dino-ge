@@ -65,8 +65,14 @@ export class ProjectStore {
     return scripts.sort();
   }
 
-  async scriptPath(id) {
+  async scriptPath(id, { entryOnly = false } = {}) {
     const parts = id.includes('/') ? relativePath(id) : [id];
+    if (entryOnly && parts.length > 1) {
+      const { directory, entry } = await this.projectDirectory(id);
+      const filename = path.join(directory, entry);
+      if (await fs.realpath(filename) !== filename) throw new ProjectError('Project entry could not be found.', 404);
+      return filename;
+    }
     if (parts.length === 1 && (!id || id.startsWith('.') || id.includes('\\') || id.includes('\0') ||
         (process.platform === 'win32' && id.includes(':')))) {
       throw new ProjectError('Invalid script ID.');
@@ -118,8 +124,7 @@ export class ProjectStore {
       throw new ProjectError('Choose a JavaScript module in this project.');
     }
     const filename = path.join(directory, ...parts);
-    const parent = path.dirname(filename);
-    if (await fs.realpath(parent) !== parent || !(await fs.lstat(filename)).isFile()) {
+    if (!(await fs.lstat(filename)).isFile() || await fs.realpath(filename) !== filename) {
       throw new ProjectError('Module could not be found.', 404);
     }
     return filename;
@@ -133,7 +138,8 @@ export class ProjectStore {
 
   async saveModule(id, relative, data, revision) {
     if (Buffer.byteLength(data) > maxBytes) throw new ProjectError('A module can contain up to 16 MiB.', 413);
-    if (revision !== undefined && (typeof revision !== 'string' || !/^[a-f0-9]{64}$/.test(revision))) {
+    if (revision === undefined) throw new ProjectError('Open the module before saving it.', 428);
+    if (typeof revision !== 'string' || !/^[a-f0-9]{64}$/.test(revision)) {
       throw new ProjectError('Invalid module revision.');
     }
     const filename = await this.modulePath(id, relative);
@@ -144,7 +150,7 @@ export class ProjectStore {
       const temporary = path.join(path.dirname(filename), `.dino-module-${randomUUID()}.tmp`);
       try {
         await fs.writeFile(temporary, data, { flag: 'wx', mode: mode & 0o777 });
-        if (revision !== undefined && moduleRevision(await fs.readFile(filename, moduleReadOptions)) !== revision) {
+        if (moduleRevision(await fs.readFile(filename, moduleReadOptions)) !== revision) {
           throw new ProjectError('This module changed since you opened it.', 409);
         }
         await fs.rename(temporary, filename);

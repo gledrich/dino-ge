@@ -240,6 +240,15 @@ export const run = window.gameRuns;`);
     await modules.getByRole('button', { name: 'Discard and reload', exact: true }).click();
     await expect(moduleEditor).toContainText('export const run = 75;');
     await modules.getByRole('button', { name: 'Close', exact: true }).click();
+
+    const alias = `/api/scripts/${encodeURIComponent(id)}/modules?path=src%2FCounter.js`;
+    expect((await request.get(alias)).status()).toBe(404);
+    const unversioned = await request.put(counterUrl, { data: { data: 'unversioned write' } });
+    expect(unversioned.status()).toBe(428);
+    const moduleAsEntry = `${name}/src/counter`;
+    const bypass = await request.put(`/api/scripts/${encodeURIComponent(moduleAsEntry)}`, { data: { data: 'entry route write' } });
+    expect(bypass.status()).toBe(404);
+    expect(await (await request.get(counterUrl)).json()).toBe('export const run = 75;');
   } finally {
     await rm(folder, { recursive: true, force: true });
     await rm(stored, { recursive: true, force: true });
