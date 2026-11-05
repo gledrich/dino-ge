@@ -3,7 +3,19 @@ import { Engine, Loader } from 'dino-ge';
 import { usePlayground } from '../context/PlaygroundContext';
 import Toolbar from './Toolbar';
 import Logo from './Logo';
-import { getAssetSource, getSceneSource, nudgeSceneSelection, sceneAssetDragType, sceneObjectDragType, sceneObjectKinds, type SceneObjectKind, type SceneObjectPlacement } from '../utils/scene-objects';
+import { getAssetSource, getSceneSource, nudgeSceneSelection, sceneAssetDragType, sceneObjectDefaults, sceneObjectDragType, sceneObjectKinds, type SceneObjectKind, type SceneObjectPlacement } from '../utils/scene-objects';
+
+function getCanvasPlacement(canvas: HTMLCanvasElement, clientX?: number, clientY?: number) {
+  const bounds = canvas.getBoundingClientRect();
+  const { zoom, position } = Engine.camera;
+  if (!bounds.width || !bounds.height || !canvas.width || !canvas.height || zoom <= 0) return;
+  const scaleX = bounds.width / canvas.width * zoom;
+  const scaleY = bounds.height / canvas.height * zoom;
+  const x = Math.round(((clientX ?? bounds.left + bounds.width / 2) - bounds.left) / scaleX + position.x);
+  const y = Math.round(((clientY ?? bounds.top + bounds.height / 2) - bounds.top) / scaleY + position.y);
+  return { x, y, scaleX, scaleY, left: bounds.left + (x - position.x) * scaleX,
+    top: bounds.top + (y - position.y) * scaleY };
+}
 
 const Viewport: React.FC = () => {
   const { 
@@ -25,12 +37,15 @@ const Viewport: React.FC = () => {
   const viewportContainerRef = useRef<HTMLDivElement>(null);
   const isEditingScene = isPaused && isDebug;
   const [placementStatus, setPlacementStatus] = useState('');
-  const [dropGuide, setDropGuide] = useState<{ x: number; y: number }>();
+  const [dropGuide, setDropGuide] = useState<{
+    x: number; y: number; left: number; top: number; kind?: SceneObjectKind;
+    width?: number; height?: number;
+  }>();
 
   const addObject = useCallback((kind: SceneObjectKind | 'Sprite', clientX?: number, clientY?: number, assetTag?: string) => {
     const canvas = viewportContainerRef.current?.querySelector<HTMLCanvasElement>('canvas#canvas');
-    const bounds = canvas?.getBoundingClientRect();
-    if (!canvas || !bounds?.width || !bounds.height) {
+    const point = canvas && getCanvasPlacement(canvas, clientX, clientY);
+    if (!point) {
       setPlacementStatus('Run the Dino GE script before adding objects.');
       return;
     }
@@ -44,12 +59,9 @@ const Viewport: React.FC = () => {
       setPlacementStatus('Add objects in a named scene class declared in the open script.');
       return;
     }
-    const { zoom, position } = Engine.camera;
-    const x = clientX === undefined ? canvas.width / 2 : (clientX - bounds.left) * canvas.width / bounds.width;
-    const y = clientY === undefined ? canvas.height / 2 : (clientY - bounds.top) * canvas.height / bounds.height;
     const options = {
       tag: `New ${kind.toLowerCase()}`, scene,
-      x: Math.round(x / zoom + position.x), y: Math.round(y / zoom + position.y),
+      x: point.x, y: point.y,
     };
     let placement: SceneObjectPlacement;
     if (kind === 'Sprite') {
@@ -169,8 +181,14 @@ const Viewport: React.FC = () => {
               !(event.target instanceof HTMLCanvasElement)) return;
           event.preventDefault();
           event.dataTransfer.dropEffect = 'copy';
+          const point = getCanvasPlacement(event.target, event.clientX, event.clientY);
+          if (!point) return;
           const rect = event.currentTarget.getBoundingClientRect();
-          setDropGuide({ x: event.clientX - rect.left, y: event.clientY - rect.top });
+          const kind = sceneObjectKinds.find(item => types.includes(`${sceneObjectDragType}-${item.toLowerCase()}`));
+          const dimensions = kind === 'Rectangle' ? sceneObjectDefaults.Rectangle : kind === 'Circle'
+            ? { width: sceneObjectDefaults.Circle.radius * 2, height: sceneObjectDefaults.Circle.radius * 2 } : undefined;
+          setDropGuide({ x: point.x, y: point.y, left: point.left - rect.left, top: point.top - rect.top, kind,
+            width: dimensions && dimensions.width * point.scaleX, height: dimensions && dimensions.height * point.scaleY });
         }}
         onDragLeave={() => setDropGuide(undefined)}
         onDrop={event => {
@@ -212,8 +230,14 @@ const Viewport: React.FC = () => {
             {placementStatus && <span className="scene-edit-status" role="status">{placementStatus}</span>}
           </div>
       )}
-      {dropGuide && <div className="scene-drop-guide" aria-hidden="true"
-        style={{ left: dropGuide.x, top: dropGuide.y }} />}
+      {dropGuide && <div className="scene-drop-preview" aria-hidden="true">
+        {dropGuide.width && dropGuide.height && <div className="scene-drop-outline" style={{
+          left: dropGuide.left, top: dropGuide.top, width: dropGuide.width, height: dropGuide.height,
+          borderRadius: dropGuide.kind === 'Circle' ? '50%' : undefined,
+        }} />}
+        <div className="scene-drop-guide" style={{ left: dropGuide.left, top: dropGuide.top }} />
+        <div className="scene-drop-position">{dropGuide.kind ?? 'Drop position'} · X {dropGuide.x} · Y {dropGuide.y}</div>
+      </div>}
       <Logo visible={!isInspectorVisible && isViewportReady} />
       <Toolbar 
         isPaused={isPaused}

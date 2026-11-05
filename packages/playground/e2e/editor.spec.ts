@@ -204,10 +204,24 @@ new Engine({ onLoad() {}, update() {} }, { containerId: 'playground-canvas-conta
   const editor = page.locator('.monaco-editor');
   await expect(editor).toContainText('new Engine');
   await expect(page.getByRole('button', { name: 'Object Library', exact: true })).toHaveAttribute('aria-pressed', 'true');
+  const box = (await canvas.boundingBox())!;
+  const transfer = await page.evaluateHandle(() => {
+    const data = new DataTransfer();
+    data.setData('application/x-dino-scene-object', 'Rectangle');
+    data.setData('application/x-dino-scene-object-rectangle', '');
+    return data;
+  });
+  await canvas.dispatchEvent('dragover', { dataTransfer: transfer, clientX: box.x + 180, clientY: box.y + 150 });
+  const preview = page.locator('.scene-drop-preview');
+  await expect(preview).toContainText('Rectangle · X 180 · Y 150');
+  await expect(preview.locator('.scene-drop-outline')).toBeVisible();
+  await canvas.dispatchEvent('dragleave', { dataTransfer: transfer });
+  await expect(preview).toHaveCount(0);
   await page.getByRole('button', { name: 'Add rectangle' }).dragTo(canvas, {
     targetPosition: { x: 180, y: 150 },
   });
   const rectangle = page.getByRole('button', { name: 'New rectangle', exact: true });
+  await expect(preview).toHaveCount(0);
   await expect(page.getByRole('button', { name: 'Edit scene', exact: true })).toHaveAttribute('aria-pressed', 'true');
   await expect(rectangle).toHaveAttribute('aria-pressed', 'true');
   await expect(page.getByRole('spinbutton', { name: 'X', exact: true })).toHaveValue('180.00');

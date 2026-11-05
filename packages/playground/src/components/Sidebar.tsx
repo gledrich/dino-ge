@@ -118,6 +118,7 @@ const Sidebar: React.FC = () => {
                     onDragStart={event => {
                       if (!kind) return;
                       event.dataTransfer.setData(sceneObjectDragType, kind);
+                      event.dataTransfer.setData(`${sceneObjectDragType}-${kind.toLowerCase()}`, '');
                       event.dataTransfer.effectAllowed = 'copy';
                     }}
                     onClick={() => {

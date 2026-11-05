@@ -87,6 +87,33 @@
   pointer-events: none;
 }
 
+.scene-drop-preview {
+  position: absolute;
+  inset: 0;
+  z-index: 9;
+  pointer-events: none;
+}
+
+.scene-drop-outline {
+  position: absolute;
+  box-sizing: border-box;
+  border: 1px dashed var(--accent-primary);
+  background: #43aa8b26;
+}
+
+.scene-drop-position {
+  position: absolute;
+  inset-inline-end: 12px;
+  bottom: 12px;
+  padding: 6px 9px;
+  border: 1px solid var(--accent-primary);
+  border-radius: var(--scene-control-radius);
+  background: var(--bg-secondary);
+  color: var(--text-primary);
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+}
+
 /* Resize Handles */
 .resize-handle-horizontal {
   width: 4px;
