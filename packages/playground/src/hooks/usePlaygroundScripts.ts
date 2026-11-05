@@ -56,7 +56,6 @@ export const usePlaygroundScripts = () => {
     stopTrackingSources.current = undefined;
     window.dispatchEvent(new CustomEvent('playground-before-run', { detail: { scriptId: currentScriptId, source: scriptText } }));
     Engine.terminateCurrent();
-    setRuntimeError(undefined);
     Engine.destroyAll();
     Engine.currentScene = null;
     Engine.destroyAll();
@@ -77,6 +76,7 @@ export const usePlaygroundScripts = () => {
 
     requestAnimationFrame(() => {
       if (run !== runId.current) return;
+      setRuntimeError(undefined);
       const script = document.createElement('script');
       script.type = 'module';
       script.dataset.playgroundScript = currentScriptId;
