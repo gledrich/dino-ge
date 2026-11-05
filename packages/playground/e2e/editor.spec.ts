@@ -1727,6 +1727,57 @@ onLoad = () => { throw new Error('The callback was already captured'); };`;
   }
 });
 
+for (const isAsync of [false, true]) {
+  test(`saves successive Library drops with a concise ${isAsync ? 'async' : 'sync'} setup arrow`, async ({ page }) => {
+    let source = `import { Engine, Rectangle, Vector2 } from 'dino-ge';
+new Engine({
+  onLoad: ${isAsync ? 'async ' : ''}() => (${isAsync ? 'await Promise.resolve(), ' : ''}new Rectangle({
+    tag: 'Original platform', position: new Vector2(300, 220), width: 64, height: 32
+  })),
+  update() {},
+}, { containerId: 'playground-canvas-container' });`;
+    await page.route('**/files', route => route.fulfill({ json: ['script'] }));
+    await page.route('**/api/scripts/script', route => {
+      if (route.request().method() === 'PUT') {
+        source = route.request().postDataJSON().data;
+        return route.fulfill({ json: { success: true } });
+      }
+      return route.fulfill({ json: source });
+    });
+    await page.goto('/');
+    const original = page.getByRole('button', { name: 'Original platform', exact: true });
+    await expect(original).toBeVisible();
+    await expect(page.locator('.monaco-editor')).toContainText(`onLoad: ${isAsync ? 'async ' : ''}() =>`);
+    await page.getByRole('button', { name: 'Edit scene', exact: true }).click();
+    await page.getByRole('button', { name: 'Snap to grid', exact: true }).click();
+    const canvas = page.locator('#canvas');
+    const placements = [['circle', 320], ['line', 416]] as const;
+    for (const [kind, x] of placements) {
+      await page.getByRole('button', { name: `Add ${kind}`, exact: true }).dragTo(canvas, {
+        targetPosition: { x, y: 176 },
+      });
+      await expect(page.getByRole('button', { name: `New ${kind}`, exact: true })).toHaveAttribute('aria-pressed', 'true');
+    }
+
+    const saved = page.waitForResponse(response => response.request().method() === 'PUT' &&
+      response.url().endsWith('/api/scripts/script'));
+    await page.getByRole('button', { name: 'Save script', exact: true }).click();
+    await saved;
+    expect(source.match(/function DinoPlaceLoad/g)).toHaveLength(1);
+    await page.reload();
+    await expect(original).toHaveCount(1);
+    for (const [kind, x] of placements) {
+      await page.getByRole('button', { name: `New ${kind}`, exact: true }).click();
+      await expect(page.getByRole('spinbutton', { name: 'X', exact: true })).toHaveValue(`${x}.00`);
+      await expect(page.getByRole('spinbutton', { name: 'Y', exact: true })).toHaveValue('176.00');
+    }
+    expect(await page.evaluate(() => {
+      const { Engine } = window as unknown as { Engine: { objects: Set<{ metadata: { tag: string } }> } };
+      return Array.from(Engine.objects, object => object.metadata.tag);
+    })).toEqual(['Original platform', 'New circle', 'New line']);
+  });
+}
+
 test('saves a palette drop to the active named scene and restores it there', async ({ page }) => {
   let source = `import { Engine, Scene as Level, Rectangle, Vector2 } from 'dino-ge';
 class Lobby extends Level {

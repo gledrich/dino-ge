@@ -397,7 +397,7 @@ export function getSceneObjectDuplication(source: string, sourceId: string, x: n
   };
 }
 
-/** Find the end of the placement block generated around a referenced callback. */
+/** Find the end of the placement block generated around a setup callback. */
 function getPlacedObjectInsertion(callback: acorn.Expression | undefined): number | undefined {
   if (callback?.type !== 'CallExpression' || callback.arguments.length !== 1) return;
   const factory = callback.callee;
@@ -459,10 +459,10 @@ export function getSceneObjectCreation(source: string, placement: SceneObjectPla
     insertion = config.start + 1;
   }
   const wrappedInsertion = getPlacedObjectInsertion(callback);
-  const referencedCallback = callback?.type === 'Identifier' || callback?.type === 'MemberExpression' ? callback : undefined;
   const body = callback?.type === 'ArrowFunctionExpression' || callback?.type === 'FunctionExpression' ? callback.body : undefined;
-  if (body && body.type !== 'BlockStatement') return null;
-  if (callback && !body && !referencedCallback && wrappedInsertion === undefined) return null;
+  const callbackToWrap = callback?.type === 'Identifier' || callback?.type === 'MemberExpression' ||
+    (callback?.type === 'ArrowFunctionExpression' && callback.body.type !== 'BlockStatement') ? callback : undefined;
+  if (callback && body?.type !== 'BlockStatement' && !callbackToWrap && wrappedInsertion === undefined) return null;
 
   const addedImports: string[] = [];
   const binding = (name: string) => {
@@ -491,15 +491,18 @@ export function getSceneObjectCreation(source: string, placement: SceneObjectPla
     const lineStart = source.lastIndexOf('\n', wrappedInsertion - 1) + 1;
     const indent = source.slice(lineStart, wrappedInsertion).match(/^[ \t]*/)?.[0] ?? '';
     edits.push({ start: wrappedInsertion, end: wrappedInsertion, newText: `${statement}\n${indent}` });
-  } else if (referencedCallback && engineHook) {
-    // Evaluate the original callback at configuration time and forward the Engine's receiver.
-    const original = source.slice(referencedCallback.start, referencedCallback.end);
+  } else if (callbackToWrap && engineHook) {
+    // Capture the original callback at configuration time. Arrows keep their lexical receiver.
+    const original = source.slice(callbackToWrap.start, callbackToWrap.end);
+    const isArrow = callbackToWrap.type === 'ArrowFunctionExpression';
+    const asyncSetup = isArrow && callbackToWrap.async;
+    const call = isArrow ? 'DinoPlaceSetup()' : 'DinoPlaceSetup == null ? undefined : Reflect.apply(DinoPlaceSetup, this, [])';
     const key = engineHook.shorthand ? 'onLoad: ' : '';
     edits.push({
-      start: referencedCallback.start,
-      end: referencedCallback.end,
-      newText: `${key}(DinoPlaceSetup => function DinoPlaceLoad() {
-    const DinoPlaceResult = DinoPlaceSetup == null ? undefined : Reflect.apply(DinoPlaceSetup, this, []);
+      start: callbackToWrap.start,
+      end: callbackToWrap.end,
+      newText: `${key}(DinoPlaceSetup => ${asyncSetup ? 'async ' : ''}function DinoPlaceLoad() {
+    const DinoPlaceResult = ${asyncSetup ? 'await ' : ''}${call};
     ${statement}
     return DinoPlaceResult;
   })(${original})`,
