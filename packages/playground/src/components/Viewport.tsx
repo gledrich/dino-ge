@@ -9,7 +9,19 @@ const shapePreviewDimensions: Partial<Record<SceneObjectKind, { width: number; h
   Rectangle: sceneObjectDefaults.Rectangle,
   Circle: { width: sceneObjectDefaults.Circle.radius * 2, height: sceneObjectDefaults.Circle.radius * 2 },
   Line: { width: sceneObjectDefaults.Line.length, height: sceneObjectDefaults.Line.strokeWidth },
+  Text: sceneObjectDefaults.Text,
 };
+
+function TextDropPreview() {
+  const { width, height, text, colour, backgroundColour, fontSize, font } = sceneObjectDefaults.Text;
+  return (
+    <svg className="scene-drop-text" viewBox={`0 0 ${width} ${height}`} preserveAspectRatio="none">
+      <rect width={width} height={height} fill={backgroundColour} />
+      <text x={width / 2} y={height / 2} fill={colour} fontSize={fontSize} fontFamily={font}
+        textAnchor="middle" dominantBaseline="central">{text}</text>
+    </svg>
+  );
+}
 
 function getCanvasPlacement(canvas: HTMLCanvasElement, clientX?: number, clientY?: number) {
   const bounds = canvas.getBoundingClientRect();
@@ -348,7 +360,10 @@ const Viewport: React.FC = () => {
         {dropGuide.width && dropGuide.height && <div className={dropGuide.kind === 'Line' ? 'scene-drop-line' : 'scene-drop-outline'} style={{
           left: dropGuide.left, top: dropGuide.top, width: dropGuide.width, height: dropGuide.height,
           borderRadius: dropGuide.kind === 'Circle' ? '50%' : undefined,
-        }}>{dropGuide.asset && <img className="scene-drop-image" src={dropGuide.asset.src} alt="" />}</div>}
+        }}>
+          {dropGuide.asset && <img className="scene-drop-image" src={dropGuide.asset.src} alt="" />}
+          {dropGuide.kind === 'Text' && <TextDropPreview />}
+        </div>}
         <div className="scene-drop-guide" style={{ left: dropGuide.left, top: dropGuide.top }} />
         <div className="scene-drop-position">{dropGuide.asset?.tag ?? dropGuide.kind ?? 'Drop position'} · X {dropGuide.x} · Y {dropGuide.y}</div>
       </div>}

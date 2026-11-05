@@ -88,7 +88,10 @@ export function getSceneSource(scene: Dino.Scene): SceneSource | undefined {
 export const sceneObjectDefaults = {
   Rectangle: { width: 80, height: 48, colour: '#54d6ad' },
   Circle: { radius: 28, colour: '#ffd166' },
-  Text: { text: 'New text', colour: '#f4f5f7' },
+  Text: {
+    text: 'New text', colour: '#203148', backgroundColour: '#e8f0fa',
+    width: 180, height: 46, fontSize: '25', font: 'Helvetica',
+  },
   Line: { length: 96, strokeWidth: 4 },
 };
 
