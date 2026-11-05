@@ -1714,16 +1714,22 @@ new Engine({ onLoad() {
 });
 
 test('keeps Library labels readable in a narrow sidebar', async ({ page }) => {
-  await page.setViewportSize({ width: 768, height: 800 });
   await page.route('**/files', route => route.fulfill({ json: ['script'] }));
   await page.route('**/api/scripts/script', route => route.fulfill({ json: `
 import { Engine } from 'dino-ge';
 new Engine({ onLoad() {} }, { containerId: 'playground-canvas-container' });` }));
   await page.goto('/');
-  for (const name of ['Library', 'Assets', 'Rectangle', 'Sprite animation']) {
-    const label = page.locator('.sidebar').getByText(name, { exact: true });
-    await expect(label).toBeVisible();
-    expect(await label.evaluate(element => element.scrollWidth <= element.clientWidth), `${name} fits`).toBe(true);
+  const rectangle = page.getByRole('button', { name: 'Add rectangle', exact: true });
+  for (const width of [768, 540, 390]) {
+    await page.setViewportSize({ width, height: 844 });
+    await expect.poll(async () => (await rectangle.boundingBox())?.width ?? 0, {
+      message: `Rectangle drag target at ${width} px`,
+    }).toBeGreaterThanOrEqual(44);
+    for (const name of ['Library', 'Assets', 'Rectangle', 'Sprite animation']) {
+      const label = page.locator('.sidebar').getByText(name, { exact: true });
+      await expect(label).toBeVisible();
+      expect(await label.evaluate(element => element.scrollWidth <= element.clientWidth), `${name} fits at ${width} px`).toBe(true);
+    }
   }
   const editor = page.locator('.monaco-editor');
   await expect(editor).toContainText('new Engine');
