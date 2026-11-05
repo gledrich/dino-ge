@@ -379,6 +379,7 @@ const Viewport: React.FC = () => {
       )}
       <div id="playground-canvas-container" ref={viewportContainerRef}
         className={isPanning ? 'scene-panning' : undefined}
+        style={isEditingScene ? { touchAction: 'none' } : undefined}
         role={isEditingScene ? 'region' : undefined}
         aria-label={isEditingScene ? 'Scene viewport' : undefined}
         aria-describedby={isEditingScene ? 'scene-keyboard-hint' : undefined}

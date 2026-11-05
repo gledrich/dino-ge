@@ -179,6 +179,58 @@ new Engine({
   await expect(page.locator('body')).toHaveAttribute('data-game-action', 'pressed');
 });
 
+test('edits canvas objects with touch and pen and rolls back cancelled contact', async ({ page, browserName }) => {
+  test.skip(browserName !== 'chromium', 'Native touch and pen input in this test use Chromium’s DevTools protocol.');
+  await page.route('**/files', route => route.fulfill({ json: ['script'] }));
+  await page.route('**/api/scripts/script', route => route.fulfill({ json: `
+import { Engine, Rectangle, Vector2 } from 'dino-ge';
+new Engine({ onLoad() {
+  new Rectangle({ tag: 'Platform', position: new Vector2(350, 220), width: 64, height: 48 });
+}, update() {} }, { containerId: 'playground-canvas-container' });` }));
+  await page.goto('/');
+  const platform = page.getByRole('button', { name: 'Platform', exact: true });
+  await expect(platform).toBeVisible();
+  await page.getByRole('button', { name: 'Edit scene', exact: true }).click();
+  const canvas = page.locator('#canvas');
+  const box = (await canvas.boundingBox())!;
+  const { width, height } = await canvas.evaluate((element: HTMLCanvasElement) => ({
+    width: element.width, height: element.height,
+  }));
+  const screen = (x: number, y: number) => ({
+    x: box.x + x * box.width / width, y: box.y + y * box.height / height,
+  });
+  const session = await page.context().newCDPSession(page);
+  const readout = page.getByRole('group', { name: 'Current scene gesture' });
+  const x = page.getByRole('spinbutton', { name: 'X', exact: true });
+  await session.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [screen(380, 244)] });
+  await session.send('Input.dispatchTouchEvent', { type: 'touchMove', touchPoints: [screen(428, 244)] });
+  await expect(readout).toContainText('Move');
+  await expect.poll(async () => Number(await x.inputValue())).toBeCloseTo(398, 0);
+  await session.send('Input.dispatchTouchEvent', { type: 'touchCancel', touchPoints: [] });
+  await expect(readout).toHaveCount(0);
+  await expect(x).toHaveValue('350.00');
+  await expect(platform).toHaveAccessibleDescription('');
+
+  await session.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [screen(380, 244)] });
+  await session.send('Input.dispatchTouchEvent', { type: 'touchMove', touchPoints: [screen(428, 244)] });
+  await session.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
+  await expect(platform).toHaveAccessibleDescription('Pending canvas changes');
+  await expect.poll(async () => Number(await x.inputValue())).toBeCloseTo(398, 0);
+
+  const corner = { ...screen(462, 268), pointerType: 'pen' as const };
+  await session.send('Input.dispatchMouseEvent', { type: 'mousePressed', ...corner, button: 'left', buttons: 1, clickCount: 1 });
+  await session.send('Input.dispatchMouseEvent', { type: 'mouseMoved', ...screen(478, 284), pointerType: 'pen', buttons: 1 });
+  await expect(readout).toContainText('Resize');
+  const widthField = page.getByRole('spinbutton', { name: 'Width', exact: true });
+  await expect.poll(async () => Number(await widthField.inputValue())).toBeCloseTo(80, 0);
+  await session.send('Input.dispatchMouseEvent', {
+    type: 'mouseReleased', ...screen(478, 284), pointerType: 'pen', button: 'left', buttons: 0, clickCount: 1,
+  });
+  await expect(readout).toHaveCount(0);
+  await page.getByRole('button', { name: 'Apply placement to code' }).click();
+  await expect(page.getByRole('status').filter({ hasText: 'Applied to code' })).toBeVisible();
+});
+
 test('rolls back interrupted canvas gestures while preserving earlier pending edits', async ({ page }) => {
   await page.route('**/files', route => route.fulfill({ json: ['script'] }));
   await page.route('**/api/scripts/script', route => route.fulfill({ json: `

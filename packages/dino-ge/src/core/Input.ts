@@ -18,6 +18,7 @@ export interface ObjectManipulationPreview {
 type ObjectGesture = {
   object: GameObject;
   startedPaused: boolean;
+  pointer?: { id: number; canvas: HTMLCanvasElement };
   initial?: Vector2;
   previewValue?: Vector2;
 } & (
@@ -27,7 +28,7 @@ type ObjectGesture = {
 );
 
 /**
- * Handles mouse and keyboard input events.
+ * Handles mouse and keyboard input and pointer gestures in paused debug mode.
  */
 export default class Input {
   private static mousePosition: Vector2 = new Vector2(0, 0);
@@ -45,6 +46,8 @@ export default class Input {
     const gesture = this.gesture;
     if (!gesture) return;
     this.gesture = null;
+    const pointer = gesture.pointer;
+    if (pointer?.canvas.hasPointerCapture(pointer.id)) pointer.canvas.releasePointerCapture(pointer.id);
     const { object, kind, initial, previewValue } = gesture;
     if (!commit && initial && previewValue) {
       if (kind === 'drag') {
@@ -118,26 +121,26 @@ export default class Input {
     size.height = height;
   }
 
-  private static getHoveredResizeHandle(object: GameObject, x: number, y: number) {
+  private static getHoveredResizeHandle(object: GameObject, x: number, y: number, slop = 0) {
     if (!object.bounds) return null;
     const geometry = getViewportGeometry(object);
     const { cornerX, cornerY, width, height, line } = geometry;
-    const halfSize = 4 / Engine.camera.zoom;
+    const halfSize = (4 + slop) / Engine.camera.zoom;
     const isInside = Math.abs(x - cornerX) < halfSize && Math.abs(y - cornerY) < halfSize;
     return !line && width !== 0 && height !== 0 && isInside ? geometry : null;
   }
 
-  private static isOverRotationHandle(object: GameObject, x: number, y: number) {
+  private static isOverRotationHandle(object: GameObject, x: number, y: number, slop = 0) {
     if (!Engine.paused || !object.bounds) return false;
     const zoom = Engine.camera.zoom;
     const handle = getViewportRotationHandle(getViewportGeometry(object), zoom);
-    return !!handle && Math.hypot(x - handle.x, y - handle.y) <= handle.radius + 2 / zoom;
+    return !!handle && Math.hypot(x - handle.x, y - handle.y) <= handle.radius + (2 + slop) / zoom;
   }
 
-  private static getHoveredLineEndpoint(object: Line, x: number, y: number) {
+  private static getHoveredLineEndpoint(object: Line, x: number, y: number, slop = 0) {
     if (!Engine.paused) return;
     const { line } = getViewportGeometry(object);
-    const tolerance = 6 / Engine.camera.zoom;
+    const tolerance = (6 + slop) / Engine.camera.zoom;
     return line && getViewportLineEndpoints(line).find(endpoint =>
       Math.abs(x - endpoint.x) <= tolerance && Math.abs(y - endpoint.y) <= tolerance);
   }
@@ -156,11 +159,11 @@ export default class Input {
     Engine.on('paused', cancelInactiveGesture);
     Engine.on('debug', cancelInactiveGesture);
 
-    document.addEventListener('mousemove', (event: MouseEvent) => {
+    const moveCanvasPointer = (event: MouseEvent) => {
       const canvas = document.getElementById('canvas') as HTMLCanvasElement | null;
       this.updateMousePosition(event, canvas);
 
-      if (this.gesture && typeof event.buttons === 'number' && !(event.buttons & 1)) {
+      if (this.gesture && !this.gesture.pointer && typeof event.buttons === 'number' && !(event.buttons & 1)) {
         this.keys.delete('mouse0');
         this.finishGesture();
       }
@@ -269,15 +272,22 @@ export default class Input {
       } else if (canvas && (canvas.style?.cursor === 'se-resize' || canvas.style?.cursor === 'grab')) {
         canvas.style.cursor = 'default';
       }
-    });
+    };
 
-    document.addEventListener('mousedown', (event: MouseEvent) => {
+    const pressCanvas = (event: MouseEvent, pointerEvent?: PointerEvent) => {
       const target = event.target as HTMLCanvasElement | null;
       if (target?.tagName !== 'CANVAS') return;
       const canvas = document.getElementById('canvas');
       if (canvas instanceof HTMLCanvasElement && target !== canvas) return;
+      if (pointerEvent) {
+        // Keep compatibility mouse events from replaying the contact as a second gesture.
+        pointerEvent.preventDefault();
+        if (this.gesture) return;
+      } else {
+        if (this.gesture?.pointer) return;
+        this.keys.add(`mouse${event.button}`);
+      }
       if (Number.isFinite(event.clientX) && Number.isFinite(event.clientY)) this.updateMousePosition(event, target);
-      this.keys.add(`mouse${event.button}`);
 
       const worldPos = new Vector2(this.mouseX, this.mouseY);
 
@@ -285,11 +295,15 @@ export default class Input {
       if (Engine.debug && event.button === 0) {
         this.finishGesture();
         const selected = Engine.selectedObject;
-        const startedPaused = Engine.paused;
-        if (selected && this.isOverRotationHandle(selected, worldPos.x, worldPos.y)) {
+        const start = {
+          startedPaused: Engine.paused,
+          pointer: pointerEvent && { id: pointerEvent.pointerId, canvas: target },
+        };
+        const slop = pointerEvent?.pointerType === 'touch' ? 6 : 0;
+        if (selected && this.isOverRotationHandle(selected, worldPos.x, worldPos.y, slop)) {
           const { rotation, worldPosition } = selected.transform;
           this.gesture = {
-            kind: 'rotate', object: selected, rotation, startedPaused,
+            kind: 'rotate', object: selected, rotation, ...start,
             pointerAngle: Math.atan2(worldPos.y - worldPosition.y, worldPos.x - worldPosition.x),
             initial: this.getGestureValue(selected, 'rotate'),
           };
@@ -297,12 +311,12 @@ export default class Input {
           return;
         }
         if (selected instanceof Line) {
-          const endpoint = this.getHoveredLineEndpoint(selected, worldPos.x, worldPos.y);
+          const endpoint = this.getHoveredLineEndpoint(selected, worldPos.x, worldPos.y, slop);
           if (endpoint) {
             this.gesture = {
               kind: endpoint.kind,
               object: selected,
-              startedPaused,
+              ...start,
               offset: new Vector2(worldPos.x - endpoint.x, worldPos.y - endpoint.y),
               initial: this.getGestureValue(selected, endpoint.kind),
             };
@@ -310,12 +324,12 @@ export default class Input {
             return;
           }
         }
-        const handle = selected && this.getHoveredResizeHandle(selected, worldPos.x, worldPos.y);
+        const handle = selected && this.getHoveredResizeHandle(selected, worldPos.x, worldPos.y, slop);
         if (selected && handle) {
           this.gesture = {
             kind: 'resize',
             object: selected,
-            startedPaused,
+            ...start,
             offset: new Vector2(worldPos.x - handle.cornerX, worldPos.y - handle.cornerY),
             initial: this.getGestureValue(selected, 'resize'),
             initialBounds: selected.bounds && new Vector2(selected.bounds.width, selected.bounds.height),
@@ -338,7 +352,7 @@ export default class Input {
             this.gesture = {
               kind: 'drag',
               object: obj,
-              startedPaused,
+              ...start,
               offset: new Vector2(worldPos.x - geometry.origin.x, worldPos.y - geometry.origin.y),
               initial: this.getGestureValue(obj, 'drag'),
             };
@@ -355,18 +369,44 @@ export default class Input {
       if (!Engine.paused) {
         this.clickListeners.forEach((listener) => listener(worldPos));
       }
-    });
+    };
 
+    document.addEventListener('mousemove', event => {
+      if (!this.gesture?.pointer) moveCanvasPointer(event);
+    });
+    document.addEventListener('mousedown', event => pressCanvas(event));
     document.addEventListener('mouseup', (event: MouseEvent) => {
       this.keys.delete(`mouse${event.button}`);
-      if (event.button !== 0) return;
+      if (event.button !== 0 || this.gesture?.pointer) return;
       if (this.gesture) this.finishGesture(this.isGestureActive(this.gesture));
     });
 
+    document.addEventListener('pointerdown', event => {
+      if (!Engine.debug || !Engine.paused || !event.isPrimary || event.button !== 0 ||
+          (event.pointerType !== 'touch' && event.pointerType !== 'pen')) return;
+      pressCanvas(event, event);
+      const pointer = this.gesture?.pointer;
+      if (event.isTrusted && pointer?.id === event.pointerId && pointer.canvas.isConnected) {
+        pointer.canvas.setPointerCapture(pointer.id);
+      }
+    });
+    document.addEventListener('pointermove', event => {
+      if (this.gesture?.pointer?.id === event.pointerId) moveCanvasPointer(event);
+    });
+    document.addEventListener('pointerup', event => {
+      const gesture = this.gesture;
+      if (gesture?.pointer?.id === event.pointerId) this.finishGesture(this.isGestureActive(gesture));
+    });
     document.addEventListener('pointercancel', event => {
-      if (event.pointerType !== 'mouse') return;
-      this.keys.delete('mouse0');
-      this.finishGesture();
+      if (event.pointerType === 'mouse') {
+        this.keys.delete('mouse0');
+        if (!this.gesture?.pointer) this.finishGesture();
+      } else if (this.gesture?.pointer?.id === event.pointerId) {
+        this.finishGesture();
+      }
+    });
+    document.addEventListener('lostpointercapture', event => {
+      if (this.gesture?.pointer?.id === event.pointerId) this.finishGesture();
     });
 
     document.addEventListener('keydown', (event: KeyboardEvent) => {
