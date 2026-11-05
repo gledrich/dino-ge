@@ -446,13 +446,6 @@
   color: var(--accent-secondary);
 }
 
-.toolbar .scene-edit-button {
-  width: auto;
-  padding-inline: 8px;
-  font: inherit;
-  font-size: 12px;
-}
-
 .toolbar .scene-edit-button[aria-pressed='true'] {
   background: var(--bg-primary);
   color: var(--accent-primary);

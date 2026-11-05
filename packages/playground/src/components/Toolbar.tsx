@@ -41,7 +41,10 @@ const Toolbar: React.FC<ToolbarProps> = ({
         aria-pressed={isEditingScene}
         title={isEditingScene ? 'Finish editing and resume the game' : 'Pause the game to drag and resize objects'}
       >
-        Edit
+        <svg viewBox="0 0 24 24" aria-hidden="true">
+          <path d="M10 11 17 4a2.8 2.8 0 0 1 4 4l-7 7-4-4Z" />
+          <path d="M10 11c-3 0-4 2-4 4s-1 4-3 5c5 1 11-1 11-5" />
+        </svg>
       </button>
       <button type="button"
         onClick={onRefresh}
