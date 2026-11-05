@@ -63,7 +63,7 @@ await writeFile(playground, playgroundHtml.replace('<!-- editor assets -->', () 
 run('run', 'docs', '-w', 'dino-ge', '--', '--out', join(site, 'docs', 'api'));
 
 await mkdir(preview, { recursive: true });
-for (const file of ['broker.html', 'broker.js', 'runner.js', 'touch-arrows.js', 'worker.js']) {
+for (const file of ['broker.html', 'broker.js', 'placement.js', 'runner.js', 'touch-arrows.js', 'worker.js']) {
   await cp(join(website, 'preview', file), join(preview, file));
 }
 if (editorOrigin) {

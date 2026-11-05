@@ -1,5 +1,6 @@
 import { Engine, isScreenUIStyle } from "dino-ge";
 import { addTouchArrows } from "./touch-arrows.js";
+import { createPlacementController, readPlacementCanvas } from "./placement.js";
 
 const editorOrigin = new URL(document.referrer).origin;
 const tellEditor = (type, fields = {}) => parent.postMessage({ type, ...fields }, editorOrigin);
@@ -7,7 +8,11 @@ const messageOf = error => error instanceof Error ? error.message : String(error
 const report = error => tellEditor("preview-error", { message: messageOf(error).slice(0, 2000) });
 
 const sceneObjects = () => Engine.currentScene?.objects ?? Engine.objects;
+const gameCanvas = () => document.querySelector("#playground-canvas-container canvas");
+const placement = createPlacementController(gameCanvas, publishScene);
 let lastScene = "";
+let lastCanvas = "";
+let observedCanvas;
 let screenUISourceRequest;
 let screenUIEditing;
 let latestScreenUI = [];
@@ -29,18 +34,51 @@ document.addEventListener("keydown", event => {
   if (screenUIEditing && event.key.toLowerCase() === "p") event.stopPropagation();
 }, true);
 
+const canvasObserver = new ResizeObserver(publishCanvas);
+
+function publishCanvas() {
+  const element = gameCanvas();
+  if (element !== observedCanvas) {
+    canvasObserver.disconnect();
+    observedCanvas = element;
+    if (element) canvasObserver.observe(element);
+  }
+  const canvas = readPlacementCanvas(element);
+  const serialised = JSON.stringify(canvas);
+  if (serialised !== lastCanvas) {
+    lastCanvas = serialised;
+    tellEditor("preview-canvas", { canvas });
+  }
+}
+
+window.addEventListener("resize", publishCanvas);
+
 function publishScene() {
+  publishCanvas();
+  const collection = sceneObjects();
+  const selected = Engine.selectedObject;
   const objects = [];
-  for (const object of sceneObjects()) {
-    if (objects.length >= 200) break;
+  const snapshotObject = object => {
     const { position, scale, rotation } = object.transform;
     const { id, metadata } = object;
     const [x, y, scaleX, scaleY] = [position.x, position.y, scale.x, scale.y];
     if ([x, y, scaleX, scaleY, rotation].every(Number.isFinite)) {
-      objects.push({ id, tag: String(metadata.tag).slice(0, 200), x, y, scaleX, scaleY, rotation });
+      return { id, tag: String(metadata.tag).slice(0, 200), x, y, scaleX, scaleY, rotation };
+    }
+  };
+  for (const object of collection) {
+    if (objects.length >= 200) break;
+    const item = snapshotObject(object);
+    if (item) objects.push(item);
+  }
+  if (selected && collection.has(selected) && !objects.some(object => object.id === selected.id)) {
+    const item = snapshotObject(selected);
+    if (item) {
+      if (objects.length === 200) objects.pop();
+      objects.push(item);
     }
   }
-  const snapshot = { objects, selectedId: Engine.selectedObject?.id ?? null };
+  const snapshot = { objects, selectedId: selected?.id ?? null };
   const serialised = JSON.stringify(snapshot);
   if (serialised === lastScene) return;
   lastScene = serialised;
@@ -53,6 +91,11 @@ window.addEventListener("message", event => {
   if (data?.type === "preview-controls" && typeof data.paused === "boolean" && typeof data.debug === "boolean") {
     Engine.paused = data.paused;
     Engine.debug = data.debug;
+  } else if (data?.type === "preview-placement-command" && Number.isSafeInteger(data.request) && data.request > 0) {
+    placement.command(data).then(
+      result => tellEditor("preview-placement-result", { request: data.request, result }),
+      error => tellEditor("preview-placement-result", { request: data.request, error: messageOf(error).slice(0, 300) }),
+    );
   } else if (data?.type === "preview-screen-ui-source" && Number.isInteger(data.index) &&
       data.index >= 0 && data.index < 250 && Number.isInteger(data.request)) {
     screenUISourceRequest = { index: data.index, request: data.request };
