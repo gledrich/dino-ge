@@ -36,6 +36,10 @@ Once running, access the editor and inspector at `http://localhost:3000`.
 - **Play/Pause Controls:** Pause the game and engine audio, then resume from the same point.
 - **Auto-Formatting:** Integrated Prettier support for clean, consistent code.
 
+### Desktop workspace
+
+Explorer starts on the left, Editor and Inspector share the right dock, and Console sits below the canvas. Drag tabs to reorder them or move them to another dock. You can also select a tab and use its **Move** menu. The Playground remembers your desktop arrangement in the browser. Choose **Reset dock layout** from the same menu to restore the defaults.
+
 ### Mobile workspace
 
 On narrow screens, Explorer, Editor, Inspector and Console share a drawer over the bottom of the game. Drag the handle to change how much of the game the drawer covers. The game keeps its full window size. In the Library, drag an object's grip up to the exposed canvas to place it.
