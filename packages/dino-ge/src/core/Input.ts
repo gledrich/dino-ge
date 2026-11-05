@@ -104,7 +104,7 @@ export default class Input {
     if (kind !== 'drag' && canvas?.style?.cursor === gestureCursor) canvas.style.cursor = 'default';
     if (previewValue) Engine.emit('objectManipulationPreview', null);
     if (commit && initial) {
-      const value = this.getGestureValue(object, kind);
+      const value = this.getObjectManipulationValue(object, kind);
       if (value.x !== initial.x || value.y !== initial.y) {
         Engine.emit('objectManipulated', { object, kind, initial });
       }
@@ -115,7 +115,7 @@ export default class Input {
     const previous = gesture.previewValue ?? gesture.initial;
     if (!previous) return;
     const { object, kind } = gesture;
-    const value = this.getGestureValue(object, kind);
+    const value = this.getObjectManipulationValue(object, kind);
     if (value.x === previous.x && value.y === previous.y &&
         proportional === (gesture.previewProportional ?? false)) return;
     gesture.previewValue = value;
@@ -136,7 +136,8 @@ export default class Input {
     this.mousePosition.set((event.clientX - rect.left) * scaleX, (event.clientY - rect.top) * scaleY);
   }
 
-  private static getGestureValue(object: GameObject, kind: ObjectGesture['kind']): Vector2 {
+  /** Read the current local value for an object manipulation. Rotation uses the x component. */
+  static getObjectManipulationValue(object: GameObject, kind: ObjectManipulationPreview['kind']): Vector2 {
     if (kind === 'rotate') return new Vector2(object.transform.rotation, 0);
     if (object instanceof Line) {
       if (kind === 'p1') return new Vector2(object.x1, object.y1);
@@ -319,7 +320,7 @@ export default class Input {
         const step = Engine.debugPositionGridSize;
         const point = projectOntoObjectAxes(geometry,
           snapToGrid(this.mouseX - offset.x, step), snapToGrid(this.mouseY - offset.y, step));
-        const current = this.getGestureValue(object, kind);
+        const current = this.getObjectManipulationValue(object, kind);
         object.setEndpoint(kind, geometry.scaleX ? point.x / geometry.scaleX : current.x,
           geometry.scaleY ? point.y / geometry.scaleY : current.y);
         this.publishPreview(gesture);
@@ -403,7 +404,7 @@ export default class Input {
           this.gesture = {
             kind: 'rotate', object: selected, rotation, ...start,
             pointerAngle: Math.atan2(worldPos.y - worldPosition.y, worldPos.x - worldPosition.x),
-            initial: this.getGestureValue(selected, 'rotate'),
+            initial: this.getObjectManipulationValue(selected, 'rotate'),
           };
           target.style.cursor = 'grabbing';
           return;
@@ -416,7 +417,7 @@ export default class Input {
               object: selected,
               ...start,
               offset: new Vector2(worldPos.x - endpoint.x, worldPos.y - endpoint.y),
-              initial: this.getGestureValue(selected, endpoint.kind),
+              initial: this.getObjectManipulationValue(selected, endpoint.kind),
             };
             target.style.cursor = 'grabbing';
             return;
@@ -429,7 +430,7 @@ export default class Input {
             object: selected,
             ...start,
             offset: new Vector2(worldPos.x - handle.cornerX, worldPos.y - handle.cornerY),
-            initial: this.getGestureValue(selected, 'resize'),
+            initial: this.getObjectManipulationValue(selected, 'resize'),
             initialBounds: selected.bounds && new Vector2(selected.bounds.width, selected.bounds.height),
             initialWorldSize: new Vector2(Math.abs(handle.width), Math.abs(handle.height)),
           };
@@ -447,7 +448,7 @@ export default class Input {
             object,
             ...start,
             offset: new Vector2(worldPos.x - geometry.origin.x, worldPos.y - geometry.origin.y),
-            initial: this.getGestureValue(object, 'drag'),
+            initial: this.getObjectManipulationValue(object, 'drag'),
           };
         }
       }
