@@ -198,6 +198,54 @@ function resolveDinoImport(reference: acorn.Expression | acorn.Super | null | un
   if (computed && property.type === 'Literal' && typeof property.value === 'string') return { name: property.value, namespace };
 }
 
+function readSourceNames(ast: acorn.Program) {
+  const identifiers = new Set<string>();
+  const strings = new Set<string>();
+  const visit = (node: acorn.AnyNode, parent?: acorn.AnyNode) => {
+    if (node.type === 'Identifier' &&
+        !(parent?.type === 'ImportSpecifier' && node === parent.imported && node !== parent.local) &&
+        !(parent?.type === 'MemberExpression' && !parent.computed && node === parent.property) &&
+        !(parent?.type === 'Property' && !parent.computed && !parent.shorthand && node === parent.key)) {
+      identifiers.add(node.name);
+    }
+    if (node.type === 'Literal' && typeof node.value === 'string') strings.add(node.value);
+    for (const value of Object.values(node)) {
+      for (const child of Array.isArray(value) ? value : [value]) {
+        if (child && typeof child === 'object' && 'type' in child) visit(child as acorn.AnyNode, node);
+      }
+    }
+  };
+  visit(ast);
+  return { identifiers, strings };
+}
+
+function hasInlineSpriteImage(options: acorn.ObjectExpression) {
+  if (options.properties.some(prop => prop.type !== 'Property' || prop.computed)) return false;
+  const images = options.properties.filter((prop): prop is acorn.Property =>
+    prop.type === 'Property' && !prop.computed && prop.key.type === 'Identifier' && prop.key.name === 'img');
+  if (images.length !== 1) return false;
+  const image = images[0].value;
+  if (image.type !== 'CallExpression' || image.arguments.length !== 2 || image.callee.type !== 'MemberExpression' ||
+      image.callee.computed || image.callee.object.type !== 'Identifier' || image.callee.object.name !== 'Object' ||
+      image.callee.property.type !== 'Identifier' || image.callee.property.name !== 'assign') return false;
+  const [target, attributes] = image.arguments;
+  if (target.type !== 'NewExpression' || target.callee.type !== 'Identifier' || target.callee.name !== 'Image' ||
+      target.arguments.length || attributes.type !== 'ObjectExpression' || attributes.properties.length !== 1) return false;
+  const [src] = attributes.properties;
+  if (src.type !== 'Property' || src.kind !== 'init' || src.computed ||
+      src.key.type !== 'Identifier' || src.key.name !== 'src') return false;
+  const { value } = src;
+  if (value.type === 'Literal') return typeof value.value === 'string';
+  if (value.type !== 'MemberExpression' || value.computed || value.property.type !== 'Identifier' ||
+      value.property.name !== 'href' || value.object.type !== 'NewExpression') return false;
+  const { callee, arguments: urlArguments } = value.object;
+  if (callee.type !== 'Identifier' || callee.name !== 'URL' || urlArguments.length !== 2) return false;
+  const [path, base] = urlArguments;
+  return path.type === 'Literal' && typeof path.value === 'string' &&
+    base.type === 'MemberExpression' && !base.computed && base.property.type === 'Identifier' && base.property.name === 'url' &&
+    base.object.type === 'MetaProperty' && base.object.meta.name === 'import' && base.object.property.name === 'meta';
+}
+
 function sceneDeclarations(ast: acorn.Program, imports: DinoImports) {
   return ast.body.flatMap(node => {
     const declaration = node.type === 'ExportNamedDeclaration' || node.type === 'ExportDefaultDeclaration'
@@ -381,7 +429,8 @@ export const instrumentCode = (code: string, trackEditorSource = true, scriptId?
         const tagProp = props.findLast(isTagProperty);
         const tagValue = (tagProp && tagProp.value.type === 'Literal') ? String(tagProp.value.value) : 'no-tag';
         const { constructorName, type, namespace } = object;
-        const idKey = `${constructorName}-${tagValue}`;
+        const inlineSprite = type === 'Sprite' && hasInlineSpriteImage(args[0]);
+        const idKey = `${inlineSprite ? 'DinoPlaceSprite' : constructorName}-${tagValue}`;
         const index = occurrenceCounts[idKey] || 0;
         occurrenceCounts[idKey] = index + 1;
         const sourceId = `${idKey}-${index}`;
@@ -390,7 +439,7 @@ export const instrumentCode = (code: string, trackEditorSource = true, scriptId?
         if (mappings) {
           const properties = mapProperties(args[0], imports, code, strict);
           const statement = standaloneStatements.get(node.start);
-          const generated = !namespace && constructorName.startsWith('DinoPlace');
+          const generated = inlineSprite || (!namespace && constructorName.startsWith('DinoPlace'));
           const options = statement && readSceneObjectOptions(args[0], imports, generated && type === 'Sprite');
           const safeOptions = options && (generated || type !== 'Sprite' || typeof options.img === 'string');
           const canDuplicate = !!safeOptions && typeof options.tag === 'string' && properties.position?.args?.length === 2 &&
@@ -629,7 +678,7 @@ export function getSceneObjectCreation(source: string, placement: SceneObjectPla
   } catch {
     return null;
   }
-  const imports = dinoImports(ast);
+  const imports = dinoImports(ast, true);
   const isOnLoad = (key: acorn.Node) =>
     (key.type === 'Identifier' && (key as acorn.Identifier).name === 'onLoad') ||
     (key.type === 'Literal' && (key as acorn.Literal).value === 'onLoad');
@@ -676,20 +725,31 @@ export function getSceneObjectCreation(source: string, placement: SceneObjectPla
     (callback?.type === 'ArrowFunctionExpression' && callback.body.type !== 'BlockStatement') ? callback : undefined;
   if (callback && body?.type !== 'BlockStatement' && !callbackToWrap && wrappedInsertion === undefined) return null;
 
+  const bindingOffset = wrappedInsertion ?? (body?.type === 'BlockStatement' ? body.start + 1
+    : callbackToWrap?.start ?? (insertion !== undefined ? insertion + 1 : source.length));
+  const visible = (local: string, bindings: ScopedBinding[] | undefined) =>
+    !(callbackToWrap && ['DinoPlaceSetup', 'DinoPlaceLoad', 'DinoPlaceResult'].includes(local)) &&
+    !bindings?.some(({ scope }) => bindingOffset >= scope.start && bindingOffset < scope.end);
+  const { identifiers, strings } = readSourceNames(ast);
   const addedImports: string[] = [];
   const binding = (name: string) => {
-    const existing = Array.from(imports.named).find(([local, exported]) => exported === name && local.startsWith('DinoPlace'));
+    if (imports.named.get(name) === name && visible(name, imports.namedShadows.get(name))) return name;
+    const existing = Array.from(imports.named).find(([local, exported]) =>
+      exported === name && visible(local, imports.namedShadows.get(local)));
     if (existing) return existing[0];
-    const base = `DinoPlace${name}`;
+    const namespace = Array.from(imports.namespaces).find(([local, shadows]) => visible(local, shadows));
+    if (namespace) return `${namespace[0]}.${name}`;
+
+    const base = identifiers.has(name) ? `Dino${name}` : name;
     let local = base;
-    for (let i = 2; source.includes(local); i++) local = `${base}${i}`;
-    addedImports.push(`${name} as ${local}`);
+    for (let i = 2; identifiers.has(local); i++) local = `${base}${i}`;
+    addedImports.push(local === name ? name : `${name} as ${local}`);
     return local;
   };
   const constructor = binding(placement.kind);
   const vector = binding('Vector2');
   let tag = placement.tag;
-  for (let i = 2; source.includes(tag); i++) tag = `${placement.tag} ${i}`;
+  for (let i = 2; source.includes(tag) || strings.has(tag); i++) tag = `${placement.tag} ${i}`;
   const options = placement.kind === 'Sprite'
     ? `img: ${spriteImageExpression(placement.asset.source)}, rows: 1, cols: 1, scale: new ${vector}(${placement.asset.scale}, ${placement.asset.scale})`
     : getSceneShapeOptionLines(placement.kind, vector).join(', ');
@@ -727,17 +787,26 @@ export function getSceneObjectCreation(source: string, placement: SceneObjectPla
     edits.push({ start: source.length, end: source.length, newText: `\n${statement}\n` });
   }
   if (addedImports.length) {
-    const start = ast.body.find(node => node.type === 'ImportDeclaration')?.start ??
-      ast.body.find(node => !('directive' in node))?.start ?? source.length;
-    const newText = `import { ${addedImports.join(', ')} } from 'dino-ge';\n`;
-    if (start === source.length) {
-      // An empty or directive-only script gets a single insertion at the end.
-      edits[0].newText = `${source.length ? '\n' : ''}${newText}${statement}\n`;
+    const existingImport = ast.body.find((node): node is acorn.ImportDeclaration =>
+      node.type === 'ImportDeclaration' && node.source.value === 'dino-ge' &&
+      node.specifiers.some(specifier => specifier.type === 'ImportSpecifier'));
+    const firstNamed = existingImport?.specifiers.find(specifier => specifier.type === 'ImportSpecifier');
+    if (firstNamed) {
+      edits.push({ start: firstNamed.start, end: firstNamed.start, newText: `${addedImports.join(', ')}, ` });
     } else {
-      edits.push({ start, end: start, newText });
+      const start = ast.body.find(node => node.type === 'ImportDeclaration')?.start ??
+        ast.body.find(node => !('directive' in node))?.start ?? source.length;
+      const newText = `import { ${addedImports.join(', ')} } from 'dino-ge';\n`;
+      if (start === source.length) {
+        // An empty or directive-only script gets a single insertion at the end.
+        edits[0].newText = `${source.length ? '\n' : ''}${newText}${statement}\n`;
+      } else {
+        edits.push({ start, end: start, newText });
+      }
     }
   }
-  return { edits, tag, sourceId: `${constructor}-${tag}-0` };
+  const sourceName = placement.kind === 'Sprite' ? 'DinoPlaceSprite' : constructor;
+  return { edits, tag, sourceId: `${sourceName}-${tag}-0` };
 }
 
 /** Save an explicit origin for a line whose constructor defaults to its start point. */

@@ -164,12 +164,12 @@ test('keeps unsaved edits across tabs and panel collapse, and retains hidden con
   await page.getByRole('tab', { name: 'Console' }).click();
   await page.getByRole('button', { name: 'Insert rectangle code', exact: true }).click();
   await expect(page.getByRole('tab', { name: 'Editor' })).toHaveAttribute('aria-selected', 'true');
-  await expect(editor).toContainText('new DinoPlaceRectangle');
+  await expect(editor).toContainText('new Rectangle');
   await expect(editor).toContainText('local draft');
   await expect.poll(() => page.evaluate(() => {
     const { monaco } = window as typeof window & { monaco: Monaco };
     return monaco.editor.getEditors()[0].getValue();
-  })).toContain("import { Rectangle as DinoPlaceRectangle, Vector2 as DinoPlaceVector2 } from 'dino-ge';");
+  })).toContain("import { Rectangle, Vector2 } from 'dino-ge';");
   await expect(page.getByRole('button', { name: 'Edit scene', exact: true })).toHaveAttribute('aria-pressed', 'false');
 });
 
@@ -801,8 +801,8 @@ new Engine({ onLoad() {}, update() {} }, { containerId: 'playground-canvas-conta
     const { monaco } = window as typeof window & { monaco: Monaco };
     return monaco.editor.getEditors()[0].getValue();
   });
-  expect(source).toContain('new DinoPlaceRectangle');
-  expect(source).toContain('new DinoPlaceLine');
+  expect(source).toContain('new Rectangle');
+  expect(source).toContain('new Line');
 
   const editor = page.locator('.monaco-editor');
   const editorBox = (await editor.boundingBox())!;
@@ -1640,13 +1640,13 @@ new Engine({ onLoad() {} }, { containerId: 'playground-canvas-container' });` })
   await expect(editor).toContainText('new Engine');
   const insert = page.getByRole('button', { name: 'Insert rectangle code' });
   await insert.click();
-  await expect(editor).toContainText('new DinoPlaceRectangle');
+  await expect(editor).toContainText('new Rectangle');
 });
 
 test('runs Library shape snippets without pre-imported constructors and matches canvas drops', async ({ page }) => {
   let source = `
 import { Engine } from 'dino-ge';
-new Engine({ onLoad() {}, update() {} }, { containerId: 'playground-canvas-container' });`;
+new Engine({ onLoad() { const Circle = 'Existing local name'; }, update() {} }, { containerId: 'playground-canvas-container' });`;
   await page.route('**/files', route => route.fulfill({ json: ['script'] }));
   await page.route('**/api/scripts/script', route => {
     if (route.request().method() === 'PUT') {
@@ -1670,6 +1670,9 @@ new Engine({ onLoad() {}, update() {} }, { containerId: 'playground-canvas-conta
   await page.getByRole('button', { name: 'Reset game', exact: true }).click();
   const explorer = page.getByRole('button', { name: 'New rectangle', exact: true });
   await expect(explorer).toBeVisible({ timeout: 3000 });
+  expect(source).toContain('Circle as DinoCircle');
+  expect(source).toContain('new DinoCircle(');
+  expect(source.match(/from 'dino-ge'/g)).toHaveLength(1);
   await page.getByRole('button', { name: 'Edit scene', exact: true }).click();
 
   const canvas = page.locator('#canvas');
@@ -1688,9 +1691,11 @@ new Engine({ onLoad() {}, update() {} }, { containerId: 'playground-canvas-conta
   }
 });
 
-test('drops a game object into the editor as runnable code', async ({ page }) => {
-  let source = `import { Engine } from 'dino-ge';
-new Engine({ onLoad() {} }, { containerId: 'playground-canvas-container' });`;
+test('drops a game object into the editor using existing imports', async ({ page }) => {
+  let source = String.raw`import { Engine, Rectangle, Vector2 } from 'dino-ge';
+new Engine({ onLoad() {
+  new Rectangle({ tag: 'New\u0020rectangle', position: new Vector2(220, 200), width: 80, height: 48 });
+} }, { containerId: 'playground-canvas-container' });`;
   await page.route('**/files', route => route.fulfill({ json: ['script'] }));
   await page.route('**/api/scripts/script', route => {
     if (route.request().method() === 'PUT') {
@@ -1703,12 +1708,14 @@ new Engine({ onLoad() {} }, { containerId: 'playground-canvas-container' });`;
   const editor = page.locator('.monaco-editor');
   await expect(editor).toContainText('new Engine');
   await page.getByRole('button', { name: 'Add rectangle', exact: true }).dragTo(editor);
-  await expect(editor).toContainText('new DinoPlaceRectangle', { timeout: 3000 });
-  await expect(page.getByRole('button', { name: 'New rectangle', exact: true })).toHaveCount(0);
+  await expect(editor).toContainText('New rectangle 2', { timeout: 3000 });
+  await expect(page.getByRole('button', { name: 'New rectangle 2', exact: true })).toHaveCount(0);
 
   await page.getByRole('button', { name: 'Reset game', exact: true }).click();
   await expect(page.getByRole('button', { name: 'New rectangle', exact: true })).toBeVisible();
-  await expect(page.getByRole('button', { name: 'New rectangle 2', exact: true })).toHaveCount(0);
+  await expect(page.getByRole('button', { name: 'New rectangle 2', exact: true })).toBeVisible();
+  expect(source.match(/from 'dino-ge'/g)).toHaveLength(1);
+  expect(source).not.toContain('DinoPlace');
 });
 
 test('places a palette object at the drop point and restores it from the saved script', async ({ page }) => {
@@ -2404,7 +2411,7 @@ new Engine({ async onLoad() {
     await expect.poll(() => page.evaluate(() => {
       const { monaco } = window as typeof window & { monaco: Monaco };
       return monaco.editor.getEditors()[0].getValue();
-    })).toContain(`new DinoPlaceVector2(${item.to[0]}, ${item.to[1]})`);
+    })).toContain(`new Vector2(${item.to[0]}, ${item.to[1]})`);
   });
 }
 
@@ -3027,7 +3034,7 @@ new Engine({
     response.url().endsWith('/api/scripts/script'));
   await page.getByRole('button', { name: 'Save script', exact: true }).click();
   await saved;
-  expect(source).toMatch(/class Workshop extends Level\s*{\s*onLoad\(\)\s*{\s*new DinoPlaceCircle/);
+  expect(source).toMatch(/class Workshop extends Level\s*{\s*onLoad\(\)\s*{\s*new Circle/);
   await page.reload();
   await expect(marker).toBeVisible();
   await expect(circle).toHaveCount(0);
@@ -3080,6 +3087,8 @@ new GE.Engine({ onLoad() { GE.Engine.currentScene = new Workshop(); }, update() 
   await page.getByRole('button', { name: 'Save script', exact: true }).click();
   await expect.poll(() => source).toContain('new GE.Vector2(330, 235)');
   expect(source).toContain('new GE.Vector2(354, 259)');
+  expect(source).toContain('new GE.Circle(');
+  expect(source.match(/from 'dino-ge'/g)).toHaveLength(1);
   await page.reload();
   await expect(platform).toBeVisible();
   await expect(copy).toBeVisible();
@@ -3154,6 +3163,8 @@ new Engine({
   await page.getByRole('button', { name: 'Save script', exact: true }).click();
   await saved;
   expect(source).toMatch(/src: new URL\(["']\.\.\/assets\/leaf\.svg["'], import\.meta\.url\)\.href/);
+  expect(source).toContain('new Sprite(');
+  expect(source.match(/from 'dino-ge'/g)).toHaveLength(1);
   await page.reload();
   await page.locator('.script-selector').selectOption(id);
   await sprite.press('Enter');
