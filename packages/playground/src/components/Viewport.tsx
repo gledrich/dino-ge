@@ -123,6 +123,9 @@ const Viewport: React.FC = () => {
     setIsInspectorVisible,
     selectedObject,
     pendingCanvasPlacements,
+    canUndoCanvasEdit,
+    canRedoCanvasEdit,
+    changeCanvasHistory,
     isPaused, 
     setIsPaused,
     isDebug, 
@@ -156,8 +159,9 @@ const Viewport: React.FC = () => {
   const [keyboardPlacement, setKeyboardPlacement] = useState<KeyboardPlacement>();
   const isPanReady = isEditingScene && (isPanTool || isSpacePan) && !keyboardPlacement;
   const historyBlockedReason = keyboardPlacement || manipulationReadout
-    ? 'Finish or cancel the current edit before using code history.'
-    : pendingCanvasPlacements.size > 0 ? 'Apply or discard canvas changes before using code history.' : '';
+    ? 'Finish or cancel the current edit before using history.' : '';
+  const codeHistoryBlockedReason = pendingCanvasPlacements.size > 0
+    ? 'Apply or discard canvas changes before using code history.' : '';
   const [dropGuide, setDropGuide] = useState<{
     x: number; y: number; left: number; top: number; kind?: SceneObjectKind;
     width?: number; height?: number;
@@ -769,8 +773,9 @@ const Viewport: React.FC = () => {
     event.stopPropagation();
   };
 
-  const changeCodeHistory = (action: 'undo' | 'redo') => {
-    if (historyBlockedReason || Input.isManipulatingObject) return;
+  const changeSceneHistory = (action: 'undo' | 'redo') => {
+    if (historyBlockedReason || Input.isManipulatingObject || dropPan.current) return;
+    if (changeCanvasHistory(action) || codeHistoryBlockedReason) return;
     window.dispatchEvent(new CustomEvent('playground-code-history', { detail: action }));
   };
 
@@ -937,7 +942,7 @@ const Viewport: React.FC = () => {
             if (isHistoryShortcut || isFrameShortcut || nudgeSceneSelection(event)) {
               event.preventDefault();
               event.stopPropagation();
-              if (isHistoryShortcut && !event.repeat) changeCodeHistory(event.shiftKey || key === 'y' ? 'redo' : 'undo');
+              if (isHistoryShortcut && !event.repeat) changeSceneHistory(event.shiftKey || key === 'y' ? 'redo' : 'undo');
               if (isFrameShortcut && !event.repeat) frameSelection();
               return;
             }
@@ -954,14 +959,19 @@ const Viewport: React.FC = () => {
           {isEditingScene && <>
             <div className="scene-object-options">
               <div className="scene-object-options" role="group" aria-label="Edit history">
-                {(['undo', 'redo'] as const).map(action => (
-                  <button key={action} type="button" className="scene-control" aria-label={`${action === 'undo' ? 'Undo' : 'Redo'} code edit`}
-                    disabled={!!historyBlockedReason}
-                    title={historyBlockedReason || (action === 'undo' ? 'Undo code edit (Ctrl/⌘+Z)' : 'Redo code edit (Ctrl/⌘+Shift+Z)')}
-                    onClick={() => changeCodeHistory(action)}
-                  ><i className={`fa-solid ${action === 'undo' ? 'fa-rotate-left' : 'fa-rotate-right'}`} aria-hidden="true" />
-                    {action === 'undo' ? 'Undo' : 'Redo'}</button>
-                ))}
+                {(['undo', 'redo'] as const).map(action => {
+                  const undo = action === 'undo';
+                  const text = undo ? 'Undo' : 'Redo';
+                  const canvasEdit = undo ? canUndoCanvasEdit : canRedoCanvasEdit;
+                  const label = `${text} ${canvasEdit ? 'canvas' : 'code'} edit`;
+                  const blocked = historyBlockedReason || (!canvasEdit && codeHistoryBlockedReason);
+                  return (
+                    <button key={action} type="button" className="scene-control" aria-label={label} disabled={!!blocked}
+                      title={blocked || `${label} (Ctrl/⌘+${undo ? 'Z' : 'Shift+Z'})`} onClick={() => changeSceneHistory(action)}>
+                      <i className={`fa-solid ${undo ? 'fa-rotate-left' : 'fa-rotate-right'}`} aria-hidden="true" /> {text}
+                    </button>
+                  );
+                })}
               </div>
               <div className="scene-object-options" role="group" aria-label="Resize and rotation options">
                 <button type="button" className="scene-control" aria-pressed={keepProportions}

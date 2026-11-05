@@ -52,7 +52,7 @@ new Engine({
   })).toContain(`tag: "beta's box"`);
 });
 
-test('uses code history from the canvas keyboard without losing unfinished canvas edits', async ({ page }) => {
+test('uses canvas and code history from the keyboard without losing an unfinished drag', async ({ page }) => {
   await page.route('**/files', route => route.fulfill({ json: ['script'] }));
   await page.route('**/api/scripts/script', route => route.fulfill({ json: `
 import { Engine, Rectangle, Vector2 } from 'dino-ge';
@@ -86,22 +86,83 @@ new Engine({ onLoad() {
   await page.mouse.move(box.x + 400, box.y + 245, { steps: 4 });
   const readout = page.getByRole('group', { name: 'Current scene gesture' });
   await expect(readout).toContainText('Move');
+  await expect.poll(async () => Number(await x.inputValue())).toBeGreaterThan(378);
+  const draggingX = await x.inputValue();
+  await scene.press('ArrowRight');
+  await expect(x).toHaveValue(draggingX);
+  await expect(platform).toHaveAccessibleDescription('');
   await scene.press('Control+z');
   await expect(readout).toContainText('Move');
   expect(await readSource()).toContain('new Vector2(360, 220)');
   await page.mouse.up();
   await expect(platform).toHaveAccessibleDescription('Pending canvas changes');
-  await expect(page.getByRole('button', { name: 'Undo code edit', exact: true })).toBeDisabled();
+  await expect.poll(async () => Number(await x.inputValue())).toBeGreaterThan(378);
+  const movedX = await x.inputValue();
+  await scene.press('ArrowRight');
+  await expect(x).toHaveValue((Number(movedX) + 1).toFixed(2));
+  await expect(page.getByRole('button', { name: 'Undo canvas edit', exact: true })).toBeEnabled();
   await scene.press('Control+z');
+  await expect(x).toHaveValue(movedX);
+  await expect(platform).toHaveAccessibleDescription('Pending canvas changes');
+  await scene.press('Control+z');
+  await expect(x).toHaveValue('360.00');
+  await expect(platform).toHaveAccessibleDescription('');
+  await page.getByRole('button', { name: 'Redo canvas edit', exact: true }).click();
+  await expect(x).toHaveValue(movedX);
   await expect(platform).toHaveAccessibleDescription('Pending canvas changes');
   expect(await readSource()).toContain('new Vector2(360, 220)');
 
   await page.getByRole('button', { name: 'Discard canvas changes', exact: true }).click();
+  await expect(page.getByRole('button', { name: 'Redo canvas edit', exact: true })).toHaveCount(0);
   await scene.press('Meta+z');
   await expect(x).toHaveValue('350.00');
   await scene.press('Control+y');
   await expect(x).toHaveValue('360.00');
   await expect.poll(readSource).toContain('new Vector2(360, 220)');
+});
+
+test('keeps live resize history for another object when applying a move to code', async ({ page }) => {
+  await page.route('**/files', route => route.fulfill({ json: ['script'] }));
+  await page.route('**/api/scripts/script', route => route.fulfill({ json: `
+import { Engine, Rectangle, Vector2 } from 'dino-ge';
+new Engine({ onLoad() {
+  new Rectangle({ tag: 'Platform', position: new Vector2(350, 220), width: 64, height: 48 });
+  new Rectangle({ tag: 'Wall', position: new Vector2(520, 220), width: 32, height: 96 });
+}, update() {} }, { containerId: 'playground-canvas-container' });` }));
+  await page.goto('/');
+  const platform = page.getByRole('button', { name: 'Platform', exact: true });
+  const wall = page.getByRole('button', { name: 'Wall', exact: true });
+  await expect(platform).toBeVisible();
+  await page.getByRole('button', { name: 'Edit scene', exact: true }).click();
+  await platform.click();
+  const canvas = page.locator('#canvas');
+  const box = (await canvas.boundingBox())!;
+  await page.mouse.move(box.x + 414, box.y + 268);
+  await page.mouse.down();
+  await page.mouse.move(box.x + 430, box.y + 284, { steps: 4 });
+  await page.mouse.up();
+  const width = page.getByRole('spinbutton', { name: 'Width', exact: true });
+  await expect.poll(async () => Number(await width.inputValue())).toBeGreaterThan(78);
+  const resizedWidth = await width.inputValue();
+  await wall.click();
+  await wall.press('ArrowRight');
+  const apply = page.getByRole('button', { name: 'Apply placement to code', exact: true });
+  await apply.click();
+  await expect(wall).toHaveAccessibleDescription('');
+  await expect(platform).toHaveAccessibleDescription('Pending canvas changes');
+
+  await platform.click();
+  await page.getByRole('button', { name: 'Undo canvas edit', exact: true }).click();
+  await expect(width).toHaveValue('64.00');
+  await expect(platform).toHaveAccessibleDescription('');
+  await page.getByRole('button', { name: 'Redo canvas edit', exact: true }).click();
+  await expect(width).toHaveValue(resizedWidth);
+  await expect(platform).toHaveAccessibleDescription('Pending canvas changes');
+  await apply.click();
+  await page.getByRole('button', { name: 'Undo code edit', exact: true }).click();
+  await expect(width).toHaveValue('64.00');
+  await wall.click();
+  await expect(page.getByRole('spinbutton', { name: 'X', exact: true })).toHaveValue('521.00');
 });
 
 test('keeps live Inspector values and save controls readable in a narrow panel', async ({ page }) => {

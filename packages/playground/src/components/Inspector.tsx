@@ -216,6 +216,7 @@ const Inspector: React.FC<InspectorProps> = ({ visible }) => {
     Engine.on('objectManipulated', onPlacementChanged);
     window.addEventListener('playground-syntax-error', onSyntaxError);
     window.addEventListener('playground-placement-history', onPlacementChanged);
+    window.addEventListener('playground-scene-history', clearStatus);
     window.addEventListener('playground-before-run', clearStatus);
     window.addEventListener('playground-update-inspector', onEngineUpdate);
 
@@ -224,6 +225,7 @@ const Inspector: React.FC<InspectorProps> = ({ visible }) => {
       Engine.off('objectManipulated', onPlacementChanged);
       window.removeEventListener('playground-syntax-error', onSyntaxError);
       window.removeEventListener('playground-placement-history', onPlacementChanged);
+      window.removeEventListener('playground-scene-history', clearStatus);
       window.removeEventListener('playground-before-run', clearStatus);
       window.removeEventListener('playground-update-inspector', onEngineUpdate);
     };

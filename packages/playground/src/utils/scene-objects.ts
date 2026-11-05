@@ -122,6 +122,7 @@ export function getSceneArrowMovement(event: SceneArrowEvent): ScenePoint | unde
 export function nudgeSceneSelection(event: SceneArrowEvent): boolean {
   const movement = getSceneArrowMovement(event);
   if (!movement) return false;
+  if (Dino.Input.isManipulatingObject) return true;
   let { x, y } = movement;
   const { Engine } = Dino;
   const object = Engine.selectedObject;
