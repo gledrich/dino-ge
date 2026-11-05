@@ -2,6 +2,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import { Engine, Loader } from 'dino-ge';
 import { usePlayground } from '../context/PlaygroundContext';
 import { useScenePlacementSource } from '../hooks/useScenePlacementSource';
+import { hostedAssetDragEvent } from '../utils/hosted-placement';
 import { getSceneAssetPreviewType, insertSceneObjectCode, isReplaceableSprite, sceneAssetDragEvent, sceneAssetDragType, type SceneImageAsset } from '../utils/scene-objects';
 import { browserPreviewUrl, getCurrentScriptId, getSpriteImageFileError, importSpriteImage, listSpriteImages, spriteImageTypes, type StoredSpriteImage } from '../utils/helpers';
 import '../styles/asset-panel.css';
@@ -26,6 +27,7 @@ function AssetTile({ asset, isEditing, canReplace, mobileDock, placementSource, 
   const image = asset.image ?? thumbnail;
   const sceneAsset = image ? { tag: asset.tag, image, projectPath: asset.projectPath } : undefined;
   const canDragCode = !!browserPreviewUrl && !mobileDock && !!sceneAsset;
+  const canPlace = !!sceneAsset && (isEditing || !!browserPreviewUrl && !!sceneAsset.projectPath);
   const startDrag = (event: React.DragEvent<HTMLButtonElement>) => {
     if (!sceneAsset || placementSource.isActive()) {
       event.preventDefault();
@@ -40,13 +42,23 @@ function AssetTile({ asset, isEditing, canReplace, mobileDock, placementSource, 
   return (
     <div className="asset-tile">
       <button type="button" className="scene-control asset-item" title={asset.url}
-        aria-label={`Add ${asset.tag} as sprite`} disabled={!isEditing || !image} draggable={isEditing && !!image}
-        {...placementSource.forItem(isEditing && sceneAsset ? { asset: sceneAsset } : undefined)}
+        aria-label={`Add ${asset.tag} as sprite`} disabled={!canPlace}
+        draggable={canPlace && (!browserPreviewUrl || !mobileDock)}
+        {...placementSource.forItem(canPlace && sceneAsset ? { asset: sceneAsset } : undefined)}
         onClick={event => {
           if (placementSource.consumeClick(event)) return;
           if (sceneAsset) window.dispatchEvent(new CustomEvent<SceneImageAsset>('playground-place-asset', { detail: sceneAsset }));
         }}
-        onDragStart={startDrag} onDragEnd={endDrag}
+        onDragStart={event => {
+          startDrag(event);
+          if (browserPreviewUrl && !event.defaultPrevented) {
+            window.dispatchEvent(new CustomEvent(hostedAssetDragEvent, { detail: sceneAsset }));
+          }
+        }}
+        onDragEnd={() => {
+          endDrag();
+          if (browserPreviewUrl) window.dispatchEvent(new CustomEvent(hostedAssetDragEvent, { detail: null }));
+        }}
       >
         <div className="asset-preview">
           {!unavailable && <img src={asset.url} alt="" draggable={false} loading="lazy"
@@ -65,7 +77,7 @@ function AssetTile({ asset, isEditing, canReplace, mobileDock, placementSource, 
             {image ? `${image.naturalWidth} × ${image.naturalHeight} px` : unavailable ? 'Image unavailable' : 'Loading image…'}
           </span>
         </div>
-        {mobileDock && isEditing && image && <i className="fa-solid fa-grip-vertical" data-scene-drag-handle aria-hidden="true" />}
+        {mobileDock && canPlace && <i className="fa-solid fa-grip-vertical" data-scene-drag-handle aria-hidden="true" />}
       </button>
       <div className="asset-actions">
         <button type="button" className="scene-control" disabled={!image} draggable={canDragCode}
@@ -100,7 +112,7 @@ const AssetPanel: React.FC<{ mobileDock?: boolean }> = ({ mobileDock = false }) 
   const filePicker = useRef<HTMLInputElement>(null);
   const { currentScriptId, isPaused, isDebug } = usePlayground();
   const isEditing = !browserPreviewUrl && isPaused && isDebug;
-  const placementSource = useScenePlacementSource(isEditing);
+  const placementSource = useScenePlacementSource(isEditing || !!browserPreviewUrl);
   const canReplace = isEditing && isReplaceableSprite(selected);
 
   useEffect(() => {
@@ -218,8 +230,7 @@ const AssetPanel: React.FC<{ mobileDock?: boolean }> = ({ mobileDock = false }) 
         : browserPreviewUrl ? 'Drop an image file onto the editor.' : 'Drop an image file onto the canvas or editor.'}</p>
       {assets.length > 0 && (
         <p className="asset-help">
-          {browserPreviewUrl ? 'Use Insert to add sprite code.'
-            : !isEditing ? 'Enter Edit scene to drag images. Use Insert to add sprite code.'
+          {!browserPreviewUrl && !isEditing ? 'Enter Edit scene to drag images. Use Insert to add sprite code.'
             : mobileDock ? 'Drag a grip to the canvas or tap an image to place it. Use Insert to add sprite code.'
               : 'Drag to the canvas to place, or to the editor for code. Click to place. Shift+Enter positions with keys.'}
         </p>

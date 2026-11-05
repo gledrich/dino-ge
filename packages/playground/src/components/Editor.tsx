@@ -9,9 +9,12 @@ import { openProjectObjectSourceEvent, type ProjectObjectSourceRequest } from '.
 import { openScreenUISourceEvent, screenUIPreview, type OpenScreenUISource } from '../utils/screen-ui-preview';
 import { applyScreenUIMoveEvent, findScreenUICall, getScreenUIMoveEdits, trackScreenUIMoveDraft, type ApplyScreenUIMove } from '../utils/screen-ui-source';
 import { downloadBrowserProject, restoreBrowserProject } from '../utils/browser-project-archive';
+import { browserWorkspace } from '../utils/browser-workspace';
 import { browserPreviewUrl, createScript, getCurrentScriptId, getScript, getFilesList, getSpriteImageFileError, readGameFolder, importGameFolder, importSpriteImage, type GameFolder } from '../utils/helpers';
+import { hostedPlacementEvent, type HostedPlacementConnection, type HostedPlacementObject, type HostedPlacementRequest } from '../utils/hosted-placement';
+import { commitHostedPlacement } from '../utils/hosted-placement-transaction';
 import { applyEditsToSource, Edit, instrumentCode, getSourceMapping, getSceneObjectCreation, getSceneObjectDeletion, getSceneObjectDuplication, getSceneObjectRename, getSpriteImageReplacement, getUniqueObjectSourceMapping, type CanvasPlacementTransaction } from '../utils/ast-utils';
-import { createSceneObject, duplicateSceneObject, getSceneSource, insertSceneObjectCode, isReplaceableSprite, openEntryObjectSourceEvent, renameEntryObjectEvent, restoreSceneTransform, sceneAssetDragEvent, sceneAssetDragType, sceneObjectCodeEvent, sceneObjectDragType, sceneObjectKinds, sceneObjectTagHistoryEvent, scenePointerDragEvent, type CanvasTransformChange, type EntryObjectRename, type SceneImageAsset, type SceneObjectPlacement, type ScenePointerDrag, type ScenePointerDragItem } from '../utils/scene-objects';
+import { createSceneObject, duplicateSceneObject, getDefaultSceneObjectTag, getSceneSource, getSceneSpritePlacement, insertSceneObjectCode, isReplaceableSprite, openEntryObjectSourceEvent, renameEntryObjectEvent, restoreSceneTransform, sceneAssetDragEvent, sceneAssetDragType, sceneObjectCodeEvent, sceneObjectDefaults, sceneObjectDragType, sceneObjectKinds, sceneObjectTagHistoryEvent, scenePointerDragEvent, type CanvasTransformChange, type EntryObjectRename, type SceneImageAsset, type SceneObjectPlacement, type ScenePointerDrag, type ScenePointerDragItem } from '../utils/scene-objects';
 import { useMonacoEditor } from '../hooks/useMonacoEditor';
 import '../styles/editor.css';
 
@@ -35,6 +38,14 @@ type SceneHistoryEntry = {
   | { object: Dino.GameObject; propertyChange: Omit<InspectorPropertyEdit, 'edit' | 'object'> }
   | { object: Dino.GameObject; spriteImage?: { before: HTMLImageElement; after: HTMLImageElement }; removed?: boolean }
 );
+
+type HostedPlacementHistoryEntry = {
+  model: editor.ITextModel;
+  run: HostedPlacementConnection;
+  handle: string;
+  before: number;
+  after: number;
+};
 
 function updateObjectTag(object: Dino.GameObject, { sourceId, tag }: ObjectTagState) {
   object.metadata.sourceId = sourceId;
@@ -69,6 +80,7 @@ const CodeEditor: React.FC<EditorProps> = ({ currentScriptId, onSave, onSelectSc
   const archivePicker = useRef<HTMLInputElement>(null);
   const loadedScriptId = useRef('');
   const sceneHistory = useRef<SceneHistoryEntry[]>([]);
+  const hostedPlacementHistory = useRef<HostedPlacementHistoryEntry[]>([]);
   const trustedEntryText = useRef<string>(undefined);
   const trustedEntryRevisions = useRef(new Set<number>());
   const loadedEntrySource = useRef<string>(undefined);
@@ -528,6 +540,73 @@ const CodeEditor: React.FC<EditorProps> = ({ currentScriptId, onSave, onSelectSc
       }
     };
 
+    const addHostedSceneObject = async (event: Event) => {
+      if (!browserPreviewUrl) return;
+      const { run, prepared, item, complete } = (event as CustomEvent<HostedPlacementRequest>).detail;
+      event.preventDefault();
+      let transactionStarted = false;
+      try {
+        const model = monacoEditorRef.current?.getModel();
+        const running = runningEntrySource.current;
+        const runSource = normaliseEntryText(run.source);
+        if (!model || !run.active() || run.scriptId !== currentScriptId ||
+            loadedScriptId.current !== currentScriptId || getCurrentScriptId() !== currentScriptId ||
+            running?.scriptId !== currentScriptId || running.source !== runSource) {
+          throw new Error('Wait for the open script and preview to finish loading.');
+        }
+        const source = model.getValue();
+        if (normaliseEntryText(source) !== runSource &&
+            (loadedEntrySource.current !== runSource || !isTrustedEntryModel(model))) {
+          throw new Error('The draft differs from the running script. Save and rerun it before placing objects.');
+        }
+        const { x, y, scene, handle } = prepared;
+        if (scene && scene.scriptId !== currentScriptId) {
+          throw new Error('Place objects in a named scene declared in the open script.');
+        }
+        const placement: SceneObjectPlacement | undefined = 'asset' in item
+          ? item.asset.projectPath ? getSceneSpritePlacement(item.asset, { x, y }, currentScriptId, scene) : undefined
+          : { kind: item.kind, tag: getDefaultSceneObjectTag(item.kind), x, y, scene };
+        if (!placement) throw new Error('Choose an image stored in this project before placing a sprite.');
+        const creation = getSceneObjectCreation(source, placement, false);
+        if (!creation) {
+          throw new Error(scene ? 'Use an inline onLoad method on the scene class to add Library objects.'
+            : 'Scene placement needs an editable Dino GE Engine setup in the open script.');
+        }
+        const version = model.getVersionId();
+        const before = model.getAlternativeVersionId();
+        const current = () => run.active() && runningEntrySource.current === running &&
+          monacoEditorRef.current?.getModel() === model && model.getVersionId() === version &&
+          loadedScriptId.current === currentScriptId && getCurrentScriptId() === currentScriptId;
+
+        let object: HostedPlacementObject;
+        if (placement.kind === 'Sprite' && 'asset' in item && item.asset.projectPath) {
+          const snapshot = await browserWorkspace.snapshot(currentScriptId);
+          const image = snapshot?.files.get(item.asset.projectPath);
+          if (!image) throw new Error('The sprite image is no longer in this project.');
+          object = { kind: 'Sprite', tag: creation.tag, image, scale: placement.asset.scale };
+        } else if (placement.kind !== 'Sprite') {
+          object = { kind: placement.kind, tag: creation.tag, options: sceneObjectDefaults[placement.kind] };
+        } else {
+          throw new Error('Choose an image stored in this project before placing a sprite.');
+        }
+
+        transactionStarted = true;
+        await commitHostedPlacement(run, handle, object, current, () => {
+          if (!applySourceEdits(creation.edits)) return false;
+          const after = model.getAlternativeVersionId();
+          if (after === before) return false;
+          hostedPlacementHistory.current.push({ model, run, handle, before, after });
+          return true;
+        });
+        complete({ tag: creation.tag });
+      } catch (error) {
+        if (!transactionStarted) run.cancel(prepared.handle);
+        hostedPlacementHistory.current = hostedPlacementHistory.current.filter(item =>
+          item.run !== run || item.handle !== prepared.handle);
+        complete({ error: error instanceof Error ? error.message : 'Could not place the object.' });
+      }
+    };
+
     const replaceSpriteImage = (event: Event) => {
       const { object, image, source } = (event as CustomEvent<{
         object: Dino.Sprite; image: HTMLImageElement; source: string;
@@ -663,11 +742,13 @@ const CodeEditor: React.FC<EditorProps> = ({ currentScriptId, onSave, onSelectSc
     window.addEventListener(applyScreenUIMoveEvent, applyScreenUIMove);
     window.addEventListener('playground-update-sprite-image', replaceSpriteImage);
     window.addEventListener('playground-add-scene-object', addSceneObject);
+    window.addEventListener(hostedPlacementEvent, addHostedSceneObject);
     window.addEventListener(sceneObjectCodeEvent, addSceneObject);
     window.addEventListener('playground-remove-scene-object', editSceneObject);
     window.addEventListener('playground-duplicate-scene-object', editSceneObject);
     const clearSceneHistory = (event: Event) => {
       sceneHistory.current = [];
+      hostedPlacementHistory.current = [];
       const run = (event as CustomEvent<{ scriptId: string; source: string }>).detail;
       const model: editor.ITextModel | null = monacoEditorRef.current?.getModel();
       if (run?.scriptId !== currentScriptId) return;
@@ -704,6 +785,7 @@ const CodeEditor: React.FC<EditorProps> = ({ currentScriptId, onSave, onSelectSc
       window.removeEventListener(applyScreenUIMoveEvent, applyScreenUIMove);
       window.removeEventListener('playground-update-sprite-image', replaceSpriteImage);
       window.removeEventListener('playground-add-scene-object', addSceneObject);
+      window.removeEventListener(hostedPlacementEvent, addHostedSceneObject);
       window.removeEventListener(sceneObjectCodeEvent, addSceneObject);
       window.removeEventListener('playground-remove-scene-object', editSceneObject);
       window.removeEventListener('playground-duplicate-scene-object', editSceneObject);
@@ -717,6 +799,13 @@ const CodeEditor: React.FC<EditorProps> = ({ currentScriptId, onSave, onSelectSc
   const syncSceneHistory = (model: editor.ITextModel, event: editor.IModelContentChangedEvent, previousRevision: number) => {
     if (!event.isUndoing && !event.isRedoing) return;
     const revision = model.getAlternativeVersionId();
+    const hosted = hostedPlacementHistory.current.findLast(item => item.run.active() &&
+      item.run.scriptId === loadedScriptId.current && item.model === model &&
+      previousRevision === (event.isUndoing ? item.after : item.before) && revision === (event.isUndoing ? item.before : item.after));
+    if (hosted) {
+      hosted.run.setVisible(hosted.handle, event.isRedoing);
+      return;
+    }
     const entry = sceneHistory.current.findLast(item => item.run.isConnected &&
       item.run.dataset.playgroundScript === loadedScriptId.current && item.model === model &&
       previousRevision === (event.isUndoing ? item.after : item.before) && revision === (event.isUndoing ? item.before : item.after));

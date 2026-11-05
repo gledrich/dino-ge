@@ -45,6 +45,189 @@ async function verifyLibraryCodeDrop(page, source, expected) {
   await page.waitForFunction(text => window.monaco?.editor.getEditors()[0]?.getValue() === text, before);
 }
 
+async function dragHostedLibraryItem(page, source, canvas) {
+  const draggable = source.and(page.locator('[draggable="true"]:enabled'));
+  await draggable.waitFor({ timeout: 5_000 });
+  await draggable.scrollIntoViewIfNeeded();
+  const start = await draggable.boundingBox();
+  const surface = await canvas.boundingBox();
+  assert.ok(start && surface);
+  const x = Math.round(surface.x + surface.width * 0.4);
+  const y = Math.round(surface.y + surface.height * 0.45);
+  const backing = await canvas.evaluate(element => ({ width: element.width, height: element.height }));
+  await page.mouse.move(start.x + start.width / 2, start.y + start.height / 2);
+  await page.mouse.down();
+  try {
+    await page.mouse.move(x, y, { steps: 12 });
+    await page.getByTestId('hosted-canvas-drop').waitFor({ timeout: 5_000 });
+    await page.mouse.move(x, y);
+  } finally {
+    await page.mouse.up();
+  }
+  return {
+    x: (x - surface.x) / surface.width * backing.width,
+    y: (y - surface.y) / surface.height * backing.height,
+  };
+}
+
+async function verifyHostedCanvasPlacement(browser) {
+  const page = await browser.newPage({ viewport: { width: 1280, height: 800 } });
+  try {
+    // Intercept the acknowledgement before the app can finish the placement.
+    await page.addInitScript(() => {
+      if (window !== window.top) return;
+      window.addEventListener('message', event => {
+        const preview = document.querySelector('iframe[title="Isolated game preview"]');
+        if (!window.changeDraftBeforePlacementCommit || event.source !== preview?.contentWindow ||
+            event.data?.type !== 'preview-placement-result' || typeof event.data.result?.id !== 'string') return;
+        window.changeDraftBeforePlacementCommit = false;
+        window.monaco.editor.getEditors()[0].getModel().applyEdits([{
+          range: { startLineNumber: 1, endLineNumber: 1, startColumn: 1, endColumn: 1 },
+          text: '// Edited during placement\n',
+        }]);
+      }, true);
+    });
+    await page.goto(playground.href);
+    const frame = page.locator(previewFrame);
+    const frameHandle = await frame.elementHandle({ timeout: 15_000 });
+    const game = await frameHandle.contentFrame();
+    assert.ok(game);
+    const canvas = game.locator('#playground-canvas-container canvas');
+    await canvas.waitFor();
+    await page.waitForFunction(() => window.monaco?.editor.getEditors()[0]?.getValue().includes('drawUI'));
+    const original = await page.evaluate(() => window.monaco.editor.getEditors()[0].getValue());
+    const run = await frame.getAttribute('src');
+
+    await page.getByRole('button', { name: 'Pause', exact: true }).click();
+    await game.evaluate(async () => {
+      const { Engine } = await import('/built/index.js');
+      window.placementEngine = Engine;
+      window.readPlacement = tag => {
+        const object = [...(Engine.currentScene?.objects ?? Engine.objects)]
+          .find(item => item.metadata.tag === tag);
+        if (!object) return null;
+        const { x, y } = object.transform.position;
+        return { id: object.id, x, y };
+      };
+    });
+    await game.waitForFunction(() => window.placementEngine.paused && !!window.readPlacement('explorer'));
+    await game.evaluate(() => {
+      const { camera } = window.placementEngine;
+      camera.position.x = 137;
+      camera.position.y = 83;
+      camera.zoom = 1.5;
+    });
+
+    for (const [name, tag] of [['Add rectangle', 'New rectangle'], ['Add ruins-atlas as sprite', 'ruins-atlas sprite']]) {
+      if (name.includes('sprite')) await page.getByRole('button', { name: 'Assets', exact: true }).click();
+      const source = page.getByRole('button', { name, exact: true });
+      const point = await dragHostedLibraryItem(page, source, canvas);
+      const expectedX = Math.round(137 + point.x / 1.5);
+      const expectedY = Math.round(83 + point.y / 1.5);
+      await page.getByRole('button', { name: tag, exact: true }).waitFor({ timeout: 5_000 });
+      await page.waitForFunction(tag => window.monaco.editor.getEditors()[0].getValue().includes(tag), tag);
+      const placed = await game.evaluate(tag => window.readPlacement(tag), tag);
+      assert.ok(placed);
+      assert.ok(Math.abs(placed.x - expectedX) <= 1 && Math.abs(placed.y - expectedY) <= 1,
+        `Canvas drop projected to ${placed.x}, ${placed.y}, expected ${expectedX}, ${expectedY}`);
+      const edited = await page.evaluate(() => window.monaco.editor.getEditors()[0].getValue());
+      const line = edited.split('\n').find(line => line.includes(tag));
+      assert.ok(line?.includes(`new Vector2(${placed.x}, ${placed.y})`), 'Draft and preview placement coordinates must agree.');
+      if (name.includes('sprite')) assert.ok(line.includes('assets/ruins-atlas.png'));
+      assert.equal(await frame.getAttribute('src'), run);
+
+      await page.evaluate(() => window.monaco.editor.getEditors()[0].trigger('release-check', 'undo', null));
+      await game.waitForFunction(tag => window.readPlacement(tag) === null, tag);
+      await page.waitForFunction(text => window.monaco.editor.getEditors()[0].getValue() === text, original);
+      await page.evaluate(() => window.monaco.editor.getEditors()[0].trigger('release-check', 'redo', null));
+      await game.waitForFunction(tag => !!window.readPlacement(tag), tag);
+      assert.deepEqual(await game.evaluate(tag => window.readPlacement(tag), tag), placed);
+      await page.waitForFunction(text => window.monaco.editor.getEditors()[0].getValue() === text, edited);
+      assert.equal(await frame.getAttribute('src'), run);
+      await page.evaluate(() => window.monaco.editor.getEditors()[0].trigger('release-check', 'undo', null));
+      await game.waitForFunction(tag => window.readPlacement(tag) === null, tag);
+      await page.waitForFunction(text => window.monaco.editor.getEditors()[0].getValue() === text, original);
+    }
+
+    await page.getByRole('button', { name: 'Library', exact: true }).click();
+    await page.evaluate(() => { window.changeDraftBeforePlacementCommit = true; });
+    await dragHostedLibraryItem(page, page.getByRole('button', { name: 'Add rectangle', exact: true }), canvas);
+    await page.getByRole('alert').filter({ hasText: 'The script or preview changed during placement.' }).waitFor({ timeout: 5_000 });
+    assert.equal(await page.evaluate(() => window.monaco.editor.getEditors()[0].getValue()), '// Edited during placement\n' + original);
+    await game.waitForFunction(() => window.readPlacement('New rectangle') === null, undefined, { timeout: 5_000 });
+    assert.equal(await frame.getAttribute('src'), run);
+  } finally {
+    await page.close();
+  }
+}
+
+async function verifyHostedNamedScenePlacement(browser, device) {
+  const page = await browser.newPage(device);
+  try {
+    await page.goto(playground.href);
+    await page.frameLocator(previewFrame).locator('canvas').waitFor({ timeout: 15_000 });
+    const script = `import { Engine, Rectangle, Scene, Vector2 } from 'dino-ge';
+class Validator {
+  constructor(props) {
+    if (Object.keys(props).length !== 1) throw new Error('Unexpected options');
+  }
+}
+new Validator({ tag: 'custom' });
+class Arena extends Scene {
+  onLoad() {
+    new Rectangle({ tag: 'Fixture anchor', position: new Vector2(30, 30), width: 20, height: 20 });
+  }
+}
+new Engine({
+  onLoad() { Engine.currentScene = new Arena(); },
+}, { containerId: 'playground-canvas-container' });`;
+    await page.getByLabel('Choose project backup').setInputFiles({
+      name: 'named-scene.dino-project.json',
+      mimeType: 'application/json',
+      buffer: Buffer.from(JSON.stringify({
+        format: 'dino-ge-project', version: 1, name: 'named-scene', entry: 'game.js',
+        files: [{ path: 'game.js', type: 'text/javascript', data: Buffer.from(script).toString('base64') }],
+      })),
+    });
+    await page.waitForFunction(() => window.monaco?.editor.getEditors()[0]?.getValue().includes('class Arena'));
+    await page.getByRole('tab', { name: 'Explorer', exact: true }).click();
+    await page.getByRole('button', { name: 'Fixture anchor', exact: true }).waitFor({ timeout: 5_000 });
+    const run = await page.locator(previewFrame).getAttribute('src');
+    await page.getByRole('button', { name: 'Add rectangle', exact: true }).press('Shift+Enter');
+    const target = page.getByRole('button', { name: 'Position Rectangle', exact: true });
+    await target.waitFor({ timeout: 5_000 });
+    const marker = await target.boundingBox();
+    const drawer = await page.locator('.mobile-dock-resize').boundingBox();
+    assert.ok(marker && drawer && marker.y + marker.height <= drawer.y + 1);
+    await target.press('ArrowRight');
+    const moved = await target.boundingBox();
+    assert.equal(moved?.x, marker.x + 1);
+    await target.press('Enter');
+    await page.getByRole('button', { name: 'New rectangle', exact: true }).waitFor({ timeout: 5_000 });
+    await page.waitForFunction(() => window.monaco.editor.getEditors()[0].getValue().includes('New rectangle'));
+    const draft = await page.evaluate(() => window.monaco.editor.getEditors()[0].getValue());
+    assert.ok(draft.slice(draft.indexOf('class Arena'), draft.indexOf('new Engine')).includes('New rectangle'));
+    assert.equal(await page.locator(previewFrame).getAttribute('src'), run);
+
+    const editor = page.getByRole('tab', { name: 'Editor', exact: true });
+    if (!await editor.isVisible()) await page.getByRole('button', { name: 'Expand bottom dock' }).click();
+    await editor.click();
+    const scriptSelector = page.getByLabel('Current script');
+    const scriptId = await scriptSelector.inputValue();
+    const save = page.getByRole('button', { name: 'Save script' });
+    await save.click();
+    await save.and(page.locator('.save')).waitFor();
+    await page.reload();
+    await editor.click();
+    await scriptSelector.selectOption(scriptId);
+    await page.waitForFunction(() => window.monaco?.editor.getEditors()[0]?.getValue().includes('New rectangle'));
+    await page.getByRole('tab', { name: 'Explorer', exact: true }).click();
+    await page.getByRole('button', { name: 'New rectangle', exact: true }).waitFor({ timeout: 15_000 });
+  } finally {
+    await page.close();
+  }
+}
+
 const desktop = await chromium.launch(chromiumOptions);
 try {
   const page = await desktop.newPage({ viewport: { width: 1280, height: 800 } });
@@ -61,6 +244,7 @@ try {
   await verifyLibraryCodeDrop(page, page.getByRole('button', { name: 'Insert rectangle code', exact: true }), 'New rectangle');
   await page.getByRole('button', { name: 'Assets', exact: true }).click();
   await verifyLibraryCodeDrop(page, page.getByRole('button', { name: 'Insert ruins-atlas sprite code', exact: true }), 'ruins-atlas sprite');
+  await verifyHostedCanvasPlacement(desktop);
   const code = page.locator('.monaco-editor').first();
   await code.locator('.view-lines').click();
   // Monaco uses different document-start shortcuts on macOS and Linux.
@@ -187,6 +371,7 @@ try {
   assert.deepEqual(await iframe.boundingBox(), previewBounds);
   assert.deepEqual(await canvas.boundingBox(), canvasBounds);
   await verifyTouchMovement(page, game, '#playground-canvas-container', true);
+  await verifyHostedNamedScenePlacement(phone, { ...device, defaultBrowserType: undefined });
 
   const standalonePage = await phone.newPage({ ...device, defaultBrowserType: undefined });
   const offOrigin = [];
@@ -200,4 +385,4 @@ try {
   await phone.close();
 }
 
-console.log('Verified site routes, saved edits, project backup and restore, phone-sized editing with touch, and the standalone game when the preview is unavailable.');
+console.log('Verified site routes, saved edits, project backup and restore, hosted Library placement, phone-sized editing with touch, and the standalone game when the preview is unavailable.');

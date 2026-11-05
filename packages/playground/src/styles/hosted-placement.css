@@ -1,0 +1,60 @@
+.hosted-placement-layer {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  pointer-events: none;
+  z-index: 30;
+}
+
+.mobile-workspace .hosted-placement-layer { position: fixed; }
+
+.hosted-canvas-drop {
+  position: absolute;
+  pointer-events: auto;
+}
+
+.hosted-placement-guide {
+  position: absolute;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  transform: translate(-12px, -50%);
+  color: var(--text-primary);
+  white-space: nowrap;
+  font-size: 12px;
+}
+
+.hosted-placement-guide > :first-child {
+  display: grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  color: var(--accent-primary);
+  background: var(--bg-primary);
+  border: 1px solid currentColor;
+  border-radius: 50%;
+  font: bold 17px/1 sans-serif;
+}
+
+.hosted-placement-guide > :last-child,
+.hosted-placement-status {
+  padding: 6px 9px;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-color);
+  border-radius: 4px;
+}
+
+.hosted-placement-keyboard:focus-visible { outline: 2px solid var(--accent-primary); }
+
+.hosted-placement-status {
+  position: absolute;
+  top: 8px;
+  left: 50%;
+  width: max-content;
+  max-width: calc(100% - 20px);
+  transform: translateX(-50%);
+  font-size: 13px;
+}
+
+.hosted-placement-error { border-color: #df7278; }

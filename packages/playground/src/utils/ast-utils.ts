@@ -388,6 +388,24 @@ export function rebaseModule(code: string, moduleUrl: URL, runtimeUrl: string, r
   return hashbang + (/[\r\n\u2028\u2029]$/.test(hashbang) ? '' : '\n') + prepare + code.slice(hashbang.length);
 }
 
+function sceneMetadataEdits(ast: acorn.Program, imports: DinoImports, scriptId: string): Edit[] {
+  return sceneDeclarations(ast, imports).map(scene => {
+    const start = scene.body.start + 1;
+    const metadata = { scriptId, className: scene.id!.name };
+    return { start, end: start, newText: `static ${sceneSourceKey} = ${JSON.stringify(metadata)};` };
+  });
+}
+
+export function instrumentHostedEntry(code: string, scriptId: string): InstrumentationResult {
+  try {
+    const ast = acorn.parse(code, { ecmaVersion: 'latest', sourceType: 'module' });
+    const edits = sceneMetadataEdits(ast, dinoImports(ast), scriptId);
+    return { code: applyEditsToSource(code, edits) ?? code };
+  } catch (error) {
+    return { code, error: error instanceof Error ? error.message : 'Syntax Error' };
+  }
+}
+
 /**
  * Instruments the provided code by injecting __sourceId into Dino GE object instantiations.
  * Also builds the source mapping registry.
@@ -414,14 +432,7 @@ export const instrumentCode = (code: string, trackEditorSource = true, scriptId?
   }
 
   const imports = dinoImports(ast, strict);
-  const injections: Edit[] = [];
-  if (scriptId) {
-    for (const scene of sceneDeclarations(ast, imports)) {
-      const start = scene.body.start + 1;
-      const metadata = { scriptId, className: scene.id!.name };
-      injections.push({ start, end: start, newText: `static ${sceneSourceKey} = ${JSON.stringify(metadata)};` });
-    }
-  }
+  const injections = scriptId ? sceneMetadataEdits(ast, imports, scriptId) : [];
 
   const knownClasses = ['Sprite', 'Rectangle', 'Circle', 'Line', 'Text', 'Tilemap'];
   const getGameObject = (node: any) => {

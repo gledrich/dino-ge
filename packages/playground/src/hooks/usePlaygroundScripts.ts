@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState, useSyncExternalStore } from 'react';
 import * as Dino from 'dino-ge';
 import { browserPreviewUrl, getScript, readProjectModule, setCurrentScriptId as rememberScriptId, updateScript } from '../utils/helpers';
-import { instrumentCode, rebaseModule } from '../utils/ast-utils';
+import { instrumentCode, instrumentHostedEntry, rebaseModule } from '../utils/ast-utils';
 import { isUneditedProjectRunModule, trackProjectObjectSources } from '../utils/project-object-source';
 import runtimeModulePath from '../utils/game-module-runtime.js?url&no-inline';
 import { browserWorkspace } from '../utils/browser-workspace';
@@ -64,27 +64,32 @@ export const usePlaygroundScripts = () => {
       return;
     }
     if (run !== runId.current || (fromSave && (keepSceneOnSave.current || screenUIPreview.hasPendingMoves()))) return;
-    const result = instrumentCode(scriptText, false, currentScriptId);
-    window.dispatchEvent(new CustomEvent('playground-syntax-error', { detail: result.error ?? null }));
-    if (result.error) return;
-
     if (browserPreviewUrl) {
       try {
         const snapshot = await browserWorkspace.snapshot(currentScriptId);
-        if (run !== runId.current) return;
         const container = document.getElementById('playground-canvas-container');
         if (!snapshot || !container) throw new Error('Could not open the game preview.');
+        const original = await snapshot.files.get(snapshot.entry)?.text();
+        if (run !== runId.current) return;
+        if (original === undefined) throw new Error('Could not read the hosted game entry.');
+        const entry = instrumentHostedEntry(original, currentScriptId);
+        window.dispatchEvent(new CustomEvent('playground-syntax-error', { detail: entry.error ?? null }));
+        if (entry.error) return;
         browserPreview.current?.dispose();
         setRuntimeError(undefined);
-        window.dispatchEvent(new CustomEvent('playground-before-run', { detail: { scriptId: currentScriptId, source: scriptText } }));
+        window.dispatchEvent(new CustomEvent('playground-before-run', { detail: { scriptId: currentScriptId, source: original } }));
         browserPreview.current = startBrowserPreview(container, browserPreviewUrl, snapshot, previewControls.current, error => {
           if (run === runId.current) setRuntimeError({ phase: 'script', error });
-        }, currentScriptId);
+        }, currentScriptId, { original, runtime: entry.code });
       } catch (error) {
         if (run === runId.current) setRuntimeError({ phase: 'script', error });
       }
       return;
     }
+
+    const result = instrumentCode(scriptText, false, currentScriptId);
+    window.dispatchEvent(new CustomEvent('playground-syntax-error', { detail: result.error ?? null }));
+    if (result.error) return;
 
     stopTrackingSources.current?.();
     stopTrackingSources.current = undefined;

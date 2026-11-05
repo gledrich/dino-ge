@@ -1,6 +1,7 @@
 import { playgroundLogs, type LogLevel } from './LogManager';
 import { isScreenUIBounds, isScreenUIFrame, screenUIPreview } from './screen-ui-preview';
 import { findScreenUICall, resolveScreenUISource } from './screen-ui-source';
+import type { HostedCanvasBounds, HostedPlacementConnection, PreparedHostedPlacement } from './hosted-placement';
 
 type Snapshot = { entry: string; files: Map<string, Blob> };
 type Controls = { paused: boolean; debug: boolean };
@@ -18,6 +19,21 @@ const emptyScene: SceneSnapshot = { objects: [], selectedId: null };
 let scene = emptyScene;
 let sendSceneCommand: ((command: SceneCommand) => void) | undefined;
 const listeners = new Set<() => void>();
+const placementListeners = new Set<() => void>();
+let placementView: { run?: HostedPlacementConnection; canvas?: HostedCanvasBounds } = {};
+
+function publishPlacement(next: typeof placementView) {
+  placementView = next;
+  placementListeners.forEach(listener => listener());
+}
+
+export const browserPreviewPlacement = {
+  subscribe(listener: () => void) {
+    placementListeners.add(listener);
+    return () => { placementListeners.delete(listener); };
+  },
+  getSnapshot: () => placementView,
+};
 
 function publishScene(next: SceneSnapshot) {
   scene = next;
@@ -63,6 +79,7 @@ export function startBrowserPreview(
   initialControls: Controls,
   reportError: (message: string) => void,
   scriptId?: string,
+  entrySource?: { original: string; runtime: string },
 ) {
   const brokerUrl = previewOrigin(address);
   const origin = brokerUrl.origin;
@@ -83,6 +100,53 @@ export function startBrowserPreview(
   let prepared = false;
   let startupStage = 'connecting to the isolated preview';
   let sourceRequest = 0;
+  let placementRequest = 0;
+  const placementReplies = new Map<number, {
+    timer: number; resolve(value: unknown): void; reject(error: Error): void;
+  }>();
+  const sendPlacement = (action: string, fields: object) => {
+    frame?.contentWindow?.postMessage({ type: 'preview-placement-command', request: ++placementRequest, action, ...fields }, origin);
+    return placementRequest;
+  };
+  const requestPlacement = (action: string, fields: object) => new Promise<unknown>((resolve, reject) => {
+    if (!frame?.contentWindow || disposed) {
+      reject(new Error('The hosted game has been replaced.'));
+      return;
+    }
+    const request = sendPlacement(action, fields);
+    const timer = window.setTimeout(() => {
+      placementReplies.delete(request);
+      reject(new Error('The hosted game did not confirm the placement.'));
+    }, 8_000);
+    placementReplies.set(request, { timer, resolve, reject });
+  });
+  const placement: HostedPlacementConnection | undefined = scriptId && entrySource ? {
+    scriptId,
+    source: entrySource.original,
+    active: () => !disposed && placementView.run === placement,
+    async prepare(point) {
+      const result = await requestPlacement('prepare', { point }) as Partial<PreparedHostedPlacement> | undefined;
+      if (!result || typeof result.handle !== 'string' || result.handle.length > 100 ||
+          typeof result.x !== 'number' || typeof result.y !== 'number' ||
+          !Number.isFinite(result.x) || !Number.isFinite(result.y) ||
+          (result.scene !== undefined && (result.scene?.scriptId !== scriptId ||
+            typeof result.scene.className !== 'string' || result.scene.className.length > 200))) {
+        throw new Error('The hosted game returned an invalid placement position.');
+      }
+      return { handle: result.handle, x: result.x, y: result.y, scene: result.scene };
+    },
+    async create(handle, object) {
+      const result = await requestPlacement('create', { handle, object }) as { id?: unknown } | undefined;
+      if (!result || typeof result.id !== 'string' || result.id.length > 100) {
+        throw new Error('The hosted game returned an invalid object identity.');
+      }
+      return { id: result.id };
+    },
+    async finalise(handle) { await requestPlacement('finalise', { handle }); },
+    cancel(handle) { if (!disposed) sendPlacement('cancel', { handle }); },
+    setVisible(handle, visible) { if (!disposed) sendPlacement('visibility', { handle, visible }); },
+  } : undefined;
+  publishPlacement({ run: placement });
   const screenUI = screenUIPreview.start(index =>
     frame?.contentWindow?.postMessage({ type: 'preview-screen-ui-source', index, request: ++sourceRequest }, origin),
   editing => frame?.contentWindow?.postMessage({ type: 'preview-screen-ui-editing', editing }, origin));
@@ -104,6 +168,12 @@ export function startBrowserPreview(
     window.removeEventListener('message', receiveMessage);
     channel.port1.close();
     screenUI.dispose();
+    for (const { timer, reject } of placementReplies.values()) {
+      clearTimeout(timer);
+      reject(new Error('The hosted game has been replaced.'));
+    }
+    placementReplies.clear();
+    if (placementView.run === placement) publishPlacement({});
     if (!prepared) channel.port2.close();
     broker.remove();
     frame?.remove();
@@ -127,7 +197,11 @@ export function startBrowserPreview(
     if (event.source === broker.contentWindow && event.data.type === 'preview-ready' && !prepared) {
       prepared = true;
       startupStage = 'preparing the project files';
-      broker.contentWindow?.postMessage({ type: 'prepare-run', ...snapshot }, origin, [channel.port2]);
+      const files = new Map(snapshot.files);
+      if (entrySource && entrySource.runtime !== entrySource.original) {
+        files.set(snapshot.entry, new Blob([entrySource.runtime], { type: 'text/javascript' }));
+      }
+      broker.contentWindow?.postMessage({ type: 'prepare-run', entry: snapshot.entry, files }, origin, [channel.port2]);
       return;
     }
     if (event.source === broker.contentWindow && event.data.type === 'preview-error') {
@@ -142,6 +216,20 @@ export function startBrowserPreview(
     if (type === 'preview-started') {
       clearTimeout(timer);
       sendControls();
+    } else if (type === 'preview-placement-result') {
+      const { request, error, result } = event.data;
+      const reply = placementReplies.get(request);
+      if (!reply) return;
+      placementReplies.delete(request);
+      clearTimeout(reply.timer);
+      if (typeof error === 'string') reply.reject(new Error(error.slice(0, 300)));
+      else reply.resolve(result);
+    } else if (type === 'preview-canvas' && placementView.run === placement) {
+      const next = event.data.canvas;
+      const canvas = isScreenUIBounds(next) && next.width > 0 && next.height > 0 ? next : undefined;
+      const before = placementView.canvas;
+      if (before?.x !== canvas?.x || before?.y !== canvas?.y ||
+          before?.width !== canvas?.width || before?.height !== canvas?.height) publishPlacement({ run: placement, canvas });
     } else if (type === 'preview-error' && typeof message === 'string') {
       clearTimeout(timer);
       reportError(message.slice(0, 2_000));
@@ -161,7 +249,8 @@ export function startBrowserPreview(
       const file = location && snapshot.files.get(location.path);
       if (!location || !file || !location.path.endsWith('.js')) return;
       void file.text().then(source => {
-        const call = findScreenUICall(source, control.kind, location);
+        const call = findScreenUICall(source, control.kind, location,
+          location.path === snapshot.entry ? entrySource?.runtime : undefined);
         if (call && request === sourceRequest) {
           screenUI.setSource(index, { ...location, ...call, source, kind: control.kind, scriptId,
             entry: location.path === snapshot.entry, writeVerified: true });

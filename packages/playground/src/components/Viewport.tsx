@@ -4,6 +4,7 @@ import { usePlayground } from '../context/PlaygroundContext';
 import type { GameRunError } from '../hooks/usePlaygroundScripts';
 import Toolbar from './Toolbar';
 import { ScreenUIOutline } from './ScreenUITools';
+import HostedLibraryPlacement from './HostedLibraryPlacement';
 import { screenUIPreview } from '../utils/screen-ui-preview';
 import Logo from './Logo';
 import { frameSceneObjectEvent, getAssetSource, getDefaultSceneObjectTag, getSceneArrowMovement, getSceneAssetPreviewType, getSceneSelectionBounds, getSceneSource, getSceneSpritePlacement, getSceneSpriteScale, isReplaceableSprite, isSceneFrameShortcut, nudgeSceneSelection, sceneAssetDragEvent, sceneAssetDragType, sceneKeyboardPlacementEvent, sceneObjectDefaults, sceneObjectDragType, sceneObjectKinds, scenePointerDragEvent, type SceneImageAsset, type SceneKeyboardPlacementRequest, type SceneObjectKind, type SceneObjectPlacement, type ScenePointerDrag, type ScenePoint } from '../utils/scene-objects';
@@ -414,6 +415,7 @@ const Viewport: React.FC<{
   }, []);
 
   useEffect(() => {
+    if (browserPreviewUrl) return;
     const startKeyboardPlacement = (event: Event) => {
       const { item, source } = (event as CustomEvent<SceneKeyboardPlacementRequest>).detail;
       if ('asset' in item && !isEditingScene) return;
@@ -490,6 +492,7 @@ const Viewport: React.FC<{
   }, [addObject, getPlacementPoint]);
 
   useEffect(() => {
+    if (browserPreviewUrl) return;
     const updatePointerDrag = (event: Event) => {
       const { detail } = event as CustomEvent<ScenePointerDrag | null>;
       if (!detail || ('asset' in detail && !isEditingScene)) {
@@ -549,6 +552,7 @@ const Viewport: React.FC<{
   }, [placeImageFile]);
 
   useEffect(() => {
+    if (browserPreviewUrl) return;
     const placeObject = (event: Event) => {
       const kind = (event as CustomEvent<SceneObjectKind>).detail;
       if (sceneObjectKinds.includes(kind)) placeLibraryObject(kind);
@@ -1115,6 +1119,7 @@ const Viewport: React.FC<{
         </a>}
       </div>}
       <ScreenUIOutline />
+      {browserPreviewUrl && <HostedLibraryPlacement />}
       <Toolbar 
         isPaused={isPaused}
         isDebug={isDebug}
