@@ -232,7 +232,7 @@ const CodeEditor: React.FC<EditorProps> = ({ currentScriptId, onRefresh }) => {
       if (!creation) {
         placement.error = placement.scene
           ? 'Use an inline onLoad method on the scene class to add palette objects.'
-          : 'Open a valid script with one Dino GE Engine and an inline onLoad block.';
+          : 'Scene placement needs one Dino GE Engine with an inline onLoad block in the open script.';
         return;
       }
       const before = model.getAlternativeVersionId();

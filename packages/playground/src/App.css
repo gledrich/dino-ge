@@ -76,6 +76,25 @@
 .scene-edit-hint { color: var(--text-secondary); font-size: 11px; }
 .scene-edit-status { border-top: 1px solid var(--border-color); padding-top: 6px; }
 
+.scene-edit-controls:has(.scene-placement-error) {
+  max-width: min(360px, calc(100% - 24px));
+  z-index: 101;
+}
+
+.scene-placement-error {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 5px 6px 5px 9px;
+  border-inline-start: 2px solid var(--accent-secondary);
+  border-radius: var(--scene-control-radius);
+  background: #332329;
+  color: #ffb4b8;
+  line-height: 1.4;
+}
+
+.scene-placement-error button { pointer-events: auto; }
+
 .scene-drop-guide {
   position: absolute;
   z-index: 9;

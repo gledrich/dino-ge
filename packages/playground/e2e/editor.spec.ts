@@ -410,6 +410,41 @@ new Engine({ onLoad() {
   await expect.poll(readCamera).toEqual({ x: 40, y: 30, zoom: 1 });
 });
 
+test('explains a rejected palette drop without pausing the game or changing the script', async ({ page }) => {
+  const source = `import { Engine } from 'dino-ge';
+function setup() {}
+let frames = 0;
+new Engine({
+  onLoad: setup,
+  update() { document.body.dataset.previewFrames = String(++frames); },
+}, { containerId: 'playground-canvas-container' });`;
+  await page.route('**/files', route => route.fulfill({ json: ['script'] }));
+  await page.route('**/api/scripts/script', route => route.fulfill({ json: source }));
+  await page.goto('/');
+  await expect(page.locator('.monaco-editor')).toContainText('onLoad: setup');
+  const canvas = page.locator('#canvas');
+  await expect(canvas).toBeVisible();
+  const readSource = () => page.evaluate(() => {
+    const { monaco } = window as typeof window & { monaco: Monaco };
+    return monaco.editor.getEditors()[0].getValue();
+  });
+  const original = await readSource();
+  await page.getByRole('button', { name: 'Add rectangle' }).dragTo(canvas, {
+    targetPosition: { x: 180, y: 150 },
+  });
+
+  const error = page.getByRole('alert').filter({ hasText: 'inline onLoad block' });
+  await expect(error).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Pause', exact: true })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Edit scene', exact: true })).toHaveAttribute('aria-pressed', 'false');
+  await expect(page.getByRole('button', { name: 'New rectangle', exact: true })).toHaveCount(0);
+  expect(await readSource()).toBe(original);
+  const frames = () => page.evaluate(() => Number(document.body.dataset.previewFrames));
+  await expect.poll(frames).toBeGreaterThan(await frames());
+  await page.getByRole('button', { name: 'Dismiss placement error' }).click();
+  await expect(error).toHaveCount(0);
+});
+
 test('saves a palette drop to the active named scene and restores it there', async ({ page }) => {
   let source = `import { Engine, Scene as Level, Rectangle, Vector2 } from 'dino-ge';
 class Lobby extends Level {

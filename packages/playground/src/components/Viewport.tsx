@@ -40,7 +40,7 @@ const Viewport: React.FC = () => {
     x: number; y: number; zoom: number } | null>(null);
   const pan = useRef<{ id: number; x: number; y: number } | null>(null);
   const [isPanning, setIsPanning] = useState(false);
-  const [placementStatus, setPlacementStatus] = useState('');
+  const [placementStatus, setPlacementStatus] = useState<{ message: string; error?: boolean }>();
   const [dropGuide, setDropGuide] = useState<{
     x: number; y: number; left: number; top: number; kind?: SceneObjectKind;
     width?: number; height?: number;
@@ -55,21 +55,20 @@ const Viewport: React.FC = () => {
   }, [isEditingScene]);
 
   const addObject = useCallback((kind: SceneObjectKind | 'Sprite', clientX?: number, clientY?: number, assetTag?: string) => {
+    const rejectPlacement = (message: string) => {
+      setPlacementStatus({ message, error: true });
+      return false;
+    };
     const canvas = viewportContainerRef.current?.querySelector<HTMLCanvasElement>('canvas#canvas');
     const point = canvas && getCanvasPlacement(canvas, clientX, clientY);
-    if (!point) {
-      setPlacementStatus('Run the Dino GE script before adding objects.');
-      return;
-    }
+    if (!point) return rejectPlacement('Run the Dino GE script before adding objects.');
     const runningScript = document.querySelector<HTMLElement>('[data-playground-script]')?.dataset.playgroundScript;
     if (runningScript !== currentScriptId) {
-      setPlacementStatus('Wait for the open script to start before adding objects.');
-      return;
+      return rejectPlacement('Wait for the open script to start before adding objects.');
     }
     const scene = Engine.currentScene ? getSceneSource(Engine.currentScene) : undefined;
     if (Engine.currentScene && !scene) {
-      setPlacementStatus('Add objects in a named scene class declared in the open script.');
-      return;
+      return rejectPlacement('Add objects in a named scene class declared in the open script.');
     }
     const options = {
       tag: `New ${kind.toLowerCase()}`, scene,
@@ -80,8 +79,7 @@ const Viewport: React.FC = () => {
       const image = Loader.getLoadedAssets().find(asset => asset.tag === assetTag)?.image;
       const source = image && getAssetSource(image.src, currentScriptId);
       if (!image || !source) {
-        setPlacementStatus('This image needs a reusable URL before it can be added to the script.');
-        return;
+        return rejectPlacement('This image needs a reusable URL before it can be added to the script.');
       }
       const scale = getSceneSpriteScale(image);
       placement = { ...options, kind, tag: `${assetTag} sprite`, asset: { image, source, scale } };
@@ -90,17 +88,17 @@ const Viewport: React.FC = () => {
     }
     window.dispatchEvent(new CustomEvent('playground-add-scene-object', { detail: placement }));
     if (!placement.sourceId) {
-      setPlacementStatus(placement.error ?? 'Open the game script in the editor before adding objects.');
-      return;
+      return rejectPlacement(placement.error ?? 'Open the game script in the editor before adding objects.');
     }
-    setPlacementStatus(`Added ${placement.tag}${scene ? ` to ${scene.className}` : ''}. Save the script to keep it.`);
+    setPlacementStatus({ message: `Added ${placement.tag}${scene ? ` to ${scene.className}` : ''}. Save the script to keep it.` });
+    return true;
   }, [currentScriptId]);
 
   const placeLibraryObject = useCallback((kind: SceneObjectKind, x?: number, y?: number) => {
+    if (!addObject(kind, x, y)) return;
     setIsPaused(true);
     setIsDebug(true);
     setIsInspectorVisible(true);
-    addObject(kind, x, y);
   }, [addObject, setIsDebug, setIsInspectorVisible, setIsPaused]);
 
   useEffect(() => {
@@ -113,9 +111,14 @@ const Viewport: React.FC = () => {
   }, [placeLibraryObject]);
 
   useEffect(() => {
-    const reportHistory = (event: Event) => setPlacementStatus((event as CustomEvent<string>).detail);
+    const reportHistory = (event: Event) => setPlacementStatus({ message: (event as CustomEvent<string>).detail });
+    const clearPlacementStatus = () => setPlacementStatus(undefined);
     window.addEventListener('playground-scene-history', reportHistory);
-    return () => window.removeEventListener('playground-scene-history', reportHistory);
+    window.addEventListener('playground-before-run', clearPlacementStatus);
+    return () => {
+      window.removeEventListener('playground-scene-history', reportHistory);
+      window.removeEventListener('playground-before-run', clearPlacementStatus);
+    };
   }, []);
 
   useEffect(() => {
@@ -300,8 +303,10 @@ const Viewport: React.FC = () => {
           if (event.key === 'Enter' || event.key === ' ') suppressGameActivation(event);
         }}
       />
-      {isEditingScene && (
-          <div className="scene-edit-controls" role="group" aria-label="Scene editing">
+      {(isEditingScene || placementStatus?.error) && (
+        <div className="scene-edit-controls" role={isEditingScene ? 'group' : undefined}
+          aria-label={isEditingScene ? 'Scene editing' : undefined}>
+          {isEditingScene && <>
             <div className="scene-object-options scene-history-actions" role="group" aria-label="Edit history">
               <span className="scene-edit-label">Scene editing</span>
               {(['undo', 'redo'] as const).map(action => (
@@ -320,8 +325,19 @@ const Viewport: React.FC = () => {
               Middle drag pans · Arrows move selection · Shift moves 10<br />
               Esc cancels a move or resize
             </span>
-            {placementStatus && <span className="scene-edit-status" role="status">{placementStatus}</span>}
-          </div>
+          </>}
+          {placementStatus?.error ? (
+            <div className="scene-placement-error">
+              <span role="alert">{placementStatus.message}</span>
+              <button type="button" className="scene-control" aria-label="Dismiss placement error"
+                onClick={() => setPlacementStatus(undefined)}>
+                <i className="fa-solid fa-xmark" aria-hidden="true" />
+              </button>
+            </div>
+          ) : placementStatus && (
+            <span className="scene-edit-status" role="status">{placementStatus.message}</span>
+          )}
+        </div>
       )}
       {dropGuide && <div className="scene-drop-preview" aria-hidden="true">
         {dropGuide.width && dropGuide.height && <div className="scene-drop-outline" style={{
