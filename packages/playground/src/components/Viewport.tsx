@@ -3,7 +3,7 @@ import { Engine, Loader } from 'dino-ge';
 import { usePlayground } from '../context/PlaygroundContext';
 import Toolbar from './Toolbar';
 import Logo from './Logo';
-import { getAssetSource, getSceneSource, nudgeSceneSelection, sceneAssetDragType, sceneObjectDefaults, sceneObjectDragType, sceneObjectKinds, type SceneObjectKind, type SceneObjectPlacement } from '../utils/scene-objects';
+import { getAssetSource, getSceneAssetPreviewType, getSceneSource, getSceneSpriteScale, nudgeSceneSelection, sceneAssetDragType, sceneObjectDefaults, sceneObjectDragType, sceneObjectKinds, type SceneObjectKind, type SceneObjectPlacement } from '../utils/scene-objects';
 
 function getCanvasPlacement(canvas: HTMLCanvasElement, clientX?: number, clientY?: number) {
   const bounds = canvas.getBoundingClientRect();
@@ -40,6 +40,7 @@ const Viewport: React.FC = () => {
   const [dropGuide, setDropGuide] = useState<{
     x: number; y: number; left: number; top: number; kind?: SceneObjectKind;
     width?: number; height?: number;
+    asset?: { tag: string; src: string };
   }>();
 
   const addObject = useCallback((kind: SceneObjectKind | 'Sprite', clientX?: number, clientY?: number, assetTag?: string) => {
@@ -71,7 +72,7 @@ const Viewport: React.FC = () => {
         setPlacementStatus('This image needs a reusable URL before it can be added to the script.');
         return;
       }
-      const scale = Math.min(1, 128 / Math.max(image.naturalWidth, image.naturalHeight));
+      const scale = getSceneSpriteScale(image);
       placement = { ...options, kind, tag: `${assetTag} sprite`, asset: { image, source, scale } };
     } else {
       placement = { ...options, kind };
@@ -185,10 +186,16 @@ const Viewport: React.FC = () => {
           if (!point) return;
           const rect = event.currentTarget.getBoundingClientRect();
           const kind = sceneObjectKinds.find(item => types.includes(`${sceneObjectDragType}-${item.toLowerCase()}`));
+          const asset = types.includes(sceneAssetDragType)
+            ? Loader.getLoadedAssets().find(item => types.includes(getSceneAssetPreviewType(item.tag))) : undefined;
           const dimensions = kind === 'Rectangle' ? sceneObjectDefaults.Rectangle : kind === 'Circle'
             ? { width: sceneObjectDefaults.Circle.radius * 2, height: sceneObjectDefaults.Circle.radius * 2 } : undefined;
+          const spriteScale = asset ? getSceneSpriteScale(asset.image) : 1;
+          const width = asset ? asset.image.naturalWidth * spriteScale : dimensions?.width;
+          const height = asset ? asset.image.naturalHeight * spriteScale : dimensions?.height;
           setDropGuide({ x: point.x, y: point.y, left: point.left - rect.left, top: point.top - rect.top, kind,
-            width: dimensions && dimensions.width * point.scaleX, height: dimensions && dimensions.height * point.scaleY });
+            width: width && width * point.scaleX, height: height && height * point.scaleY,
+            asset: asset && { tag: asset.tag, src: asset.image.src } });
         }}
         onDragLeave={() => setDropGuide(undefined)}
         onDrop={event => {
@@ -234,9 +241,9 @@ const Viewport: React.FC = () => {
         {dropGuide.width && dropGuide.height && <div className="scene-drop-outline" style={{
           left: dropGuide.left, top: dropGuide.top, width: dropGuide.width, height: dropGuide.height,
           borderRadius: dropGuide.kind === 'Circle' ? '50%' : undefined,
-        }} />}
+        }}>{dropGuide.asset && <img className="scene-drop-image" src={dropGuide.asset.src} alt="" />}</div>}
         <div className="scene-drop-guide" style={{ left: dropGuide.left, top: dropGuide.top }} />
-        <div className="scene-drop-position">{dropGuide.kind ?? 'Drop position'} · X {dropGuide.x} · Y {dropGuide.y}</div>
+        <div className="scene-drop-position">{dropGuide.asset?.tag ?? dropGuide.kind ?? 'Drop position'} · X {dropGuide.x} · Y {dropGuide.y}</div>
       </div>}
       <Logo visible={!isInspectorVisible && isViewportReady} />
       <Toolbar 

@@ -6,6 +6,16 @@ export const sceneObjectDragType = 'application/x-dino-scene-object';
 export const sceneAssetDragType = 'application/x-dino-scene-asset';
 export const sceneSourceKey = '__dinoPlaygroundSceneSource';
 
+// Drag payloads are protected until drop, but their type names remain visible.
+export function getSceneAssetPreviewType(tag: string): string {
+  const bytes = new TextEncoder().encode(tag);
+  return `${sceneAssetDragType}-${Array.from(bytes, byte => byte.toString(16).padStart(2, '0')).join('')}`;
+}
+
+export function getSceneSpriteScale(image: HTMLImageElement): number {
+  return Math.min(1, 128 / Math.max(image.naturalWidth, image.naturalHeight));
+}
+
 export interface ScenePoint { x: number; y: number }
 
 export interface SceneTransformState {

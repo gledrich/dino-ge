@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { Loader } from 'dino-ge';
 import { usePlayground } from '../context/PlaygroundContext';
-import { sceneAssetDragType } from '../utils/scene-objects';
+import { getSceneAssetPreviewType, sceneAssetDragType } from '../utils/scene-objects';
 import '../styles/asset-panel.css';
 
 interface AssetEntry {
@@ -36,6 +36,7 @@ const AssetPanel: React.FC = () => {
               onClick={() => window.dispatchEvent(new CustomEvent('playground-place-asset', { detail: asset.tag }))}
               onDragStart={event => {
                 event.dataTransfer.setData(sceneAssetDragType, asset.tag);
+                event.dataTransfer.setData(getSceneAssetPreviewType(asset.tag), '');
                 event.dataTransfer.effectAllowed = 'copy';
               }}
             >
