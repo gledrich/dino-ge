@@ -46,8 +46,11 @@ const defaultProps = {
  * A basic rectangle shape that can be drawn to the screen.
  */
 export default class Rectangle extends GameObject {
+  private readonly shape: ShapeComponent;
+
   /** Fill colour (CSS colour string). */
-  public colour: string;
+  public get colour(): string { return this.shape.colour; }
+  public set colour(value: string) { this.shape.colour = value; }
 
   /**
    * initialises a new instance of a Rectangle.
@@ -72,11 +75,11 @@ export default class Rectangle extends GameObject {
     this.metadata.tag = defaultedProps.tag;
     this.transform.position = defaultedProps.position;
     this.transform.rotation = defaultedProps.rotation ?? 0;
-    this.colour = defaultedProps.colour;
     this.metadata.zIndex = defaultedProps.zIndex;
 
     // ShapeComponent will automatically create the BoundsComponent via onAttach
-    this.addComponent(new ShapeComponent('rect', this.colour, defaultedProps.width, defaultedProps.height));
+    this.shape = new ShapeComponent('rect', defaultedProps.colour, defaultedProps.width, defaultedProps.height);
+    this.addComponent(this.shape);
 
     this.addComponent(new VisibilityComponent(props.visible ?? true));
 

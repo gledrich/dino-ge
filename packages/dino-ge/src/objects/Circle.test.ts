@@ -5,6 +5,15 @@ import PhysicsComponent from '../components/PhysicsComponent.js';
 import ShapeComponent from '../components/ShapeComponent.js';
 
 describe('Circle', () => {
+  it('keeps its public colour and rendered shape in sync', () => {
+    const circle = new Circle({ position: new Vector2(), radius: 10, colour: 'red' });
+    const shape = circle.getComponent(ShapeComponent)!;
+    circle.colour = '#54d6ad';
+    expect(shape.colour).toBe('#54d6ad');
+    shape.colour = 'rgba(20, 40, 60, 0.5)';
+    expect(circle.colour).toBe('rgba(20, 40, 60, 0.5)');
+  });
+
   it('initialises with default values', () => {
     const circle = new Circle({
       position: new Vector2(10, 10),

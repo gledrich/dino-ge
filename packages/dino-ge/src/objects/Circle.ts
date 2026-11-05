@@ -53,7 +53,8 @@ export default class Circle extends GameObject {
   public set radius(value: number) { this.shape.width = value; }
 
   /** Fill colour (CSS colour string). */
-  public colour: string;
+  public get colour(): string { return this.shape.colour; }
+  public set colour(value: string) { this.shape.colour = value; }
 
   /**
    * The centre point of the circle in world space.
@@ -97,11 +98,10 @@ export default class Circle extends GameObject {
     this.metadata.tag = defaultedProps.tag;
     this.transform.position = defaultedProps.position;
     this.transform.rotation = defaultedProps.rotation ?? 0;
-    this.colour = defaultedProps.colour;
     this.metadata.zIndex = defaultedProps.zIndex;
 
     // ShapeComponent will automatically create the BoundsComponent (radius * 2) via onAttach
-    this.shape = new ShapeComponent('circle', this.colour, defaultedProps.radius, defaultedProps.radius);
+    this.shape = new ShapeComponent('circle', defaultedProps.colour, defaultedProps.radius, defaultedProps.radius);
     this.addComponent(this.shape);
 
     this.addComponent(new VisibilityComponent(props.visible ?? true));
