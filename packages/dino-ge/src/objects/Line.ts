@@ -15,6 +15,8 @@ export interface LineProperties {
   __sourceId?: string;
   /** Stroke width of the line. */
   width?: number;
+  /** CSS stroke colour. An empty value uses the canvas stroke style. */
+  colour?: string;
   /** Transform origin for local endpoints. Defaults to p1 for existing lines. */
   position?: Vector2;
   /** Initial rotation in radians. */
@@ -56,6 +58,10 @@ export default class Line extends GameObject {
   /** Stroke width of the line in pixels. */
   get strokeWidth(): number { return this.lineComponent.strokeWidth; }
   set strokeWidth(value: number) { this.lineComponent.strokeWidth = value; }
+
+  /** CSS stroke colour. An empty value uses the canvas stroke style. */
+  get colour(): string | undefined { return this.lineComponent.colour; }
+  set colour(value: string | undefined) { this.lineComponent.colour = value; }
 
   /** Start x coordinate relative to the line's transform. */
   get x1(): number { return this.lineComponent.p1.x; }
@@ -132,7 +138,7 @@ export default class Line extends GameObject {
     };
 
     this.metadata.tag = defaultedProps.tag;
-    this.lineComponent = new LineComponent(defaultedProps.width, defaultedProps.p1, defaultedProps.p2);
+    this.lineComponent = new LineComponent(defaultedProps.width, defaultedProps.p1, defaultedProps.p2, props.colour);
     this.metadata.zIndex = defaultedProps.zIndex;
     this.transform.position = defaultedProps.position ?? defaultedProps.p1;
     this.transform.rotation = defaultedProps.rotation ?? 0;

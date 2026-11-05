@@ -11,12 +11,15 @@ export default class LineComponent extends RenderComponent {
   p1: Vector2;
   /** End point of the line. */
   p2: Vector2;
+  /** Stroke colour. An empty value uses the canvas stroke style. */
+  colour?: string;
 
-  constructor(strokeWidth: number, p1: Vector2, p2: Vector2) {
+  constructor(strokeWidth: number, p1: Vector2, p2: Vector2, colour?: string) {
     super();
     this.strokeWidth = strokeWidth;
     this.p1 = p1;
     this.p2 = p2;
+    this.colour = colour;
   }
 
   /**
@@ -35,6 +38,7 @@ export default class LineComponent extends RenderComponent {
 
     ctx.beginPath();
     ctx.lineWidth = this.strokeWidth;
+    if (this.colour) ctx.strokeStyle = this.colour;
     ctx.moveTo(this.p1.x, this.p1.y);
     ctx.lineTo(this.p2.x, this.p2.y);
     ctx.stroke();

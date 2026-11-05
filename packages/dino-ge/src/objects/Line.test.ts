@@ -13,6 +13,7 @@ describe('Line', () => {
     p1: new Vector2(10, 10),
     p2: new Vector2(50, 50),
     width: 5,
+    colour: '#54d6ad',
     tag: 'separator',
     zIndex: 2
   };
@@ -29,6 +30,9 @@ describe('Line', () => {
     expect(line.metadata.tag).toBe('separator');
     expect(line.metadata.zIndex).toBe(2);
     expect(line.strokeWidth).toBe(5);
+    expect(line.colour).toBe('#54d6ad');
+    line.colour = 'blue';
+    expect(line.getComponent(LineComponent)?.colour).toBe('blue');
     expect(line.x1).toBe(10);
     expect(line.y1).toBe(10);
     expect(line.x2).toBe(50);

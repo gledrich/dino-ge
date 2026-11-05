@@ -33,7 +33,8 @@ describe('LineComponent', () => {
       lineTo: jest.fn(),
       stroke: jest.fn(),
       closePath: jest.fn(),
-      lineWidth: 0
+      lineWidth: 0,
+      strokeStyle: '#abc123',
     } as unknown as CanvasRenderingContext2D;
 
     component.draw(mockCtx);
@@ -43,7 +44,12 @@ describe('LineComponent', () => {
     expect(mockCtx.moveTo).toHaveBeenCalledWith(p1.x, p1.y);
     expect(mockCtx.lineTo).toHaveBeenCalledWith(p2.x, p2.y);
     expect(mockCtx.stroke).toHaveBeenCalled();
+    expect(mockCtx.strokeStyle).toBe('#abc123');
     expect(mockCtx.restore).toHaveBeenCalled();
+
+    component.colour = 'rebeccapurple';
+    component.draw(mockCtx);
+    expect(mockCtx.strokeStyle).toBe('rebeccapurple');
   });
 
   it('early returns from draw if no gameObject is attached', () => {
