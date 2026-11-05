@@ -60,6 +60,7 @@ const createInitialState = (): EngineState => ({
   pauseStartTime: 0,
   currentScene: null,
   debugCollisions: [],
+  showDebugHud: true,
   showPhysicsVectors: false,
   showCollisionLines: false,
   zOrderDirty: true,
@@ -112,6 +113,12 @@ export default class Engine {
   public static set debugCollisions(val: { manifold: CollisionManifold, timestamp: number; }[]) {
     this._state.debugCollisions = val;
   }
+
+  /**
+   * Whether to draw the on-canvas stats and inspector in debug mode.
+   */
+  public static get showDebugHud(): boolean { return this._state.showDebugHud !== false; }
+  public static set showDebugHud(val: boolean) { this._state.showDebugHud = val; }
 
   /**
    * Whether to show velocity/acceleration vectors in debug mode.
@@ -491,7 +498,7 @@ export default class Engine {
       Engine.renderingSystem.update(objects, 0, Engine.debug);
     }
 
-    if (Engine.debug) {
+    if (Engine.debug && Engine.showDebugHud) {
       this._drawDebug(objects);
     }
     if (this.screenUI && this.callbacks.drawUI) this.screenUI.render(this.callbacks.drawUI);

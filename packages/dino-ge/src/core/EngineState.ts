@@ -22,6 +22,7 @@ export interface EngineState {
   pauseStartTime: number;
   currentScene: Scene | null;
   debugCollisions: { manifold: CollisionManifold, timestamp: number }[];
+  showDebugHud: boolean;
   showPhysicsVectors: boolean;
   showCollisionLines: boolean;
   zOrderDirty: boolean;

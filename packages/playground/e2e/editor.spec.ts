@@ -172,6 +172,38 @@ new Engine({
   await expect(page.locator('body')).toHaveAttribute('data-game-action', 'pressed');
 });
 
+test('keeps the canvas clear in Edit scene and restores the debug HUD for play', async ({ page }) => {
+  await page.route('**/files', route => route.fulfill({ json: ['script'] }));
+  await page.route('**/api/scripts/script', route => route.fulfill({ json: `
+import { Engine } from 'dino-ge';
+new Engine({ update() {} }, { containerId: 'playground-canvas-container', backgroundColour: '#ffffff' });
+` }));
+  await page.goto('/');
+  const canvas = page.locator('#canvas');
+  const readHudPixel = () => canvas.evaluate((element: HTMLCanvasElement) =>
+    element.getContext('2d')!.getImageData(element.width - 20, 12, 1, 1).data[0]);
+  const debug = page.getByRole('button', { name: 'Toggle debug mode' });
+  await expect.poll(readHudPixel).toBe(255);
+  await debug.click();
+  await expect.poll(readHudPixel).toBeLessThan(128);
+
+  await page.getByRole('button', { name: 'Edit scene', exact: true }).click();
+  await expect.poll(readHudPixel).toBe(255);
+  await expect(debug).toHaveAttribute('aria-pressed', 'true');
+  const box = (await canvas.boundingBox())!;
+  await page.getByRole('button', { name: 'Add rectangle' }).dragTo(canvas, {
+    targetPosition: { x: Math.round(box.width) - 110, y: 26 },
+  });
+  await expect(page.getByRole('button', { name: 'New rectangle', exact: true })).toHaveAttribute('aria-pressed', 'true');
+  await expect(page.getByRole('spinbutton', { name: 'Y', exact: true })).toHaveValue('26.00');
+  await expect.poll(() => canvas.evaluate((element: HTMLCanvasElement) =>
+    Array.from(element.getContext('2d')!.getImageData(element.width - 80, 45, 1, 1).data))).toEqual([84, 214, 173, 255]);
+
+  await page.getByRole('button', { name: 'Play', exact: true }).click();
+  await debug.click();
+  await expect.poll(readHudPixel).toBeLessThan(128);
+});
+
 test('keeps the hierarchy and Inspector in sync when the game changes scene objects', async ({ page }) => {
   await page.route('**/files', route => route.fulfill({ json: ['script'] }));
   await page.route('**/api/scripts/script', route => route.fulfill({ json: `

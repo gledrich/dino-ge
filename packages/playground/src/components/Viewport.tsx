@@ -47,6 +47,13 @@ const Viewport: React.FC = () => {
     asset?: { tag: string; src: string };
   }>();
 
+  useEffect(() => {
+    if (!isEditingScene) return;
+    const previous = Engine.showDebugHud;
+    Engine.showDebugHud = false;
+    return () => { Engine.showDebugHud = previous; };
+  }, [isEditingScene]);
+
   const addObject = useCallback((kind: SceneObjectKind | 'Sprite', clientX?: number, clientY?: number, assetTag?: string) => {
     const canvas = viewportContainerRef.current?.querySelector<HTMLCanvasElement>('canvas#canvas');
     const point = canvas && getCanvasPlacement(canvas, clientX, clientY);
