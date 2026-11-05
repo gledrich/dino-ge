@@ -10,6 +10,7 @@ import {
   Vector2,
   VisibilityComponent,
 } from 'dino-ge';
+import { Outpost } from './outpost.js';
 
 const asset = name => new URL(`./assets/${name}`, import.meta.url).href;
 const cellSize = 48;
@@ -70,6 +71,13 @@ let stopMusic;
 
 const lifetime = new AbortController();
 const sounds = {};
+const outpost = new URLSearchParams(window.location.search).has('expedition') ? null :
+  new Outpost(embedded, {
+    start: () => { audioLoading ??= loadAudio(); },
+    play: name => sounds[name]?.play(),
+    muted: () => muted,
+    toggle: toggleMute,
+  });
 
 function positionInCell(sprite, column, row, size) {
   const inset = (cellSize - size) / 2;
@@ -294,6 +302,10 @@ function checkSpikeDamage(now) {
   }
 }
 function update() {
+  if (outpost) {
+    outpost.update(game.width, game.height);
+    return;
+  }
   if (!player) return;
   const now = Engine.totalTime;
   if (active) move(now);
@@ -536,6 +548,10 @@ function drawAudioControls(ui, centre, pad, audioTop) {
 }
 
 function drawUI(ui) {
+  if (outpost) {
+    outpost.draw(ui);
+    return;
+  }
   const { width, height } = ui;
   const centre = ui.anchor('centre', 'top').x;
   const pad = width < 400 ? 9 : 15;
@@ -570,9 +586,11 @@ void Sound.setPaused(Engine.paused);
 const game = new Engine(
   {
     onLoad: () => {
-      loadLevel().catch(error => {
+      const loading = outpost ? outpost.load(asset, lifetime.signal) : loadLevel();
+      loading.catch(error => {
         if (lifetime.signal.aborted) return;
-        phase = 'error';
+        if (outpost) outpost.phase = 'error';
+        else phase = 'error';
         console.error(error);
       });
     },

@@ -40,7 +40,7 @@ test.beforeEach(async ({ page }) => {
       }
     };
   });
-  await page.goto('/');
+  await page.goto('/?expedition');
   await expectCanvasText(page, 'AMBER RUINS');
   await clickCanvasText(page, 'Start expedition');
   await expectCanvasText(page, 'The Gatehouse');

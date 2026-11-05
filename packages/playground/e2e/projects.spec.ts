@@ -76,9 +76,9 @@ test('a fresh Playground runs its editable Amber Ruins copy', async ({ page, bro
     await page.goto(url);
     await expect(page.locator('.script-selector')).toHaveValue('amber-ruins/game');
     await expect(page.locator('#playground-canvas-container canvas')).toBeVisible();
-    await expectCanvasText(page, 'Into the ruins');
-    await clickCanvasText(page, 'Start expedition');
-    await expectCanvasText(page, 'The Gatehouse');
+    await expectCanvasText(page, 'THE LANTERNREACH CHAPTER');
+    await clickCanvasText(page, 'Begin chapter');
+    await expectCanvasText(page, 'Lanternreach');
     const audioState = () => page.evaluate(() =>
       (window as typeof window & { gameAudio?: BaseAudioContext }).gameAudio?.state
     );
@@ -101,7 +101,7 @@ test('a fresh Playground runs its editable Amber Ruins copy', async ({ page, bro
     }
     await page.getByRole('tab', { name: 'Console' }).click();
     await page.getByRole('button', { name: 'Reset game' }).click();
-    await expectCanvasText(page, 'Start expedition');
+    await expectCanvasText(page, 'Begin chapter');
     await expect(page.getByRole('button', { name: 'Pause', exact: true })).toBeVisible();
     expect(await readFile(join(workspace, 'scripts/amber-ruins/game.js'), 'utf8')).toContain('walkDuration');
 
@@ -120,7 +120,7 @@ test('a fresh Playground runs its editable Amber Ruins copy', async ({ page, bro
     await page.evaluate(() => (window as any).Engine.emit('START_GAME'));
     await expect(page.getByRole('button', { name: 'player', exact: true })).toBeVisible();
     await page.getByLabel('Current script').selectOption('amber-ruins/game');
-    await expectCanvasText(page, 'Start expedition');
+    await expectCanvasText(page, 'Begin chapter');
     await expect(page.locator('#playground-canvas-container canvas')).toHaveCount(1);
     await expect(page.getByRole('button', { name: 'player', exact: true })).toHaveCount(0);
     await expect.poll(() => page.evaluate(() => (window as any).Engine.currentScene === null)).toBe(true);

@@ -51,10 +51,11 @@ Once running, access it at [http://localhost:3000](http://localhost:3000).
 ### Development
 
 Run `npm run build -w dino-ge` and then `npm run example` to play **Amber Ruins**
-at [http://localhost:3001](http://localhost:3001). Use WASD, the arrow keys or
-a standard gamepad's left stick to explore three tiled rooms, avoid the spike
-traps and bring three amber relics to the vault gate. The game includes music,
-sound effects and independent volume controls.
+at [http://localhost:3001](http://localhost:3001). Explore the marsh and the
+Sunken Archive, restore Lanternreach’s bridge and relight the Skywell beacon.
+Use WASD, the arrow keys or a gamepad’s left stick to move, **E** to interact
+and **J** to open the journal. The chapter saves discoveries and restorations
+in your browser.
 
 The [example workspace](./packages/example/amber-ruins/README.md) describes
 the assets and the engine APIs the game uses. The original Dino Survival demo

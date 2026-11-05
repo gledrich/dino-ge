@@ -1,0 +1,51 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="256" height="32" viewBox="0 0 256 32" shape-rendering="crispEdges">
+  <defs>
+    <g id="grass">
+      <path fill="#324e3d" d="M0 0h32v32H0z"/>
+      <path fill="#395943" d="M0 2h11v5H0zm12 9h9v5h-9zm13 10h7v7h-7zM3 24h8v6H3z"/>
+      <path fill="#4d6948" d="M4 4h2v4H4zm2 2h3v2H6zm17 10h2v4h-2zm2 2h3v2h-3zM10 27h2v3h-2z"/>
+      <path fill="#829257" d="M14 21h2v2h-2zm15-15h1v2h-1z"/>
+    </g>
+    <g id="stone">
+      <path fill="#40464a" d="M0 0h32v32H0z"/>
+      <path fill="#51595a" d="M0 0h15v14H0zm18 2h14v16H18zM2 17h15v15H2zm18 21v-17h12v11H20z"/>
+      <path fill="#60665d" d="M1 1h13v2H1zm18 2h13v2H19zM3 18h13v2H3zm18 4h11v2H21z"/>
+      <path fill="#363d42" d="M7 8h5v2H7zm5 2h2v4h-2zm10 18h4v2h-4z"/>
+    </g>
+  </defs>
+  <use href="#grass"/>
+  <g transform="translate(32)">
+    <path fill="#77644b" d="M0 0h32v32H0z"/>
+    <path fill="#8b7656" d="M0 0h22v5H0zm18 10h14v8H18zM1 17h13v9H1zm15 13h13v2H16z"/>
+    <path fill="#ab9266" d="M4 8h5v2H4zm15 16h7v2h-7zM2 28h3v2H2zm27-24h3v2h-3z"/>
+  </g>
+  <g transform="translate(64)">
+    <path fill="#193a40" d="M0 0h32v32H0z"/>
+    <path fill="#21464b" d="M0 2h13v2H0zm17 8h15v2H17zM6 17h14v2H6zm16 9h10v2H22z"/>
+    <path fill="#2d5657" d="M2 18h9v1H2zm17-7h6v1h-6zM4 29h5v1H4z"/>
+    <path fill="#44706a" d="M27 20h4v1h-4zm-15-15h5v1h-5z"/>
+  </g>
+  <use href="#stone" x="96"/>
+  <g transform="translate(128)">
+    <path fill="#22282e" d="M0 0h32v32H0z"/>
+    <path fill="#363d44" d="M0 0h32v9H0zm2 11h15v8H2zm17 1h13v7H19zm0 10h9v7h-9zM1 23h13v5H1z"/>
+    <path fill="#56605e" d="M0 0h32v2H0zm2 11h15v1H2zm17 1h13v1H19z"/>
+    <path fill="#182328" d="M0 29h32v3H0z"/>
+  </g>
+  <g transform="translate(160)">
+    <path fill="#332d29" d="M0 0h32v32H0z"/>
+    <path fill="#a47c52" d="M0 1h32v6H0zm0 8h32v6H0zm0 8h32v6H0zm0 8h32v6H0z"/>
+    <path fill="#c79b64" d="M0 1h32v2H0zm0 8h32v2H0zm0 8h32v2H0zm0 8h32v2H0z"/>
+    <path fill="#523e32" d="M3 0h2v32H3zm24 0h2v32h-2z"/>
+  </g>
+  <g transform="translate(192)">
+    <use href="#stone"/>
+    <path fill="#26232b" d="M3 15l7 8h13l7-10-7 3-3-10-7 9-3-6z"/>
+    <path fill="#b5736d" d="M4 15l6 4V9zm9 0l7 4V6zm9 4l8-6-3 8z"/>
+  </g>
+  <g transform="translate(224)">
+    <path fill="#193a40" d="M0 0h32v32H0z"/>
+    <path fill="#74604c" d="M3 0h3v12H3zm23 0h3v8h-3zM3 24h3v8H3zm23-3h3v11h-3zM4 0h23v3H4zm0 28h23v4H4z"/>
+    <path fill="#325253" d="M8 15h12v2H8zm9 7h10v1H17z"/>
+  </g>
+</svg>
