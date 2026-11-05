@@ -10,7 +10,7 @@ import '../styles/editor.css';
 
 interface EditorProps {
   currentScriptId: string;
-  onRefresh: (value: string) => void;
+  onSave: (value: string) => Promise<void>;
 }
 
 interface SceneHistoryEntry {
@@ -25,7 +25,7 @@ interface SceneHistoryEntry {
   removed?: boolean;
 }
 
-const CodeEditor: React.FC<EditorProps> = ({ currentScriptId, onRefresh }) => {
+const CodeEditor: React.FC<EditorProps> = ({ currentScriptId, onSave }) => {
   const [scripts, setScripts] = useState<string[]>([]);
   const [isSaving, setIsSaving] = useState(false);
   const [isFormatting, setIsFormatting] = useState(false);
@@ -42,9 +42,14 @@ const CodeEditor: React.FC<EditorProps> = ({ currentScriptId, onRefresh }) => {
   const handleSave = useCallback(async (value: string) => {
     if (loadedScriptId.current !== currentScriptId) return;
     setIsSaving(true);
-    onRefresh(value);
-    setTimeout(() => setIsSaving(false), 500);
-  }, [currentScriptId, onRefresh]);
+    try {
+      await onSave(value);
+    } catch (error) {
+      console.error('Could not save the script', error);
+    } finally {
+      setIsSaving(false);
+    }
+  }, [currentScriptId, onSave]);
 
   const handleFormat = useCallback(async () => {
     const model = monacoEditorRef.current?.getModel();
@@ -438,7 +443,7 @@ const CodeEditor: React.FC<EditorProps> = ({ currentScriptId, onRefresh }) => {
       window.removeEventListener('playground-apply-edit', handleApplyEditEvent);
       window.removeEventListener('playground-apply-multi-edit', handleApplyMultiEditEvent);
     };
-  }, [currentScriptId, editorValue, onRefresh, formatCode, applyEdits, pushEditOperations, monacoEditorRef]);
+  }, [currentScriptId, editorValue, formatCode, applyEdits, pushEditOperations, monacoEditorRef]);
 
   const syncSceneHistory = (model: editor.ITextModel, event: editor.IModelContentChangedEvent) => {
     if (!event.isUndoing && !event.isRedoing) return;

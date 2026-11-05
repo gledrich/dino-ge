@@ -297,6 +297,59 @@ new Engine({ onLoad() {
   await expect(wall).toHaveAccessibleDescription('');
 });
 
+test('saves the script during scene editing without clearing pending canvas changes', async ({ page }) => {
+  const original = `import { Engine, Rectangle, Vector2 } from 'dino-ge';
+new Engine({ onLoad() {
+  new Rectangle({ tag: 'Platform', position: new Vector2(300, 220), width: 64, height: 48 });
+}, update() {} }, { containerId: 'playground-canvas-container' });`;
+  let savedSource = original;
+  await page.route('**/files', route => route.fulfill({ json: ['script'] }));
+  await page.route('**/api/scripts/script', route => {
+    if (route.request().method() === 'PUT') {
+      savedSource = route.request().postDataJSON().data;
+      return route.fulfill({ json: { success: true } });
+    }
+    return route.fulfill({ json: savedSource });
+  });
+  await page.goto('/');
+  const platform = page.getByRole('button', { name: 'Platform', exact: true });
+  const edit = page.getByRole('button', { name: 'Edit scene', exact: true });
+  const save = page.getByRole('button', { name: 'Save script', exact: true });
+  const x = page.getByRole('spinbutton', { name: 'X', exact: true });
+  const saveScript = async () => {
+    const saved = page.waitForResponse(response => response.request().method() === 'PUT' &&
+      response.url().endsWith('/api/scripts/script'));
+    await save.click();
+    await saved;
+    await expect(save).not.toHaveClass(/\bsaving\b/);
+  };
+  await expect(platform).toBeVisible();
+  await expect(page.locator('.monaco-editor')).toContainText('new Rectangle');
+  const editorSource = await page.evaluate(() => {
+    const { monaco } = window as typeof window & { monaco: Monaco };
+    return monaco.editor.getEditors()[0].getValue();
+  });
+  await edit.click();
+  await platform.click();
+  await platform.press('Shift+ArrowRight');
+  await expect(x).toHaveValue('310.00');
+  await saveScript();
+  await expect(edit).toHaveAttribute('aria-pressed', 'true');
+  await expect(platform).toHaveAccessibleDescription('Pending canvas changes');
+  await expect(x).toHaveValue('310.00');
+  expect(savedSource.replace(/\r\n/g, '\n')).toBe(editorSource.replace(/\r\n/g, '\n'));
+
+  await page.getByRole('button', { name: 'Apply placement to code' }).click();
+  await saveScript();
+  expect(savedSource).toContain('new Vector2(310, 220)');
+  await expect(edit).toHaveAttribute('aria-pressed', 'true');
+  await expect(platform).toHaveAttribute('aria-pressed', 'true');
+  await page.getByRole('button', { name: 'Reset game', exact: true }).click();
+  await expect(edit).toHaveAttribute('aria-pressed', 'false');
+  await platform.click();
+  await expect(x).toHaveValue('310.00');
+});
+
 test('rotates a scene object by its handle and saves the angle', async ({ page }) => {
   await page.route('**/files', route => route.fulfill({ json: ['script'] }));
   await page.route('**/api/scripts/script', route => route.fulfill({ json: `

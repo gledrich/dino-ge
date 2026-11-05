@@ -240,7 +240,7 @@ const Inspector: React.FC<InspectorProps> = ({ visible }) => {
       setPlacementStatus('The open script could not be updated.');
       return;
     }
-    finishPlacement(selectedObject, after, 'Applied to code. Save the script to keep it.');
+    finishPlacement(selectedObject, after, 'Applied to code.');
   };
 
   const handleApplyToCode = () => {
@@ -314,7 +314,7 @@ const Inspector: React.FC<InspectorProps> = ({ visible }) => {
             {placement && (
               <section id="canvas-changes" className="inspector-section" aria-labelledby="canvas-changes-title" tabIndex={-1}>
                 <h3 id="canvas-changes-title">Canvas changes</h3>
-                <p className="inspector-section-description">Changes are live in the scene.</p>
+                <p className="inspector-section-description">Apply these changes before saving the script.</p>
                 <button type="button" className="scene-control inspector-apply" onClick={applyPlacement}>
                   <i className="fa-solid fa-code" aria-hidden="true" /> Apply placement to code
                 </button>

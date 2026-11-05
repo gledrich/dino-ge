@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useRef } from 'react';
 import * as Dino from 'dino-ge';
 import { getScript, updateScript } from '../utils/helpers';
 import { instrumentCode, rebaseModule } from '../utils/ast-utils';
@@ -12,14 +12,21 @@ export const usePlaygroundScripts = () => {
     currentScriptId, 
     setCurrentScriptId, 
     isViewportReady, 
+    isPaused,
+    isDebug,
+    pendingCanvasPlacements,
     setIsPaused 
   } = usePlayground();
+  const keepSceneOnSave = useRef(false);
+  useLayoutEffect(() => {
+    keepSceneOnSave.current = (isPaused && isDebug) || pendingCanvasPlacements.size > 0;
+  }, [isPaused, isDebug, pendingCanvasPlacements]);
 
-  const updatePlayground = useCallback(async () => {
+  const updatePlayground = useCallback(async (fromSave = false) => {
     if (!isViewportReady) return;
     const run = ++runId.current;
     const scriptText = await getScript(currentScriptId);
-    if (run !== runId.current) return;
+    if (run !== runId.current || (fromSave && keepSceneOnSave.current)) return;
     const result = instrumentCode(scriptText, false, currentScriptId);
     window.dispatchEvent(new CustomEvent('playground-syntax-error', { detail: result.error ?? null }));
     if (result.error) return;
@@ -57,11 +64,15 @@ export const usePlaygroundScripts = () => {
     });
   }, [currentScriptId, isViewportReady]);
 
-  const handleRefresh = useCallback(async (editorValue: string) => {
+  const handleRefresh = useCallback(async (editorValue: string, fromSave = false) => {
+    const activeRun = runId.current;
+    const keepCurrentScene = fromSave && keepSceneOnSave.current;
     await updateScript(editorValue, false, currentScriptId);
-    await updatePlayground();
-    setIsPaused(false);
+    if (fromSave && (keepCurrentScene || keepSceneOnSave.current || activeRun !== runId.current)) return;
+    await updatePlayground(fromSave);
+    if (!fromSave || !keepSceneOnSave.current) setIsPaused(false);
   }, [currentScriptId, updatePlayground, setIsPaused]);
+  const handleSave = useCallback((editorValue: string) => handleRefresh(editorValue, true), [handleRefresh]);
 
   useEffect(() => {
     updatePlayground();
@@ -103,5 +114,5 @@ export const usePlaygroundScripts = () => {
     return () => window.removeEventListener('playground-refresh', refresh);
   }, [handleRefresh, setIsPaused, updatePlayground]);
 
-  return { handleRefresh, updatePlayground };
+  return { handleSave, updatePlayground };
 };

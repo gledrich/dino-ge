@@ -25,7 +25,7 @@ function App() {
     arePanelsMinimized,
   } = usePlayground();
 
-  const { handleRefresh } = usePlaygroundScripts();
+  const { handleSave } = usePlaygroundScripts();
   useEffect(captureConsole, []);
 
   const explorerPanelRef = usePanelRef();
@@ -213,7 +213,7 @@ function App() {
                       aria-labelledby="playground-tab-editor" hidden={activeTab !== 'editor'}>
                       <Editor 
                         currentScriptId={currentScriptId} 
-                        onRefresh={handleRefresh}
+                        onSave={handleSave}
                       />
                     </div>
                     <div className="editor-tab-panel" id="playground-panel-console" role="tabpanel"
