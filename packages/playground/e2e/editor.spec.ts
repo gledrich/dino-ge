@@ -1193,6 +1193,52 @@ new Engine({ onLoad() {
   await expect.poll(async () => Number(await page.getByRole('spinbutton', { name: 'Y', exact: true }).inputValue())).toBeCloseTo(152, 0);
 });
 
+test('cycles through visible overlapping objects and drags the object picked underneath', async ({ page }) => {
+  await page.route('**/files', route => route.fulfill({ json: ['script'] }));
+  await page.route('**/api/scripts/script', route => route.fulfill({ json: `
+import { Circle, Engine, Rectangle, Vector2 } from 'dino-ge';
+new Engine({ onLoad() {
+  new Rectangle({ tag: 'Floor', position: new Vector2(320, 224), width: 64, height: 64 });
+  new Rectangle({ tag: 'Middle panel', position: new Vector2(320, 224), width: 64, height: 64, zIndex: 1 });
+  new Circle({ tag: 'Front panel', position: new Vector2(320, 224), radius: 32, zIndex: 2 });
+  new Rectangle({ tag: 'Hidden panel', position: new Vector2(320, 224), width: 64, height: 64, zIndex: 3, visible: false });
+} }, { containerId: 'playground-canvas-container' });` }));
+  await page.goto('/');
+  const front = page.getByRole('button', { name: 'Front panel', exact: true });
+  const floor = page.getByRole('button', { name: 'Floor', exact: true });
+  await expect(front).toBeVisible();
+  await page.getByRole('button', { name: 'Edit scene', exact: true }).click();
+  await page.getByRole('button', { name: 'Snap to grid', exact: true }).click();
+  const canvas = page.locator('#canvas');
+  const centre = { x: 352, y: 256 };
+  await canvas.click({ position: centre });
+  await expect(front).toHaveAttribute('aria-pressed', 'true');
+  for (const name of ['Middle panel', 'Floor', 'Front panel', 'Middle panel', 'Floor']) {
+    await canvas.click({ position: centre, modifiers: ['Alt'] });
+    const selected = page.getByRole('button', { name, exact: true });
+    await expect(selected).toHaveAttribute('aria-pressed', 'true');
+    await expect(selected).toHaveAccessibleDescription('');
+  }
+
+  const box = (await canvas.boundingBox())!;
+  await page.mouse.move(box.x + centre.x, box.y + centre.y);
+  await page.mouse.down();
+  await page.mouse.move(box.x + centre.x + 32, box.y + centre.y, { steps: 4 });
+  await expect(page.getByRole('group', { name: 'Current scene gesture' })).toHaveText('Move · X 352 · Y 224');
+  await page.mouse.up();
+  await expect(floor).toHaveAccessibleDescription('Pending canvas changes');
+  await expect(front).toHaveAccessibleDescription('');
+  await page.getByRole('button', { name: 'Apply placement to code' }).click();
+  await expect.poll(() => page.evaluate(() => {
+    const { monaco } = window as typeof window & { monaco: Monaco };
+    return monaco.editor.getEditors()[0].getValue();
+  })).toMatch(/tag: 'Floor',\s*position: new Vector2\(352, 224\)/);
+
+  await canvas.click({ position: { x: 550, y: 260 } });
+  await canvas.click({ position: { x: 360, y: 256 } });
+  await expect(front).toHaveAttribute('aria-pressed', 'true');
+});
+
 test('navigates the editing camera, places in world coordinates and restores the gameplay view', async ({ page }) => {
   await page.route('**/files', route => route.fulfill({ json: ['script'] }));
   await page.route('**/api/scripts/script', route => route.fulfill({ json: `

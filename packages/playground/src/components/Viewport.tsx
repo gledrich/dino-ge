@@ -718,8 +718,8 @@ const Viewport: React.FC = () => {
             </div>
             {!keyboardPlacement && <span id="scene-keyboard-hint" className="scene-edit-hint">
               Middle drag pans · {isGridSnapping ? 'Arrows move 1 cell · Shift moves 10 cells' : 'Arrows move 1 px · Shift moves 10 px'}<br />
-              F frames selection · Round handle rotates · Square handle resizes<br />
-              Shift enables either option while dragging · Esc cancels<br />
+              F frames selection · Alt/Option-click cycles overlapping objects<br />
+              Round handle rotates · Square resizes · Shift constrains · Esc cancels<br />
               {historyBlockedReason || 'Ctrl/⌘+Z undoes · Add Shift to redo'}
             </span>}
             {!isInspectorVisible && selectedObject && pendingCanvasPlacements.has(selectedObject) && (

@@ -41,6 +41,7 @@ export default class Input {
   private static isinitialised = false;
 
   private static gesture: ObjectGesture | null = null;
+  private static overlapSelection: GameObject | null = null;
 
   /** Whether a pointer is currently manipulating a scene object. */
   static get isManipulatingObject(): boolean {
@@ -158,6 +159,22 @@ export default class Input {
       Math.abs(x - endpoint.x) <= tolerance && Math.abs(y - endpoint.y) <= tolerance);
   }
 
+  private static getCanvasHit(object: GameObject, point: Vector2) {
+    if (!object.bounds || object.getComponent?.(VisibilityComponent)?.visible === false) return;
+    const geometry = getViewportGeometry(object);
+    if (containsViewportPoint(object, geometry, point.x, point.y, 5 / Engine.camera.zoom)) {
+      return { object, geometry };
+    }
+  }
+
+  private static *getCanvasHits(objects: Iterable<GameObject>, point: Vector2) {
+    const sorted = getViewportDrawOrder(objects);
+    for (let index = sorted.length - 1; index >= 0; index--) {
+      const hit = this.getCanvasHit(sorted[index], point);
+      if (hit) yield hit;
+    }
+  }
+
   private static resizeGesture(gesture: Extract<ObjectGesture, { kind: 'resize' }>, shiftKey: boolean) {
     const obj = gesture.object;
     const geometry = getViewportGeometry(obj);
@@ -226,6 +243,9 @@ export default class Input {
 
     const cancelInactiveGesture = () => {
       if (this.gesture && !this.isGestureActive(this.gesture)) this.finishGesture();
+      if (this.overlapSelection !== Engine.selectedObject || !Engine.paused || !Engine.debug) {
+        this.overlapSelection = null;
+      }
     };
     Engine.on('selectedObjectChanged', cancelInactiveGesture);
     Engine.on('paused', cancelInactiveGesture);
@@ -337,6 +357,15 @@ export default class Input {
       if (Engine.debug && event.button === 0) {
         this.finishGesture();
         const selected = Engine.selectedObject;
+        const objects = Engine.currentScene?.objects ?? Engine.objects;
+        if (Engine.paused && event.altKey && !event.ctrlKey && !event.metaKey && !event.shiftKey) {
+          const hits = Array.from(this.getCanvasHits(objects, worldPos), hit => hit.object);
+          const index = hits.findIndex(object => object === selected);
+          const next = hits.length ? hits[(index + 1) % hits.length] : null;
+          Engine.selectedObject = next;
+          this.overlapSelection = hits.length > 1 ? next : null;
+          return;
+        }
         const start = {
           startedPaused: Engine.paused,
           pointer: pointerEvent && { id: pointerEvent.pointerId, canvas: target },
@@ -380,32 +409,19 @@ export default class Input {
           return;
         }
 
-        const objects = Engine.currentScene ? Engine.currentScene.objects : Engine.objects;
-        let found = false;
-
-        const sorted = getViewportDrawOrder(objects);
-
-        for (let i = sorted.length - 1; i >= 0; i--) {
-          const obj = sorted[i];
-          if (!obj.bounds || obj.getComponent?.(VisibilityComponent)?.visible === false) continue;
-          
-          const geometry = getViewportGeometry(obj);
-          if (containsViewportPoint(obj, geometry, worldPos.x, worldPos.y, 5 / Engine.camera.zoom)) {
-            Engine.selectedObject = obj;
-            this.gesture = {
-              kind: 'drag',
-              object: obj,
-              ...start,
-              offset: new Vector2(worldPos.x - geometry.origin.x, worldPos.y - geometry.origin.y),
-              initial: this.getGestureValue(obj, 'drag'),
-            };
-            found = true;
-            break;
-          }
-        }
-
-        if (!found) {
-          Engine.selectedObject = null;
+        const preferredHit = Engine.paused && selected && selected === this.overlapSelection && objects.has(selected)
+          ? this.getCanvasHit(selected, worldPos) : undefined;
+        const hit = preferredHit ?? this.getCanvasHits(objects, worldPos).next().value;
+        Engine.selectedObject = hit?.object ?? null;
+        if (hit) {
+          const { object, geometry } = hit;
+          this.gesture = {
+            kind: 'drag',
+            object,
+            ...start,
+            offset: new Vector2(worldPos.x - geometry.origin.x, worldPos.y - geometry.origin.y),
+            initial: this.getGestureValue(object, 'drag'),
+          };
         }
       }
 
