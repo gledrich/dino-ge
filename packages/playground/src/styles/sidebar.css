@@ -180,5 +180,9 @@
   .sidebar-tabs,
   .sidebar-content { padding-inline: 8px; }
 
-  .library-row .scene-control { gap: 5px; padding-inline: 5px; }
+  .scene-control.snippet-btn,
+  .library-row .library-code { gap: 4px; padding-inline: 5px; }
+
+  .snippet-btn i { width: 12px; }
+  .library-section > .snippet-btn span { white-space: normal; overflow-wrap: anywhere; }
 }
