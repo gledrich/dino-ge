@@ -6,7 +6,12 @@ export interface PropertyRowDef {
   label: string;
   type: string;
   propertyPath: string;
+  min?: number;
 }
+
+const lineProperties = new Map([
+  ['p1.x', 'x1'], ['p1.y', 'y1'], ['p2.x', 'x2'], ['p2.y', 'y2'], ['width', 'strokeWidth'],
+]);
 
 export interface InspectableObject extends Dino.GameObject {
   [key: string]: any;
@@ -17,6 +22,9 @@ export interface InspectableObject extends Dino.GameObject {
  * Maps flat configuration keys (e.g., 'tag', '_physics.velocity.x') to their respective ECS Components.
  */
 export const resolveComponentPath = (obj: InspectableObject, pathStr: string): { target: any, prop: string } | null => {
+  const lineProperty = obj instanceof Dino.Line ? lineProperties.get(pathStr) : undefined;
+  if (lineProperty) return { target: obj, prop: lineProperty };
+
   let target: any = obj;
   let propPath = pathStr;
 
@@ -139,15 +147,16 @@ const InspectorRow: React.FC<{
   }, [selectedObject, def, lastSyncedValue]);
 
   const parseValue = (element: HTMLInputElement) => {
-    let val: any = def.type === 'checkbox' ? element.checked : element.value;
-    if (def.type === 'number') val = parseFloat(val);
-    return val;
+    if (def.type === 'checkbox') return element.checked;
+    if (def.type !== 'number') return element.value;
+    const value = element.valueAsNumber;
+    if (Number.isFinite(value) && !element.validity.rangeUnderflow) return value;
   };
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const val = parseValue(e.target);
     const resolved = resolveComponentPath(selectedObject, def.propertyPath);
-    if (resolved && resolved.target && (def.type !== 'number' || Number.isFinite(val))) {
+    if (resolved?.target && val !== undefined) {
       resolved.target[resolved.prop] = val;
     }
   };
@@ -161,7 +170,7 @@ const InspectorRow: React.FC<{
     }
 
     const val = parseValue(inputRef.current);
-    if (def.type === 'number' && !Number.isFinite(val)) return;
+    if (val === undefined) return;
     window.dispatchEvent(new Event('playground-sync-source-mapping'));
     const edit = getSurgicalEdit(sourceId, def.propertyPath, val, (path) => {
       const res = resolveComponentPath(selectedObject, path);
@@ -184,6 +193,7 @@ const InspectorRow: React.FC<{
         <input
           id={inputId}
           type={def.type}
+          min={def.min}
           step="any"
           ref={inputRef}
           onChange={handleChange}

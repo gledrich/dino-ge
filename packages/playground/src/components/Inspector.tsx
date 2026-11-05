@@ -13,7 +13,7 @@ interface InspectorProps {
   visible: boolean;
 }
 
-const SECTIONS: Record<string, { rows: PropertyRowDef[], component?: any }> = {
+const SECTIONS: Record<string, { rows: PropertyRowDef[], component: any, description?: string }> = {
   General: {
     component: Dino.TagComponent,
     rows: [
@@ -39,6 +39,17 @@ const SECTIONS: Record<string, { rows: PropertyRowDef[], component?: any }> = {
       { label: 'Height', type: 'number', propertyPath: 'height' }
     ]
   },
+  Line: {
+    component: Dino.LineComponent,
+    description: 'Endpoints are relative to the line’s transform.',
+    rows: [
+      { label: 'Start X', type: 'number', propertyPath: 'p1.x' },
+      { label: 'Start Y', type: 'number', propertyPath: 'p1.y' },
+      { label: 'End X', type: 'number', propertyPath: 'p2.x' },
+      { label: 'End Y', type: 'number', propertyPath: 'p2.y' },
+      { label: 'Stroke width', type: 'number', propertyPath: 'width', min: 0.01 },
+    ]
+  },
   Physics: {
     component: Dino.PhysicsComponent,
     rows: [
@@ -54,6 +65,13 @@ const SECTIONS: Record<string, { rows: PropertyRowDef[], component?: any }> = {
     ]
   }
 };
+
+const getInspectorSections = (object: InspectableObject) => Object.entries(SECTIONS)
+  .filter(([name, { component }]) => {
+    if (name === 'Line') return object instanceof Dino.Line && object.hasComponent(component);
+    if (name === 'Bounds' && object.hasComponent(Dino.LineComponent)) return false;
+    return object.hasComponent(component);
+  });
 
 const Inspector: React.FC<InspectorProps> = ({ visible }) => {
   const { isDebug, isPaused } = usePlayground();
@@ -230,11 +248,7 @@ const Inspector: React.FC<InspectorProps> = ({ visible }) => {
 
     const edits: Edit[] = [];
 
-    Object.values(SECTIONS).forEach(section => {
-      if (section.component && !selectedObject.hasComponent(section.component)) {
-        return;
-      }
-
+    getInspectorSections(selectedObject).forEach(([, section]) => {
       section.rows.forEach(def => {
         const resolved = resolveComponentPath(selectedObject, def.propertyPath);
         if (resolved && resolved.target) {
@@ -335,15 +349,11 @@ const Inspector: React.FC<InspectorProps> = ({ visible }) => {
             {!selectedObject ? (
               <div className="no-selection">Click an object to inspect.</div>
             ) : (
-              Object.entries(SECTIONS).map(([sectionName, config]) => {
-                if (sectionName === 'Bounds' && selectedObject.hasComponent(Dino.LineComponent)) return null;
-                if (config.component && !selectedObject.hasComponent(config.component)) {
-                  return null;
-                }
-                
+              getInspectorSections(selectedObject).map(([sectionName, config]) => {
                 return (
                   <div key={sectionName} className="inspector-section">
                     <h3>{sectionName}</h3>
+                    {config.description && <p className="inspector-section-description">{config.description}</p>}
                     {config.rows.map((def) => (
                       <InspectorRow 
                         key={def.propertyPath} 

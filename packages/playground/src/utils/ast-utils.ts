@@ -542,6 +542,10 @@ export const getSurgicalEdit = (
   };
 
   const found = findPropMapping(mapping.properties, paths);
+  if (mapping.type === 'Line' && paths.length === 2 && (paths[0] === 'p1' || paths[0] === 'p2') &&
+      !found?.mapping.args?.[paths[1] === 'x' ? 0 : 1]?.numeric) {
+    return null;
+  }
 
   // PRIORITY 1: Precise match found
   if (found && found.depth === paths.length) {

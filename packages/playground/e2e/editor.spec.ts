@@ -410,7 +410,7 @@ new Engine({ onLoad() {
   await expect.poll(readCamera).toEqual({ x: 40, y: 30, zoom: 1 });
 });
 
-test('places a line at the preview anchor, moves it by the stroke and saves its position', async ({ page }) => {
+test('places a line, moves it by its stroke and restores the saved geometry', async ({ page }) => {
   let source = `import { Engine } from 'dino-ge';
 new Engine({ onLoad() {}, update() {} }, { containerId: 'playground-canvas-container' });`;
   await page.route('**/files', route => route.fulfill({ json: ['script'] }));
@@ -453,6 +453,17 @@ new Engine({ onLoad() {}, update() {} }, { containerId: 'playground-canvas-conta
   await page.getByRole('button', { name: 'Apply placement to code' }).click();
   await expect(page.getByRole('status').filter({ hasText: 'Applied to code' })).toBeVisible();
 
+  const endX = page.getByRole('spinbutton', { name: 'End X', exact: true });
+  const stroke = page.getByRole('spinbutton', { name: 'Stroke width', exact: true });
+  const readExtendedStrokePixel = () => canvas.evaluate((element: HTMLCanvasElement, [originX, originY]) =>
+    element.getContext('2d')!.getImageData(Number(originX) + 125, Number(originY) + 4, 1, 1).data[0], [movedX, movedY]);
+  await expect.poll(readExtendedStrokePixel).toBe(255);
+  await endX.fill('145');
+  await stroke.fill('12');
+  await expect.poll(readExtendedStrokePixel).toBe(0);
+  await page.getByRole('button', { name: 'Save End X to code' }).click();
+  await page.getByRole('button', { name: 'Save Stroke width to code' }).click();
+
   const saved = page.waitForResponse(response => response.request().method() === 'PUT' &&
     response.url().endsWith('/api/scripts/script'));
   await page.getByRole('button', { name: 'Save script', exact: true }).click();
@@ -461,6 +472,8 @@ new Engine({ onLoad() {}, update() {} }, { containerId: 'playground-canvas-conta
   await line.click();
   await expect(x).toHaveValue(movedX);
   await expect(y).toHaveValue(movedY);
+  await expect(endX).toHaveValue('145.00');
+  await expect(stroke).toHaveValue('12.00');
 });
 
 test('explains a rejected palette drop without pausing the game or changing the script', async ({ page }) => {
