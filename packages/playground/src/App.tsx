@@ -231,6 +231,7 @@ function App() {
 
             {/* Bottom: Editor & Console Tabs */}
             <Panel 
+              className={mobile ? 'mobile-drawer-panel' : undefined}
               defaultSize={40} 
               minSize={mobile ? '24%' : 40}
               collapsible={true} 

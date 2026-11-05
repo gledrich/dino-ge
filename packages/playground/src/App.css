@@ -356,6 +356,11 @@
 
 .mobile-workspace .explorer-scene { min-height: 0; }
 .mobile-workspace .resize-handle-horizontal { display: none; }
+.mobile-workspace .viewport-panel { isolation: isolate; }
+.mobile-workspace #playground-canvas-container { position: fixed; inset: 0; }
+.mobile-workspace .mobile-drawer-panel,
+.mobile-workspace #playground-expand-bottom-dock { position: relative; z-index: 1; }
+.mobile-workspace #playground-expand-bottom-dock { background-color: var(--bg-tertiary); }
 .mobile-workspace .explorer-library { height: 60%; }
 .mobile-workspace .dock-header { height: 44px; padding-inline: 6px; gap: 4px; }
 .mobile-workspace .playground-tabs { flex: 1; gap: 0; }

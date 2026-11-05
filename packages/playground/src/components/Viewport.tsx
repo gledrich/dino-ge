@@ -29,11 +29,14 @@ function TextDropPreview() {
 
 function getCanvasProjection(canvas: HTMLCanvasElement) {
   const bounds = canvas.getBoundingClientRect();
+  // The mobile drawer covers part of the canvas without changing its world projection.
+  const viewport = canvas.closest('.viewport-panel')?.getBoundingClientRect();
+  const exposedHeight = Math.max(0, Math.min(bounds.bottom, viewport?.bottom ?? bounds.bottom) - bounds.top);
   const { zoom, position } = Engine.camera;
-  if (!bounds.width || !bounds.height || !canvas.width || !canvas.height || zoom <= 0) return;
+  if (!bounds.width || !exposedHeight || !canvas.width || !canvas.height || zoom <= 0) return;
   const scaleX = bounds.width / canvas.width * zoom;
   const scaleY = bounds.height / canvas.height * zoom;
-  return { bounds, position, scaleX, scaleY };
+  return { bounds, exposedHeight, position, scaleX, scaleY };
 }
 
 type CanvasProjection = NonNullable<ReturnType<typeof getCanvasProjection>>;
@@ -59,9 +62,9 @@ function getCanvasPlacement(canvas: HTMLCanvasElement, step: number, clientX?: n
   alignItem?: DropPreviewItem): ProjectedPlacement | undefined {
   const projection = getCanvasProjection(canvas);
   if (!projection) return;
-  const { bounds, position, scaleX, scaleY } = projection;
+  const { bounds, exposedHeight, position, scaleX, scaleY } = projection;
   const x = snapToGrid(((clientX ?? bounds.left + bounds.width / 2) - bounds.left) / scaleX + position.x, step);
-  const y = snapToGrid(((clientY ?? bounds.top + bounds.height / 2) - bounds.top) / scaleY + position.y, step);
+  const y = snapToGrid(((clientY ?? bounds.top + exposedHeight / 2) - bounds.top) / scaleY + position.y, step);
   const dimensions = alignItem && getDropDimensions(alignItem);
   if (!dimensions) return projectCanvasPoint({ x, y }, projection);
 
@@ -74,13 +77,13 @@ function getCanvasPlacement(canvas: HTMLCanvasElement, step: number, clientX?: n
   return { ...projectCanvasPoint(snapped, projection), alignment };
 }
 
-function keepPointOnCanvas(point: ScenePoint, { bounds, position, scaleX, scaleY }: CanvasProjection, step: number) {
+function keepPointOnCanvas(point: ScenePoint, { bounds, exposedHeight, position, scaleX, scaleY }: CanvasProjection, step: number) {
   const clamp = (value: number, start: number, span: number) => {
     const min = Math.ceil(start / step) * step;
     const max = Math.floor((start + span) / step) * step;
     return min <= max ? Math.min(max, Math.max(min, value)) : snapToGrid(start + span / 2, step);
   };
-  return { x: clamp(point.x, position.x, bounds.width / scaleX), y: clamp(point.y, position.y, bounds.height / scaleY) };
+  return { x: clamp(point.x, position.x, bounds.width / scaleX), y: clamp(point.y, position.y, exposedHeight / scaleY) };
 }
 
 interface KeyboardPlacement extends SceneKeyboardPlacementRequest {
@@ -129,11 +132,11 @@ function getEdgePanStrength(offset: number, size: number) {
   return 0;
 }
 
-function getEdgePanDelta({ bounds, scaleX, scaleY }: CanvasProjection, x: number, y: number, elapsedMs: number) {
-  if (x < 0 || x > bounds.width || y < 0 || y > bounds.height) return;
+function getEdgePanDelta({ bounds, exposedHeight, scaleX, scaleY }: CanvasProjection, x: number, y: number, elapsedMs: number) {
+  if (x < 0 || x > bounds.width || y < 0 || y > exposedHeight) return;
   const travel = 0.45 * Math.max(0, Math.min(elapsedMs, 50));
   const dx = getEdgePanStrength(x, bounds.width) * travel / scaleX;
-  const dy = getEdgePanStrength(y, bounds.height) * travel / scaleY;
+  const dy = getEdgePanStrength(y, exposedHeight) * travel / scaleY;
   if (dx || dy) return { x: dx, y: dy };
 }
 
