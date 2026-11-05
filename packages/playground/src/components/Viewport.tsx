@@ -102,6 +102,7 @@ const Viewport: React.FC = () => {
   const [isPanning, setIsPanning] = useState(false);
   const [isPanTool, setIsPanTool] = useState(false);
   const [isSpacePan, setIsSpacePan] = useState(false);
+  const [zoomPercent, setZoomPercent] = useState<number>();
   const [isGridSnapping, setIsGridSnapping] = useState(false);
   const [sceneGridSize, setSceneGridSize] = useState(16);
   const [keepProportions, setKeepProportions] = useState(false);
@@ -471,12 +472,12 @@ const Viewport: React.FC = () => {
     }
   };
 
-  const rememberCamera = (canvas: HTMLCanvasElement) => {
+  const rememberCamera = useCallback((canvas: HTMLCanvasElement) => {
     const scene = Engine.currentScene;
     if (savedCamera.current?.canvas === canvas && savedCamera.current.scene === scene) return;
     const { position, zoom } = Engine.camera;
     savedCamera.current = { canvas, scene, x: position.x, y: position.y, zoom };
-  };
+  }, []);
 
   const endPan = useCallback((cancel = false) => {
     const drag = pan.current;
@@ -497,37 +498,73 @@ const Viewport: React.FC = () => {
       Engine.camera.position.set(saved.x, saved.y);
       Engine.camera.zoom = saved.zoom;
     }
+    setZoomPercent(undefined);
   }, [endPan]);
 
   useEffect(() => {
     if (!isEditingScene) return;
+    let scene = Engine.currentScene;
+    const updateSceneZoom = () => {
+      if (Engine.currentScene === scene) return;
+      scene = Engine.currentScene;
+      setZoomPercent(undefined);
+    };
     const cancelNavigation = () => {
       setIsSpacePan(false);
       endPan(true);
     };
     window.addEventListener('playground-before-run', restoreCamera);
     window.addEventListener('blur', cancelNavigation);
+    Engine.on('sceneHierarchyChanged', updateSceneZoom);
     return () => {
       window.removeEventListener('playground-before-run', restoreCamera);
       window.removeEventListener('blur', cancelNavigation);
+      Engine.off('sceneHierarchyChanged', updateSceneZoom);
       setIsPanTool(false);
       setIsSpacePan(false);
       restoreCamera();
     };
   }, [isEditingScene, endPan, restoreCamera]);
 
-  const zoomView = (factor: number) => {
-    if (pan.current) return;
+  const zoomView = useCallback((factor: number, pointer?: ScenePoint) => {
+    if (pan.current || keyboardPlacement || Input.isManipulatingObject) return;
     const canvas = viewportContainerRef.current?.querySelector<HTMLCanvasElement>('canvas#canvas');
     if (!canvas || !canvas.width || !canvas.height) return;
     const { position, zoom } = Engine.camera;
+    if (!Number.isFinite(zoom) || zoom <= 0) return;
     const next = clampSceneZoom(zoom * factor);
     if (next === zoom) return;
+    let x = canvas.width / 2;
+    let y = canvas.height / 2;
+    if (pointer) {
+      const bounds = canvas.getBoundingClientRect();
+      if (!bounds.width || !bounds.height) return;
+      x = (pointer.x - bounds.left) * canvas.width / bounds.width;
+      y = (pointer.y - bounds.top) * canvas.height / bounds.height;
+    }
     rememberCamera(canvas);
-    position.set(position.x + canvas.width / 2 * (1 / zoom - 1 / next),
-      position.y + canvas.height / 2 * (1 / zoom - 1 / next));
+    const adjustment = 1 / zoom - 1 / next;
+    position.set(position.x + x * adjustment, position.y + y * adjustment);
     Engine.camera.zoom = next;
-  };
+    setZoomPercent(Math.round(next * 100));
+  }, [keyboardPlacement, rememberCamera]);
+
+  useEffect(() => {
+    const viewport = viewportContainerRef.current;
+    if (!isEditingScene || !viewport) return;
+    const wheelZoom = (event: WheelEvent) => {
+      if (!(event.target instanceof HTMLCanvasElement)) return;
+      event.preventDefault();
+      event.stopPropagation();
+      const mode = event.deltaMode;
+      if (!event.deltaY) return;
+      const unit = mode === WheelEvent.DOM_DELTA_LINE ? 16
+        : mode === WheelEvent.DOM_DELTA_PAGE ? event.target.clientHeight : 1;
+      zoomView(Math.exp(-event.deltaY * unit / 500), { x: event.clientX, y: event.clientY });
+    };
+    viewport.addEventListener('wheel', wheelZoom, { capture: true, passive: false });
+    return () => viewport.removeEventListener('wheel', wheelZoom, true);
+  }, [isEditingScene, zoomView]);
 
   const frameSelection = () => {
     if (!selectedObject || keyboardPlacement || pan.current || Input.isManipulatingObject) return;
@@ -554,6 +591,7 @@ const Viewport: React.FC = () => {
     )) : Engine.camera.zoom;
     rememberCamera(canvas);
     Engine.camera.zoom = zoom;
+    setZoomPercent(Math.round(zoom * 100));
     Engine.camera.position.set(bounds.left + selectionWidth / 2 - width / (2 * zoom),
       bounds.top + selectionHeight / 2 - (top + bottom) / (2 * zoom));
   };
@@ -787,7 +825,7 @@ const Viewport: React.FC = () => {
               {isPanTool ? 'Hand tool active · Drag to pan' : 'Space or middle drag pans'} · {isGridSnapping ? 'Arrows move 1 cell · Shift moves 10 cells' : 'Arrows move 1 px · Shift moves 10 px'}<br />
               F frames selection · Alt/Option-click cycles overlapping objects<br />
               Round handle rotates · Square resizes · Shift constrains · Esc cancels<br />
-              {historyBlockedReason || 'Ctrl/⌘+Z undoes · Add Shift to redo'}
+              Zoom {zoomPercent ?? Math.round(Engine.camera.zoom * 100)}% · Wheel zooms at pointer · {historyBlockedReason || 'Ctrl/⌘+Z undoes · Add Shift to redo'}
             </span>}
             {!isInspectorVisible && selectedObject && pendingCanvasPlacements.has(selectedObject) && (
               <button type="button" className="scene-control scene-review-changes" onClick={() => {

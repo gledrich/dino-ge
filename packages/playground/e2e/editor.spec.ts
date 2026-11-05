@@ -1341,6 +1341,63 @@ new Engine({ onLoad() {
   await expect.poll(readCamera).toEqual({ x: 40, y: 30, zoom: 1 });
 });
 
+test('zooms at the pointer and preserves world coordinates for placement', async ({ page }) => {
+  await page.route('**/files', route => route.fulfill({ json: ['script'] }));
+  await page.route('**/api/scripts/script', route => route.fulfill({ json: `
+import { Engine } from 'dino-ge';
+new Engine({ onLoad() {
+  Engine.camera.position.set(40, 32);
+  document.getElementById('canvas').addEventListener('wheel', () => {
+    document.body.dataset.gameWheel = 'received';
+  });
+}, update() {} }, { containerId: 'playground-canvas-container' });` }));
+  await page.goto('/');
+  await page.getByRole('button', { name: 'Edit scene', exact: true }).click();
+  await page.getByRole('button', { name: 'Snap to grid', exact: true }).click();
+  const canvas = page.locator('#canvas');
+  await canvas.evaluate(element => {
+    element.style.transformOrigin = 'top left';
+    element.style.transform = 'scale(0.75)';
+  });
+  const box = (await canvas.boundingBox())!;
+  const target = { x: 280 * 0.75, y: 192 * 0.75 };
+  const viewAtPointer = () => canvas.evaluate((element: HTMLCanvasElement, target) => {
+    const { Engine } = window as unknown as {
+      Engine: { camera: { position: { x: number; y: number }; zoom: number } };
+    };
+    const { position, zoom } = Engine.camera;
+    const bounds = element.getBoundingClientRect();
+    return { x: position.x + target.x * element.width / bounds.width / zoom,
+      y: position.y + target.y * element.height / bounds.height / zoom, zoom };
+  }, target);
+  await page.mouse.move(box.x + target.x, box.y + target.y);
+  await page.mouse.wheel(0, -320);
+  await expect.poll(async () => (await viewAtPointer()).zoom).toBeGreaterThan(1);
+  const zoomed = await viewAtPointer();
+  expect(zoomed.x).toBeCloseTo(320, 0);
+  expect(zoomed.y).toBeCloseTo(224, 0);
+  await expect(page.locator('body')).not.toHaveAttribute('data-game-wheel', 'received');
+  await expect(page.getByRole('region', { name: 'Scene viewport' }))
+    .toHaveAccessibleDescription(new RegExp(`Zoom ${Math.round(zoomed.zoom * 100)}%`));
+
+  await page.getByRole('button', { name: 'Add rectangle', exact: true }).dragTo(canvas, { targetPosition: target });
+  await expect(page.getByRole('spinbutton', { name: 'X', exact: true })).toHaveValue('320.00');
+  await expect(page.getByRole('spinbutton', { name: 'Y', exact: true })).toHaveValue('224.00');
+  await page.mouse.move(box.x + target.x + 12, box.y + target.y + 12);
+  await page.mouse.down();
+  await canvas.dispatchEvent('wheel', { deltaY: -200, clientX: box.x + target.x + 12,
+    clientY: box.y + target.y + 12, bubbles: true, cancelable: true });
+  await page.mouse.up();
+  expect((await viewAtPointer()).zoom).toBe(zoomed.zoom);
+
+  await page.getByRole('button', { name: 'Play', exact: true }).click();
+  await expect.poll(viewAtPointer).toMatchObject({ x: expect.closeTo(320, 0), y: expect.closeTo(224, 0), zoom: 1 });
+  await page.mouse.move(box.x + target.x, box.y + target.y);
+  await page.mouse.wheel(0, -200);
+  await expect(page.locator('body')).toHaveAttribute('data-game-wheel', 'received');
+  expect((await viewAtPointer()).zoom).toBe(1);
+});
+
 test('frames offscreen objects and groups without moving them or changing the gameplay camera', async ({ page }) => {
   await page.route('**/files', route => route.fulfill({ json: ['script'] }));
   await page.route('**/api/scripts/script', route => route.fulfill({ json: `
