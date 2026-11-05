@@ -104,7 +104,7 @@
   padding-inline: 7px;
 }
 
-.library-row .snippet-btn[draggable='true'] { cursor: grab; }
+.library-row .snippet-btn[draggable='true'] { cursor: grab; touch-action: pan-y; }
 .library-row .snippet-btn[draggable='true']:active { cursor: grabbing; }
 .library-row .library-code {
   color: var(--text-secondary);

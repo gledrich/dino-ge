@@ -179,6 +179,82 @@ new Engine({
   await expect(page.locator('body')).toHaveAttribute('data-game-action', 'pressed');
 });
 
+test('places Library objects by touch and pen with a snapped preview', async ({ page, browserName }) => {
+  test.skip(browserName !== 'chromium', 'Native touch and pen input in this test use Chromium’s DevTools protocol.');
+  await page.route('**/files', route => route.fulfill({ json: ['script'] }));
+  await page.route('**/api/scripts/script', route => route.fulfill({ json: `
+import { Engine } from 'dino-ge';
+new Engine({ onLoad() {}, update() {} }, { containerId: 'playground-canvas-container' });` }));
+  await page.goto('/');
+  const canvas = page.locator('#canvas');
+  await expect(canvas).toBeVisible();
+  await page.getByRole('button', { name: 'Edit scene', exact: true }).click();
+  await page.getByRole('button', { name: 'Snap to grid' }).click();
+  const box = (await canvas.boundingBox())!;
+  const size = await canvas.evaluate((element: HTMLCanvasElement) => ({ width: element.width, height: element.height }));
+  const screen = (x: number, y: number) => ({
+    x: box.x + x * box.width / size.width, y: box.y + y * box.height / size.height,
+  });
+  const buttonPoint = async (name: string) => {
+    const rect = (await page.getByRole('button', { name, exact: true }).boundingBox())!;
+    return { x: rect.x + rect.width / 2, y: rect.y + rect.height / 2 };
+  };
+  const session = await page.context().newCDPSession(page);
+  const preview = page.locator('.scene-drop-preview');
+  const rectangle = page.getByRole('button', { name: 'New rectangle', exact: true });
+  const touchDrag = async () => {
+    const start = await buttonPoint('Add rectangle');
+    await session.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [start] });
+    await session.send('Input.dispatchTouchEvent', { type: 'touchMove', touchPoints: [{ ...start, x: start.x + 48 }] });
+    await session.send('Input.dispatchTouchEvent', { type: 'touchMove', touchPoints: [screen(310, 210)] });
+    await expect(preview).toContainText('Rectangle · X 304 · Y 208');
+  };
+  await touchDrag();
+  await session.send('Input.dispatchTouchEvent', { type: 'touchCancel', touchPoints: [] });
+  await expect(preview).toHaveCount(0);
+  await expect(rectangle).toHaveCount(0);
+
+  await touchDrag();
+  await session.send('Input.dispatchTouchEvent', { type: 'touchMove', touchPoints: [{ x: 10, y: 280 }] });
+  await expect(preview).toHaveCount(0);
+  await session.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
+  await expect(rectangle).toHaveCount(0);
+
+  await touchDrag();
+  await session.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
+  await expect(preview).toHaveCount(0);
+  await expect(rectangle).toHaveAttribute('aria-pressed', 'true');
+  await expect(page.getByRole('spinbutton', { name: 'X', exact: true })).toHaveValue('304.00');
+  await expect(rectangle).toHaveCount(1);
+
+  const penStart = await buttonPoint('Add line');
+  const penEnd = screen(410, 258);
+  await session.send('Input.dispatchMouseEvent', {
+    type: 'mousePressed', ...penStart, pointerType: 'pen', button: 'left', buttons: 1, clickCount: 1,
+  });
+  await session.send('Input.dispatchMouseEvent', {
+    type: 'mouseMoved', ...penEnd, pointerType: 'pen', buttons: 1,
+  });
+  await expect(preview).toContainText('Line · X 416 · Y 256');
+  await session.send('Input.dispatchMouseEvent', {
+    type: 'mouseReleased', ...penEnd, pointerType: 'pen', button: 'left', buttons: 0, clickCount: 1,
+  });
+  await expect(page.getByRole('button', { name: 'New line', exact: true })).toHaveAttribute('aria-pressed', 'true');
+  await expect(page.getByRole('spinbutton', { name: 'X', exact: true })).toHaveValue('416.00');
+  await expect(preview).toHaveCount(0);
+
+  const circle = await buttonPoint('Add circle');
+  await session.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [circle] });
+  await session.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
+  await expect(page.getByRole('button', { name: 'New circle', exact: true })).toHaveAttribute('aria-pressed', 'true');
+  const source = await page.evaluate(() => {
+    const { monaco } = window as typeof window & { monaco: Monaco };
+    return monaco.editor.getEditors()[0].getValue();
+  });
+  expect(source).toContain('new DinoPlaceRectangle');
+  expect(source).toContain('new DinoPlaceLine');
+});
+
 test('edits canvas objects with touch and pen and rolls back cancelled contact', async ({ page, browserName }) => {
   test.skip(browserName !== 'chromium', 'Native touch and pen input in this test use Chromium’s DevTools protocol.');
   await page.route('**/files', route => route.fulfill({ json: ['script'] }));

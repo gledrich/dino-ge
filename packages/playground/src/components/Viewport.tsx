@@ -3,7 +3,7 @@ import { Engine, SpriteComponent, snapToGrid, type ObjectManipulationPreview } f
 import { usePlayground } from '../context/PlaygroundContext';
 import Toolbar from './Toolbar';
 import Logo from './Logo';
-import { getAssetSource, getSceneAssetPreviewType, getSceneSource, getSceneSpriteScale, isReplaceableSprite, nudgeSceneSelection, sceneAssetDragType, sceneObjectDefaults, sceneObjectDragType, sceneObjectKinds, type SceneImageAsset, type SceneObjectKind, type SceneObjectPlacement, type ScenePoint } from '../utils/scene-objects';
+import { getAssetSource, getSceneAssetPreviewType, getSceneSource, getSceneSpriteScale, isReplaceableSprite, nudgeSceneSelection, sceneAssetDragType, sceneObjectDefaults, sceneObjectDragType, sceneObjectKinds, sceneObjectPointerDragEvent, type SceneImageAsset, type SceneObjectKind, type SceneObjectPlacement, type SceneObjectPointerDrag, type ScenePoint } from '../utils/scene-objects';
 import { maxSpriteImageBytes, spriteImageTypes, storeSpriteImage } from '../utils/helpers';
 
 const shapePreviewDimensions: Partial<Record<SceneObjectKind, { width: number; height: number }>> = {
@@ -177,6 +177,46 @@ const Viewport: React.FC = () => {
   const placeLibraryObject = useCallback((kind: SceneObjectKind, x?: number, y?: number) => {
     if (addObject(kind, getPlacementPoint(x, y))) enterSceneEditing();
   }, [addObject, enterSceneEditing, getPlacementPoint]);
+
+  const showDropGuide = useCallback((canvas: HTMLCanvasElement, x: number, y: number,
+    { kind, asset, importingImage }: { kind?: SceneObjectKind; asset?: SceneImageAsset; importingImage?: boolean }) => {
+    const point = getCanvasPlacement(canvas, placementStep, x, y);
+    const rect = viewportContainerRef.current?.getBoundingClientRect();
+    if (!point || !rect) {
+      setDropGuide(undefined);
+      return;
+    }
+    const dimensions = kind && shapePreviewDimensions[kind];
+    const spriteScale = asset ? getSceneSpriteScale(asset.image) : 1;
+    const width = asset ? asset.image.naturalWidth * spriteScale : dimensions?.width;
+    const height = asset ? asset.image.naturalHeight * spriteScale : dimensions?.height;
+    setDropGuide({ x: point.x, y: point.y, left: point.left - rect.left, top: point.top - rect.top, kind,
+      width: width && width * point.scaleX, height: height && height * point.scaleY,
+      importingImage,
+      asset: asset && { tag: asset.tag, src: asset.image.src } });
+  }, [placementStep]);
+
+  useEffect(() => {
+    const updatePointerDrag = (event: Event) => {
+      const { detail } = event as CustomEvent<SceneObjectPointerDrag | null>;
+      if (!detail) {
+        setDropGuide(undefined);
+        return;
+      }
+      const { kind, phase, point: { x, y } } = detail;
+      const target = document.elementFromPoint(x, y);
+      const isOverCanvas = target instanceof HTMLCanvasElement && target.id === 'canvas' &&
+        viewportContainerRef.current?.contains(target);
+      if (isOverCanvas && phase === 'preview') {
+        showDropGuide(target, x, y, { kind });
+      } else {
+        setDropGuide(undefined);
+        if (isOverCanvas && phase === 'drop') placeLibraryObject(kind, x, y);
+      }
+    };
+    window.addEventListener(sceneObjectPointerDragEvent, updatePointerDrag);
+    return () => window.removeEventListener(sceneObjectPointerDragEvent, updatePointerDrag);
+  }, [placeLibraryObject, showDropGuide]);
 
   const placeLoadedImage = useCallback((asset: SceneImageAsset, x?: number, y?: number) => {
     addObject('Sprite', getPlacementPoint(x, y), asset);
@@ -417,20 +457,10 @@ const Viewport: React.FC = () => {
               !(event.target instanceof HTMLCanvasElement)) return;
           event.preventDefault();
           event.dataTransfer.dropEffect = 'copy';
-          const point = getCanvasPlacement(event.target, placementStep, event.clientX, event.clientY);
-          if (!point) return;
-          const rect = event.currentTarget.getBoundingClientRect();
           const kind = sceneObjectKinds.find(item => types.includes(`${sceneObjectDragType}-${item.toLowerCase()}`));
           const dragged = draggedAsset.current;
           const asset = dragged && types.includes(getSceneAssetPreviewType(dragged.tag)) ? dragged : undefined;
-          const dimensions = kind && shapePreviewDimensions[kind];
-          const spriteScale = asset ? getSceneSpriteScale(asset.image) : 1;
-          const width = asset ? asset.image.naturalWidth * spriteScale : dimensions?.width;
-          const height = asset ? asset.image.naturalHeight * spriteScale : dimensions?.height;
-          setDropGuide({ x: point.x, y: point.y, left: point.left - rect.left, top: point.top - rect.top, kind,
-            width: width && width * point.scaleX, height: height && height * point.scaleY,
-            importingImage,
-            asset: asset && { tag: asset.tag, src: asset.image.src } });
+          showDropGuide(event.target, event.clientX, event.clientY, { kind, asset, importingImage });
         }}
         onDragLeave={() => setDropGuide(undefined)}
         onDrop={event => {
