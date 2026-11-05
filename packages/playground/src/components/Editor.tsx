@@ -256,7 +256,7 @@ const CodeEditor: React.FC<EditorProps> = ({ currentScriptId, onSave, onSelectSc
           ? 'Use an inline onLoad method on the scene class to add palette objects.'
           : codeOnly
             ? 'Check the script syntax and use one editable Engine setup to insert object code.'
-            : 'Scene placement needs one Dino GE Engine with an inline configuration and an editable onLoad callback.';
+            : 'Scene placement needs one Dino GE Engine with an editable inline configuration or a local const callback object used only by that Engine.';
         return;
       }
       const before = model.getAlternativeVersionId();

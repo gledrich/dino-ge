@@ -2494,47 +2494,80 @@ new Engine({
   await expect(error).toHaveCount(0);
 });
 
-test('saves successive palette drops with a named setup callback and preserves the captured callback', async ({ page }) => {
-  let source = `import { Engine, Rectangle, Vector2 } from 'dino-ge';
+test('leaves a callback object shared outside the Engine untouched when a drop is rejected', async ({ page }) => {
+  const source = `import { Engine } from 'dino-ge';
+const callbacks = { update() {} };
+const otherConfiguration = { ...callbacks };
+void otherConfiguration;
+new Engine(callbacks, { containerId: 'playground-canvas-container' });`;
+  await page.route('**/files', route => route.fulfill({ json: ['script'] }));
+  await page.route('**/api/scripts/script', route => route.fulfill({ json: source }));
+  await page.goto('/');
+  await expect(page.locator('.monaco-editor')).toContainText('otherConfiguration');
+  const readSource = () => page.evaluate(() => {
+    const { monaco } = window as typeof window & { monaco: Monaco };
+    return monaco.editor.getEditors()[0].getValue();
+  });
+  const original = await readSource();
+  await page.getByRole('button', { name: 'Add rectangle', exact: true }).dragTo(page.locator('#canvas'), {
+    targetPosition: { x: 180, y: 150 },
+  });
+  await expect(page.getByRole('alert').filter({ hasText: 'used only by that Engine' })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Edit scene', exact: true })).toHaveAttribute('aria-pressed', 'false');
+  expect(await readSource()).toBe(original);
+});
+
+for (const separate of [false, true]) {
+  test(`saves successive palette drops with a named setup callback in ${separate ? 'a local' : 'an inline'} configuration`, async ({ page }) => {
+    const options = "{ containerId: 'playground-canvas-container' }";
+    const startGame = separate ? `const callbacks = {};
+function startGame() {
+  const callbacks = { onLoad, update() {} };
+  new Engine(callbacks, ${options});
+}
+startGame();` : `new Engine({ onLoad, update() {} }, ${options});`;
+    let source = `import { Engine, Rectangle, Vector2 } from 'dino-ge';
 function onLoad() {
   if (this.update) new Rectangle({ tag: 'setup marker', position: new Vector2(30, 30), width: 30, height: 30 });
 }
-new Engine({ onLoad, update() {} }, { containerId: 'playground-canvas-container' });
+${startGame}
 onLoad = () => { throw new Error('The callback was already captured'); };`;
-  await page.route('**/files', route => route.fulfill({ json: ['script'] }));
-  await page.route('**/api/scripts/script', route => {
-    if (route.request().method() === 'PUT') {
-      source = route.request().postDataJSON().data;
-      return route.fulfill({ json: { success: true } });
+    await page.route('**/files', route => route.fulfill({ json: ['script'] }));
+    await page.route('**/api/scripts/script', route => {
+      if (route.request().method() === 'PUT') {
+        source = route.request().postDataJSON().data;
+        return route.fulfill({ json: { success: true } });
+      }
+      return route.fulfill({ json: source });
+    });
+    await page.goto('/');
+    const canvas = page.locator('#canvas');
+    const marker = page.getByRole('button', { name: 'setup marker', exact: true });
+    await expect(marker).toBeVisible();
+    await expect.poll(() => page.evaluate(() => {
+      const { monaco } = window as typeof window & { monaco?: Monaco };
+      return monaco?.editor.getEditors()[0]?.getValue();
+    })).toContain('onLoad,');
+    for (const [kind, x] of [['rectangle', 175], ['circle', 275]] as const) {
+      await page.getByRole('button', { name: `Add ${kind}` }).dragTo(canvas, { targetPosition: { x, y: 150 } });
+      await expect(page.getByRole('button', { name: `New ${kind}`, exact: true })).toHaveAttribute('aria-pressed', 'true');
     }
-    return route.fulfill({ json: source });
-  });
-  await page.goto('/');
-  const canvas = page.locator('#canvas');
-  const marker = page.getByRole('button', { name: 'setup marker', exact: true });
-  await expect(marker).toBeVisible();
-  await expect.poll(() => page.evaluate(() => {
-    const { monaco } = window as typeof window & { monaco?: Monaco };
-    return monaco?.editor.getEditors()[0]?.getValue();
-  })).toContain('onLoad,');
-  for (const [kind, x] of [['rectangle', 175], ['circle', 275]] as const) {
-    await page.getByRole('button', { name: `Add ${kind}` }).dragTo(canvas, { targetPosition: { x, y: 150 } });
-    await expect(page.getByRole('button', { name: `New ${kind}`, exact: true })).toHaveAttribute('aria-pressed', 'true');
-  }
-  await expect(marker).toHaveCount(1);
+    await expect(marker).toHaveCount(1);
 
-  const saved = page.waitForResponse(response => response.request().method() === 'PUT' &&
-    response.url().endsWith('/api/scripts/script'));
-  await page.getByRole('button', { name: 'Save script', exact: true }).click();
-  await saved;
-  expect(source.match(/function DinoPlaceLoad/g)).toHaveLength(1);
-  await page.reload();
-  await expect(marker).toHaveCount(1);
-  for (const [kind, x] of [['rectangle', 175], ['circle', 275]] as const) {
-    await page.getByRole('button', { name: `New ${kind}`, exact: true }).click();
-    await expect(page.getByRole('spinbutton', { name: 'X', exact: true })).toHaveValue(`${x}.00`);
-  }
-});
+    const saved = page.waitForResponse(response => response.request().method() === 'PUT' &&
+      response.url().endsWith('/api/scripts/script'));
+    await page.getByRole('button', { name: 'Save script', exact: true }).click();
+    await saved;
+    expect(source.match(/function DinoPlaceLoad/g)).toHaveLength(1);
+    if (separate) expect(source).toContain('const callbacks = {};');
+    await page.reload();
+    await expect(marker).toHaveCount(1);
+    for (const [kind, x] of [['rectangle', 175], ['circle', 275]] as const) {
+      await page.getByRole('button', { name: `New ${kind}`, exact: true }).click();
+      await expect(page.getByRole('spinbutton', { name: 'X', exact: true })).toHaveValue(`${x}.00`);
+    }
+  });
+}
 
 for (const isAsync of [false, true]) {
   test(`saves successive Library drops with a concise ${isAsync ? 'async' : 'sync'} setup arrow`, async ({ page }) => {

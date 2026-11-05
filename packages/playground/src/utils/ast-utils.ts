@@ -88,14 +88,21 @@ const mapProperties = (objExpr: any, imports: DinoImports, code: string): Record
   return mapping;
 };
 
-interface DinoImports {
-  named: Map<string, string>;
-  namespaces: Map<string, acorn.Node[]>;
+interface ScopedBinding {
+  identifier: acorn.Identifier;
+  scope: acorn.Node;
 }
 
-function collectNamespaceShadows(ast: acorn.Program, namespaces: DinoImports['namespaces']) {
+type ScopedBindings = Map<string, ScopedBinding[]>;
+
+interface DinoImports {
+  named: Map<string, string>;
+  namespaces: ScopedBindings;
+}
+
+function collectBindingScopes(ast: acorn.Program, bindings: ScopedBindings) {
   const bind = (pattern: acorn.Pattern | null | undefined, scope: acorn.Node) => {
-    if (pattern?.type === 'Identifier') namespaces.get(pattern.name)?.push(scope);
+    if (pattern?.type === 'Identifier') bindings.get(pattern.name)?.push({ identifier: pattern, scope });
     else if (pattern?.type === 'RestElement') bind(pattern.argument, scope);
     else if (pattern?.type === 'AssignmentPattern') bind(pattern.left, scope);
     else if (pattern?.type === 'ArrayPattern') pattern.elements.forEach(element => bind(element, scope));
@@ -148,7 +155,7 @@ function collectNamespaceShadows(ast: acorn.Program, namespaces: DinoImports['na
 
 function dinoImports(ast: acorn.Program): DinoImports {
   const named = new Map<string, string>();
-  const namespaces = new Map<string, acorn.Node[]>();
+  const namespaces: ScopedBindings = new Map();
   for (const node of ast.body) {
     if (node.type !== 'ImportDeclaration' || node.source.value !== 'dino-ge') continue;
     for (const specifier of node.specifiers) {
@@ -159,7 +166,7 @@ function dinoImports(ast: acorn.Program): DinoImports {
       }
     }
   }
-  if (namespaces.size) collectNamespaceShadows(ast, namespaces);
+  if (namespaces.size) collectBindingScopes(ast, namespaces);
   return { named, namespaces };
 }
 
@@ -171,7 +178,7 @@ function resolveDinoImport(reference: acorn.Expression | acorn.Super | null | un
   if (reference?.type !== 'MemberExpression' || reference.object.type !== 'Identifier') return;
   const namespace = reference.object.name;
   const shadows = imports.namespaces.get(namespace);
-  if (!shadows || shadows.some(scope => reference.start >= scope.start && reference.end <= scope.end)) return;
+  if (!shadows || shadows.some(({ scope }) => reference.start >= scope.start && reference.end <= scope.end)) return;
   const { property, computed } = reference;
   if (!computed && property.type === 'Identifier') return { name: property.name, namespace };
   if (computed && property.type === 'Literal' && typeof property.value === 'string') return { name: property.value, namespace };
@@ -495,6 +502,44 @@ function getPlacedObjectInsertion(callback: acorn.Expression | undefined): numbe
   }
 }
 
+/** Edit a local callback object only when its binding belongs exclusively to this Engine call. */
+function getLocalEngineConfiguration(ast: acorn.Program, argument: acorn.Identifier) {
+  const bindings: ScopedBinding[] = [];
+  collectBindingScopes(ast, new Map([[argument.name, bindings]]));
+  bindings.sort((a, b) => (a.scope.end - a.scope.start) - (b.scope.end - b.scope.start));
+  const bindingAt = (node: acorn.Node) => bindings.find(({ scope }) => node.start >= scope.start && node.end <= scope.end);
+  const binding = bindingAt(argument);
+  if (!binding) return;
+
+  let configuration: acorn.ObjectExpression | undefined;
+  let shared = false;
+  const visit = (node: acorn.AnyNode, parent?: acorn.AnyNode) => {
+    if (node.type === 'VariableDeclaration' && node.kind === 'const') {
+      const declaration = node.declarations.find(item => item.id === binding.identifier);
+      if (declaration?.init?.type === 'ObjectExpression') {
+        if (parent?.type === 'ExportNamedDeclaration') shared = true;
+        else configuration = declaration.init;
+      }
+    }
+    if (node.type === 'Identifier' && node.name === argument.name && node !== argument &&
+        node !== binding.identifier && bindingAt(node) === binding) {
+      const propertyName = (parent?.type === 'MemberExpression' && parent.property === node && !parent.computed) ||
+        (parent?.type === 'Property' && parent.key === node && !parent.computed && !parent.shorthand);
+      if (!propertyName) shared = true;
+    }
+    if (node.type === 'CallExpression' && node.callee.type === 'Identifier' && node.callee.name === 'eval' &&
+        bindingAt(node) === binding) shared = true;
+    if (shared) return;
+    for (const value of Object.values(node)) {
+      for (const child of Array.isArray(value) ? value : [value]) {
+        if (child && typeof child === 'object' && 'type' in child) visit(child as acorn.AnyNode, node);
+      }
+    }
+  };
+  visit(ast);
+  return shared ? undefined : configuration;
+}
+
 /** Adds a constructor to the active setup, or to a standalone script when requested. */
 export function getSceneObjectCreation(source: string, placement: SceneObjectPlacement, allowStandalone = false) {
   let ast: acorn.Program;
@@ -504,18 +549,6 @@ export function getSceneObjectCreation(source: string, placement: SceneObjectPla
     return null;
   }
   const imports = dinoImports(ast);
-  const configurations: acorn.ObjectExpression[] = [];
-  const visit = (node: any) => {
-    if (node.type === 'NewExpression' && resolveDinoImport(node.callee, imports)?.name === 'Engine' &&
-      node.arguments[0]?.type === 'ObjectExpression') {
-      configurations.push(node.arguments[0]);
-    }
-    for (const value of Object.values(node)) {
-      for (const child of Array.isArray(value) ? value : [value]) {
-        if (child && typeof child === 'object' && 'type' in child) visit(child);
-      }
-    }
-  };
   const isOnLoad = (key: acorn.Node) =>
     (key.type === 'Identifier' && (key as acorn.Identifier).name === 'onLoad') ||
     (key.type === 'Literal' && (key as acorn.Literal).value === 'onLoad');
@@ -532,16 +565,29 @@ export function getSceneObjectCreation(source: string, placement: SceneObjectPla
     callback = hook?.value;
     insertion = scene.body.start + 1;
   } else {
+    const engines: acorn.NewExpression[] = [];
+    const visit = (node: acorn.AnyNode) => {
+      if (node.type === 'NewExpression' && resolveDinoImport(node.callee, imports)?.name === 'Engine') engines.push(node);
+      for (const value of Object.values(node)) {
+        for (const child of Array.isArray(value) ? value : [value]) {
+          if (child && typeof child === 'object' && 'type' in child) visit(child as acorn.AnyNode);
+        }
+      }
+    };
     visit(ast);
-    if (configurations.length === 1) {
-      const [config] = configurations;
-      if (config.properties.some(prop => prop.type !== 'Property' || prop.computed)) return null;
+    if (engines.length === 1) {
+      const [argument] = engines[0].arguments;
+      const config = argument?.type === 'Identifier' ? getLocalEngineConfiguration(ast, argument)
+        : argument?.type === 'ObjectExpression' ? argument : undefined;
+      if (!config || config.properties.some(prop => prop.type !== 'Property' || prop.computed ||
+          (prop.key.type === 'Identifier' && prop.key.name === '__proto__') ||
+          (prop.key.type === 'Literal' && prop.key.value === '__proto__'))) return null;
       const hooks = config.properties.filter((prop): prop is acorn.Property => prop.type === 'Property' && isOnLoad(prop.key));
       if (hooks.length > 1 || (hooks[0] && hooks[0].kind !== 'init')) return null;
       engineHook = hooks[0];
       callback = engineHook?.value;
       insertion = config.start + 1;
-    } else if (configurations.length || !allowStandalone) return null;
+    } else if (engines.length || !allowStandalone) return null;
   }
   const wrappedInsertion = getPlacedObjectInsertion(callback);
   const body = callback?.type === 'ArrowFunctionExpression' || callback?.type === 'FunctionExpression' ? callback.body : undefined;
