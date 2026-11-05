@@ -703,6 +703,7 @@ describe('Engine', () => {
     otherScene.add(child);
     expect(hierarchy).not.toHaveBeenCalled();
     scene.add(parent);
+    expect(hierarchy).toHaveBeenLastCalledWith(expect.objectContaining({ detail: parent }));
     scene.objects.add(child);
     scene.objects.add(child);
     parent.transform.addChild(child.transform);
@@ -711,6 +712,7 @@ describe('Engine', () => {
 
     Engine.selectedObject = child;
     scene.remove(child);
+    expect(hierarchy).toHaveBeenLastCalledWith(expect.objectContaining({ detail: null }));
     expect(selection).toHaveBeenLastCalledWith(expect.objectContaining({ detail: null }));
     expect(Engine.selectedObject).toBeNull();
     expect(hierarchy).toHaveBeenCalledTimes(5);

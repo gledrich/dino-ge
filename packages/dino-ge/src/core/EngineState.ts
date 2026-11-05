@@ -42,7 +42,7 @@ export const getEngineState = (): EngineState => {
 };
 
 /** Notify observers after membership changes in the active object collection. */
-export function notifySceneObjectsChanged(collection?: Set<GameObject>) {
+export function notifySceneObjectsChanged(collection?: Set<GameObject>, addedObject?: GameObject) {
   const state = getEngineState();
   if (!state) return;
   const active = state.currentScene?.objects ?? state.objects;
@@ -52,7 +52,7 @@ export function notifySceneObjectsChanged(collection?: Set<GameObject>) {
     state.selectedObject = null;
     state.events.dispatchEvent(new CustomEvent('selectedObjectChanged', { detail: null }));
   }
-  state.events.dispatchEvent(new CustomEvent('sceneHierarchyChanged'));
+  state.events.dispatchEvent(new CustomEvent('sceneHierarchyChanged', { detail: addedObject ?? null }));
 }
 
 export function notifySceneObjectChanged(object?: GameObject) {
