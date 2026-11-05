@@ -117,6 +117,92 @@ describe('ScreenUI', () => {
     expect(listener).toHaveBeenLastCalledWith({ width: 400, height: 200, controls: [] });
   });
 
+  it('previews an offset from the original draw options on every frame', () => {
+    const { ui, ctx } = setup();
+    const listener = jest.fn();
+    const rect = { x: 10, y: 20, width: 80, height: 30 };
+    const panel = Object.freeze(Object.create(rect)) as typeof rect;
+    const edit = { index: 0, control: { ...rect, kind: 'panel' as const, colour: 'red' }, x: 15, y: -4 };
+    const getEditing = jest.fn();
+    const observers = new Set([{ listener, getEditing }]);
+    const draw = (frame: ScreenUI) => frame.panel(panel, 'red');
+
+    ui.render(draw, observers);
+    getEditing.mockReturnValue({ positions: [edit] });
+    ui.render(draw, observers);
+    ui.render(draw, observers);
+    expect(ctx.fillRect.mock.calls).toEqual([
+      [10, 20, 80, 30], [25, 16, 80, 30], [25, 16, 80, 30],
+    ]);
+    expect(listener).toHaveBeenCalledTimes(1);
+    expect(listener).toHaveBeenCalledWith(expect.objectContaining({ controls: [edit.control] }));
+  });
+
+  it('keeps a position preview scoped to the intended draw slot', () => {
+    const { ui, ctx } = setup();
+    const listener = jest.fn();
+    const getEditing = jest.fn();
+    const observers = new Set([{ listener, getEditing }]);
+    const panel = { x: 10, y: 20, width: 80, height: 30 };
+    const replacement = { x: 20, y: 20, width: 80, height: 30 };
+
+    ui.render(frame => frame.panel(panel, 'red'), observers);
+    getEditing.mockReturnValue({
+      positions: [{ index: 0, control: { ...panel, kind: 'panel', colour: 'red' }, x: 30, y: 0 }],
+    });
+    ui.render(frame => {
+      frame.panel(replacement, 'red');
+      frame.panel(panel, 'red');
+    }, observers);
+    expect(ctx.fillRect.mock.calls.slice(-2)).toEqual([[20, 20, 80, 30], [10, 20, 80, 30]]);
+  });
+
+  it('does not preview a move on a known duplicate control ID', () => {
+    const { ui, ctx } = setup();
+    const getEditing = jest.fn();
+    const observers = new Set([{ listener: jest.fn(), getEditing }]);
+    const button = { x: 10, y: 20, width: 80, height: 30, id: 'play', text: 'Play', onPress: jest.fn() };
+    const draw = (frame: ScreenUI) => {
+      frame.button(button);
+      frame.button({ ...button, x: 100 });
+    };
+
+    ui.render(draw, observers);
+    getEditing.mockReturnValue({ positions: [{ index: 0, control: { ...button, kind: 'button' }, x: 30, y: 0 }] });
+    ui.render(draw, observers);
+    expect(ctx.fillRect.mock.calls.slice(-2)).toEqual([[10, 20, 80, 30], [100, 20, 80, 30]]);
+  });
+
+  it('continues drawing if an observer supplies an invalid preview target', () => {
+    const { ui, ctx } = setup();
+    const getEditing = jest.fn();
+    const observers = new Set([{ listener: jest.fn(), getEditing }]);
+    const draw = (frame: ScreenUI) => frame.panel({ x: 10, y: 20, width: 80, height: 30 }, 'red');
+
+    ui.render(draw, observers);
+    getEditing.mockReturnValue({ positions: [{ index: 0, control: null, x: 10, y: 15 }] });
+    ui.render(draw, observers);
+    expect(ctx.fillRect).toHaveBeenLastCalledWith(10, 20, 80, 30);
+  });
+
+  it('suppresses game button clicks and keys as soon as editing starts', () => {
+    const { ui, canvas } = setup();
+    const action = jest.fn();
+    const getEditing = jest.fn();
+    const observers = new Set([{ listener: jest.fn(), getEditing }]);
+    ui.render(frame => frame.button({ x: 40, y: 20, width: 80, height: 40, text: 'Play', onPress: action }), observers);
+
+    getEditing.mockReturnValue({ positions: [] });
+    canvas.dispatchEvent(new MouseEvent('click', { clientX: 60, clientY: 40 }));
+    canvas.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter' }));
+    expect(action).not.toHaveBeenCalled();
+
+    getEditing.mockReturnValue(undefined);
+    canvas.dispatchEvent(new MouseEvent('click', { clientX: 60, clientY: 40 }));
+    canvas.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter' }));
+    expect(action).toHaveBeenCalledTimes(2);
+  });
+
   it('does no text measurement when unobserved and drops unfinished frames', () => {
     const { ui, ctx } = setup();
     const listener = jest.fn();

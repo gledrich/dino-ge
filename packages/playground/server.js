@@ -5,7 +5,7 @@ import fs from 'fs/promises';
 import { fileURLToPath } from 'url';
 import { createRequire } from 'module';
 import { constants, existsSync } from 'fs';
-import { ProjectError, ProjectStore, spriteImageTypes } from './lib/projects.js';
+import { moduleRevision, ProjectError, ProjectStore, spriteImageTypes } from './lib/projects.js';
 
 const require = createRequire(import.meta.url);
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -64,7 +64,18 @@ const serveWorkspace = [async (req, res, next) => {
   try {
     const requested = path.resolve(scriptsRoot, `.${decodeURIComponent(req.path)}`);
     const resolved = await fs.realpath(requested);
-    if (resolved.startsWith(scriptsRoot + path.sep)) return next();
+    if (resolved.startsWith(scriptsRoot + path.sep)) {
+      if (req.params.run && (req.method === 'GET' || req.method === 'HEAD') && /\.m?js$/.test(requested)) {
+        const stat = await fs.stat(resolved);
+        if (stat.isFile() && stat.size <= 16 * 1024 * 1024) {
+          const contents = await fs.readFile(resolved, { flag: constants.O_RDONLY | noFollow });
+          // Pin the source to the bytes the module loader received for this run.
+          return res.set('Server-Timing', `dino-source;desc="${moduleRevision(contents)}"`)
+            .set('Cache-Control', 'no-store').type('text/javascript').send(contents);
+        }
+      }
+      return next();
+    }
   } catch (err) {
     if (!(err instanceof URIError) && err.code !== 'ENOENT' && err.code !== 'ENOTDIR') return next(err);
   }

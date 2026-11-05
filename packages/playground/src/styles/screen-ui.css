@@ -20,6 +20,11 @@
   overflow-wrap: anywhere;
 }
 
+.screen-ui-inspector .scene-control:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
 .screen-ui-outline-layer {
   position: absolute;
   inset: 0;
@@ -28,8 +33,45 @@
   z-index: 20;
 }
 
+.mobile-workspace .screen-ui-outline-layer { position: fixed; }
+
+.screen-ui-outline-layer[data-editing] {
+  pointer-events: auto;
+  touch-action: none;
+}
+
 .screen-ui-outline {
   position: absolute;
   outline: 2px solid var(--accent-primary);
   box-shadow: 0 0 0 3px var(--bg-primary);
+}
+
+.screen-ui-drag-handle {
+  position: absolute;
+  box-sizing: border-box;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  cursor: grab;
+  pointer-events: auto;
+  touch-action: none;
+}
+
+.screen-ui-drag-handle:active { cursor: grabbing; }
+.screen-ui-drag-handle[aria-disabled='true'] { cursor: default; }
+.screen-ui-drag-handle:hover,
+.screen-ui-drag-handle:focus-visible { outline: 2px dashed var(--accent-primary); }
+
+@media (pointer: coarse) {
+  .screen-ui-drag-handle[aria-pressed='true'] { z-index: 1; }
+
+  .screen-ui-drag-handle[aria-pressed='true']::after {
+    content: '';
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: max(44px, 100%);
+    height: max(44px, 100%);
+    transform: translate(-50%, -50%);
+  }
 }

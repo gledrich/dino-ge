@@ -53,18 +53,41 @@ export interface ScreenUISnapshot {
   source?: { index: number; stack: string };
 }
 
+export interface ScreenUIPositionPreview {
+  index: number;
+  control: ScreenUIControl;
+  /** Offset from the current draw position in canvas pixels. */
+  x: number;
+  y: number;
+}
+
+export interface ScreenUIEditing {
+  positions: readonly ScreenUIPositionPreview[];
+}
+
 export interface ScreenUIObservation {
   listener: (snapshot: ScreenUISnapshot) => void;
   getSourceIndex?: () => number | undefined;
+  getEditing?: () => ScreenUIEditing | undefined;
 }
 
 interface ObservedFrame {
   controls: ScreenUIControl[];
+  editing?: ScreenUIEditing;
   requests: Map<ScreenUIObservation, number | undefined>;
   stacks: Map<number, string | undefined>;
 }
 
 const controlTextFields = ['id', 'text', 'colour', 'background', 'font'] as const;
+
+function matchesDrawnControl(control: ScreenUIControl, target: ScreenUIControl): boolean {
+  if (control.kind !== target.kind) return false;
+  if (control.id || target.id) return control.id === target.id;
+  return control.x === target.x && control.y === target.y &&
+    control.width === target.width && control.height === target.height &&
+    control.text === target.text && control.colour === target.colour &&
+    control.background === target.background && control.font === target.font;
+}
 
 /** A screen-space canvas layer. The game chooses which controls to draw each frame. */
 export default class ScreenUI {
@@ -76,6 +99,7 @@ export default class ScreenUI {
   private previousCursor?: string;
   private observedFrame?: ObservedFrame;
   private observers?: ReadonlySet<ScreenUIObservation>;
+  private lastControls: readonly ScreenUIControl[] = [];
   private readonly lastPublished = new WeakMap<ScreenUIObservation, {
     frame: string;
     source?: ScreenUISnapshot['source'];
@@ -91,6 +115,7 @@ export default class ScreenUI {
     this.canvas.addEventListener('pointerleave', () => { this.pointer = undefined; }, options);
     this.canvas.addEventListener('blur', () => { this.focused = undefined; }, options);
     this.canvas.addEventListener('click', event => {
+      if (this.getEditing()) return;
       const point = this.position(event);
       for (let index = this.buttons.length - 1; index >= 0; index--) {
         const button = this.buttons[index];
@@ -102,6 +127,7 @@ export default class ScreenUI {
       }
     }, options);
     this.canvas.addEventListener('keydown', event => {
+      if (this.getEditing()) return;
       const index = this.buttons.findIndex(button => (button.id ?? button.text) === this.focused);
       if (event.key === 'Tab') {
         const direction = event.shiftKey ? -1 : 1;
@@ -142,7 +168,8 @@ export default class ScreenUI {
     try {
       draw(this);
       const pointer = this.pointer;
-      const hovered = pointer && this.buttons.some(button => button.enabled !== false && this.contains(button, pointer));
+      const hovered = pointer && !frame?.editing &&
+        this.buttons.some(button => button.enabled !== false && this.contains(button, pointer));
       if (hovered && this.previousCursor === undefined) {
         this.previousCursor = this.canvas.style.cursor;
         this.canvas.style.cursor = 'pointer';
@@ -154,11 +181,19 @@ export default class ScreenUI {
       this.observedFrame = undefined;
       this.ctx.restore();
     }
+    this.lastControls = frame?.controls ?? [];
     if (frame && !this.lifetime.signal.aborted) this.publish(frame, observers);
   }
 
   panel(rect: ScreenRect, colour: string): void {
-    this.drawPanel(rect, colour, this.observedFrame);
+    const frame = this.observedFrame;
+    if (!frame) {
+      this.drawPanel(rect, colour);
+      return;
+    }
+    const { x, y, width, height } = rect;
+    const position = this.record(frame, { kind: 'panel', x, y, width, height, colour });
+    this.drawPanel({ x: position ? x + position.x : x, y: position ? y + position.y : y, width, height }, colour);
   }
 
   label(label: ScreenLabel): void {
@@ -166,36 +201,50 @@ export default class ScreenUI {
   }
 
   image(image: CanvasImageSource, { x, y, width, height }: ScreenRect): void {
+    const frame = this.observedFrame;
+    const position = frame && this.record(frame, { kind: 'image', x, y, width, height });
+    if (position) {
+      x += position.x;
+      y += position.y;
+    }
     this.ctx.drawImage(image, x, y, width, height);
-    if (this.observedFrame) this.record(this.observedFrame, { kind: 'image', x, y, width, height });
   }
 
   button(button: ScreenButton): void {
     this.buttons.push(button);
     const { x, y, width, height, text, enabled = true, colour = '#fff',
       background = '#25383e', hoverBackground = '#39515a', font = 'bold 14px sans-serif' } = button;
-    const highlighted = enabled && ((this.pointer && this.contains(button, this.pointer)) ||
-      (this.focused === (button.id ?? text) && document.activeElement === this.canvas));
-    this.drawPanel(button, highlighted ? hoverBackground : enabled ? background : '#424c4e');
-    this.drawLabel({ x: x + width / 2, y: y + height / 2, text, align: 'center', colour, font, maxWidth: width - 8 });
-    if (this.observedFrame) this.record(this.observedFrame, {
+    const frame = this.observedFrame;
+    const position = frame && this.record(frame, {
       kind: 'button', x, y, width, height, id: button.id, text, enabled, colour, background, font,
     });
+    const paintX = position ? x + position.x : x;
+    const paintY = position ? y + position.y : y;
+    const highlighted = enabled && !frame?.editing && ((this.pointer && this.contains(button, this.pointer)) ||
+      (this.focused === (button.id ?? text) && document.activeElement === this.canvas));
+    this.drawPanel({ x: paintX, y: paintY, width, height }, highlighted ? hoverBackground : enabled ? background : '#424c4e');
+    this.drawLabel({ x: paintX + width / 2, y: paintY + height / 2, text, align: 'center', colour, font, maxWidth: width - 8 });
   }
 
   progressBar({ value, colour = '#f6b754', background = '#30434a', x, y, width, height }: ScreenProgressBar): void {
-    this.drawPanel({ x, y, width, height }, background);
     const progress = Number.isFinite(value) ? Math.min(1, Math.max(0, value)) : 0;
-    this.drawPanel({ x, y, width: width * progress, height }, colour);
-    if (this.observedFrame) this.record(this.observedFrame, {
+    const frame = this.observedFrame;
+    const position = frame && this.record(frame, {
       kind: 'progressBar', x, y, width, height, value: progress, colour, background,
     });
+    if (position) {
+      x += position.x;
+      y += position.y;
+    }
+    this.drawPanel({ x, y, width, height }, background);
+    this.drawPanel({ x, y, width: width * progress, height }, colour);
   }
 
   dispose(): void {
     if (this.lifetime.signal.aborted) return;
     this.lifetime.abort();
     this.buttons = [];
+    this.lastControls = [];
     const observers = this.observers;
     this.observers = undefined;
     if (observers?.size) {
@@ -204,10 +253,9 @@ export default class ScreenUI {
     }
   }
 
-  private drawPanel({ x, y, width, height }: ScreenRect, colour: string, frame?: ObservedFrame): void {
+  private drawPanel({ x, y, width, height }: ScreenRect, colour: string): void {
     this.ctx.fillStyle = colour;
     this.ctx.fillRect(x, y, width, height);
-    if (frame) this.record(frame, { kind: 'panel', x, y, width, height, colour });
   }
 
   private drawLabel(
@@ -218,25 +266,38 @@ export default class ScreenUI {
     this.ctx.font = font;
     this.ctx.textAlign = align;
     this.ctx.textBaseline = 'middle';
+    if (frame && typeof text === 'string') {
+      const metrics = this.ctx.measureText(text);
+      const scale = maxWidth === undefined || metrics.width <= 0
+        ? 1 : Math.min(1, Math.max(0, maxWidth) / metrics.width);
+      const position = this.record(frame, {
+        kind: 'label',
+        x: x - metrics.actualBoundingBoxLeft * scale,
+        y: y - metrics.actualBoundingBoxAscent,
+        width: (metrics.actualBoundingBoxLeft + metrics.actualBoundingBoxRight) * scale,
+        height: metrics.actualBoundingBoxAscent + metrics.actualBoundingBoxDescent,
+        text, colour, font: this.ctx.font,
+      });
+      if (position) {
+        x += position.x;
+        y += position.y;
+      }
+    }
     if (maxWidth === undefined) this.ctx.fillText(text, x, y);
     else this.ctx.fillText(text, x, y, maxWidth);
-    if (!frame || typeof text !== 'string') return;
-    const metrics = this.ctx.measureText(text);
-    const scale = maxWidth === undefined || metrics.width <= 0
-      ? 1 : Math.min(1, Math.max(0, maxWidth) / metrics.width);
-    this.record(frame, {
-      kind: 'label',
-      x: x - metrics.actualBoundingBoxLeft * scale,
-      y: y - metrics.actualBoundingBoxAscent,
-      width: (metrics.actualBoundingBoxLeft + metrics.actualBoundingBoxRight) * scale,
-      height: metrics.actualBoundingBoxAscent + metrics.actualBoundingBoxDescent,
-      text, colour, font: this.ctx.font,
-    });
+  }
+
+  private getEditing(): ScreenUIEditing | undefined {
+    if (!this.observers) return;
+    for (const observer of this.observers) {
+      const editing = observer.getEditing?.();
+      if (editing && Array.isArray(editing.positions)) return editing;
+    }
   }
 
   private beginObservation(observers?: ReadonlySet<ScreenUIObservation>): ObservedFrame | undefined {
     if (!observers?.size) return;
-    const frame: ObservedFrame = { controls: [], requests: new Map(), stacks: new Map() };
+    const frame: ObservedFrame = { controls: [], editing: this.getEditing(), requests: new Map(), stacks: new Map() };
     for (const observer of observers) {
       const index = observer.getSourceIndex?.();
       frame.requests.set(observer, index);
@@ -245,7 +306,7 @@ export default class ScreenUI {
     return frame;
   }
 
-  private record(frame: ObservedFrame, control: ScreenUIControl): void {
+  private record(frame: ObservedFrame, control: ScreenUIControl): ScreenUIPositionPreview | undefined {
     const { width, height } = control;
     if (width < 0) {
       control.x += width;
@@ -263,6 +324,15 @@ export default class ScreenUI {
     const index = frame.controls.length;
     if (frame.stacks.has(index)) frame.stacks.set(index, new Error().stack ?? '');
     frame.controls.push(control);
+    const position = frame.editing?.positions.find(candidate => candidate?.index === index);
+    if (!position?.control || !Number.isFinite(position.x) || !Number.isFinite(position.y) ||
+      !matchesDrawnControl(control, position.control)) return;
+    const previous = this.lastControls[index];
+    if (!previous || !matchesDrawnControl(previous, position.control)) return;
+    // Explicit IDs can track responsive geometry, provided the previous frame had one matching control.
+    if (control.id && this.lastControls.some((candidate, slot) => slot !== index &&
+      matchesDrawnControl(candidate, position.control))) return;
+    return position;
   }
 
   private publish(frame: ObservedFrame, observers?: ReadonlySet<ScreenUIObservation>): void {

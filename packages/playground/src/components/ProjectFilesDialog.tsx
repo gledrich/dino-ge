@@ -3,11 +3,12 @@ import Editor from '@monaco-editor/react';
 import type { editor } from 'monaco-editor';
 import { listProjectModules, ProjectModuleConflict, readProjectModule, saveProjectModule } from '../utils/helpers';
 import { getProjectObjectLocation, markProjectModuleEdited, recordProjectPlacementSave, type ProjectObjectSource, type ProjectObjectSourceRequest, type ProjectPlacementDraft } from '../utils/project-object-source';
-import type { ScreenUISource } from '../utils/screen-ui-preview';
+import { screenUIPreview, type ScreenUISource } from '../utils/screen-ui-preview';
+import { getScreenUIMoveEdits, trackScreenUIMoveDraft, type ApplyScreenUIMove } from '../utils/screen-ui-source';
 
-export default function ProjectFilesDialog({ scriptId, initialSource, screenUISource, prepareDraft, onClose }: {
+export default function ProjectFilesDialog({ scriptId, initialSource, screenUISource, screenUIMove, prepareDraft, onClose }: {
   scriptId: string; initialSource?: ProjectObjectSource; screenUISource?: ScreenUISource;
-  prepareDraft?: ProjectObjectSourceRequest['prepareDraft']; onClose: () => void;
+  screenUIMove?: ApplyScreenUIMove; prepareDraft?: ProjectObjectSourceRequest['prepareDraft']; onClose: () => void;
 }) {
   const dialog = useRef<HTMLDialogElement>(null);
   const [modules, setModules] = useState<string[]>();
@@ -17,6 +18,7 @@ export default function ProjectFilesDialog({ scriptId, initialSource, screenUISo
   const [draft, setDraft] = useState('');
   const [placementDraft, setPlacementDraft] = useState<ProjectPlacementDraft>();
   const prepareInitialDraft = useRef(prepareDraft);
+  const pendingScreenUIMove = useRef(screenUIMove);
   const [saving, setSaving] = useState(false);
   const [status, setStatus] = useState('');
   const [error, setError] = useState('');
@@ -133,6 +135,34 @@ export default function ProjectFilesDialog({ scriptId, initialSource, screenUISo
           <Editor height="100%" defaultLanguage="javascript" theme="vs-dark" value={draft} saveViewState={!sourcePath}
             path={`file:///projects/${scriptId.split('/')[0]}/${path.split('/').map(encodeURIComponent).join('/')}`}
             onMount={(editor: editor.IStandaloneCodeEditor) => {
+              const move = pendingScreenUIMove.current;
+              if (move && move.location.path === path) {
+                pendingScreenUIMove.current = undefined;
+                const { location, offset } = move;
+                const model = editor.getModel();
+                const value = model?.getValue();
+                const edits = location.writeVerified && screenUIPreview.getSnapshot().source === location &&
+                  loaded.value === location.source && value !== undefined &&
+                  value.replace(/\r\n/g, '\n') === location.source.replace(/\r\n/g, '\n')
+                  ? getScreenUIMoveEdits(value, location.kind, location, offset, location.source) : undefined;
+                if (!model || !edits) {
+                  setError('The Screen UI module changed. Reset the game before applying this move.');
+                } else {
+                  const before = model.getAlternativeVersionId();
+                  model.pushStackElement();
+                  model.pushEditOperations([], edits.map(({ start, end, newText }) => {
+                    const from = model.getPositionAt(start);
+                    const to = model.getPositionAt(end);
+                    return { range: {
+                      startLineNumber: from.lineNumber, startColumn: from.column,
+                      endLineNumber: to.lineNumber, endColumn: to.column,
+                    }, text: newText };
+                  }), () => null);
+                  model.pushStackElement();
+                  setDraft(model.getValue());
+                  trackScreenUIMoveDraft(model, move, before, edits);
+                }
+              }
               if (!sourceLocation) return;
               const position = editor.getModel()?.validatePosition(sourceLocation);
               if (!position) return;

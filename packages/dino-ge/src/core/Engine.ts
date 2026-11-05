@@ -2,7 +2,7 @@ import Canvas from './Canvas.js';
 import GameObject from './GameObject.js';
 import Input from './Input.js';
 import Scene from './Scene.js';
-import ScreenUI, { type ScreenUISnapshot } from './ScreenUI.js';
+import ScreenUI, { type ScreenUIEditing, type ScreenUISnapshot } from './ScreenUI.js';
 import Camera from './Camera.js';
 import System from './System.js';
 import PhysicsSystem from '../systems/PhysicsSystem.js';
@@ -249,10 +249,14 @@ export default class Engine {
     };
   }
 
-  /** Inspect completed ScreenUI frames. Request a source stack by index when needed. */
+  /**
+   * Inspect completed ScreenUI frames and optionally preview screen-space edits.
+   * Return undefined from getEditing to restore game input and the original positions.
+   */
   public static observeScreenUI(
     listener: (snapshot: ScreenUISnapshot) => void,
     getSourceIndex?: () => number | undefined,
+    getEditing?: () => ScreenUIEditing | undefined,
   ): () => void {
     const protect = <Args extends unknown[], Result>(callback: (...args: Args) => Result) =>
       (...args: Args): Result | undefined => {
@@ -267,7 +271,11 @@ export default class Engine {
         }
       };
     const observers = this._state.screenUIObservers ??= new Set();
-    const observer = { listener: protect(listener), getSourceIndex: getSourceIndex && protect(getSourceIndex) };
+    const observer = {
+      listener: protect(listener),
+      getSourceIndex: getSourceIndex && protect(getSourceIndex),
+      getEditing: getEditing && protect(getEditing),
+    };
     observers.add(observer);
     return () => { observers.delete(observer); };
   }

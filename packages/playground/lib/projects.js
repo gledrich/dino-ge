@@ -9,7 +9,7 @@ const maxBytes = 16 * 1024 * 1024;
 const projectName = /^[a-z0-9][a-z0-9_-]{0,63}$/i;
 const maxImageBytes = 5 * 1024 * 1024;
 const moduleReadOptions = { flag: constants.O_RDONLY | (constants.O_NOFOLLOW ?? 0) };
-const moduleRevision = contents => createHash('sha256').update(contents).digest('hex');
+export const moduleRevision = contents => createHash('sha256').update(contents).digest('hex');
 
 export const spriteImageTypes = ['image/png', 'image/jpeg', 'image/gif', 'image/webp'];
 

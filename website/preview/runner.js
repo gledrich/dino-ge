@@ -9,6 +9,13 @@ const report = error => tellEditor("preview-error", { message: messageOf(error).
 const sceneObjects = () => Engine.currentScene?.objects ?? Engine.objects;
 let lastScene = "";
 let screenUISourceRequest;
+let screenUIEditing;
+let latestScreenUI = [];
+let latestPreviewControls = [];
+
+document.addEventListener("keydown", event => {
+  if (screenUIEditing && event.key.toLowerCase() === "p") event.stopPropagation();
+}, true);
 
 function publishScene() {
   const objects = [];
@@ -37,6 +44,21 @@ window.addEventListener("message", event => {
   } else if (data?.type === "preview-screen-ui-source" && Number.isInteger(data.index) &&
       data.index >= 0 && data.index < 250 && Number.isInteger(data.request)) {
     screenUISourceRequest = { index: data.index, request: data.request };
+  } else if (data?.type === "preview-screen-ui-editing") {
+    if (data.editing === undefined) {
+      screenUIEditing = undefined;
+    } else if (Array.isArray(data.editing?.positions) && data.editing.positions.length <= 250) {
+      screenUIEditing = { positions: data.editing.positions.flatMap(move => {
+        if (!move || !Number.isInteger(move.index) || !move.control || !Number.isFinite(move.x) ||
+            !Number.isFinite(move.y) || Math.abs(move.x) > 65_536 || Math.abs(move.y) > 65_536) return [];
+        const current = latestPreviewControls[move.index];
+        if (!current || current.kind !== move.control.kind) return [];
+        const matches = current.id ? current.id === move.control.id
+          : ["id", "text", "font", "colour", "background", "x", "y", "width", "height"]
+            .every(key => current[key] === move.control[key]);
+        return matches ? [{ index: move.index, control: latestScreenUI[move.index], x: move.x, y: move.y }] : [];
+      }) };
+    }
   } else if (data?.type === "preview-scene-command" && typeof data.id === "string") {
     const object = [...sceneObjects()].find(candidate => candidate.id === data.id);
     if (!object) return;
@@ -68,6 +90,8 @@ Engine.observeScreenUI(({ width, height, controls, source }) => {
     }
     return bounded;
   });
+  latestScreenUI = controls;
+  latestPreviewControls = previewControls;
   tellEditor("preview-screen-ui", {
     frame: { width, height, controls: previewControls },
     canvas: { x, y, width: cssWidth, height: cssHeight },
@@ -78,7 +102,7 @@ Engine.observeScreenUI(({ width, height, controls, source }) => {
     });
     screenUISourceRequest = undefined;
   }
-}, () => screenUISourceRequest?.index);
+}, () => screenUISourceRequest?.index, () => screenUIEditing);
 
 Engine.on("gameRuntimeError", ({ detail }) => report(detail.error));
 window.addEventListener("error", event => report(event.error ?? event.message));

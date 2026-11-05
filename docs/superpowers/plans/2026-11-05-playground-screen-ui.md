@@ -35,10 +35,10 @@
 
 ## Change 2 — Drag Screen UI controls
 
-- [ ] Add a browser case for a mouse or touch drag and keyboard nudges, a dynamic coordinate, a repeated draw site and Discard. Observe the failure before implementing.
-- [ ] Add Edit Screen UI, a paused editing overlay and a run-scoped pending position. Preview against original draw options each frame. Validate hosted commands in the isolated runner.
-- [ ] Apply a verified position edit to the current entry or module draft with one undo step. Preserve computed coordinates with offsets where the call can be verified as unique.
-- [ ] Verify mouse, touch, keyboard, apply, discard, undo and reload in both Playground versions. Present the drag change separately.
+- [x] Add a browser case for a mouse or touch drag and keyboard nudges, a dynamic coordinate, a repeated draw site and Discard. Observe the failure before implementing.
+- [x] Add Edit Screen UI, a paused editing overlay and a run-scoped pending position. Preview against original draw options each frame. Validate hosted commands in the isolated runner.
+- [x] Apply a verified position edit to the current entry or module draft with one undo step. Preserve computed coordinates with offsets where the call can be verified as unique.
+- [x] Verify mouse, touch, keyboard, apply, discard, undo and reload in both Playground versions. Present the drag change separately.
 
 ## Change 3 — Edit Screen UI properties
 

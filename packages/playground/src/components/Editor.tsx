@@ -6,8 +6,8 @@ import { usePlayground } from '../context/PlaygroundContext';
 import { restoreInspectorProperty, type InspectorPropertyEdit } from './InspectorRow';
 import ProjectFilesDialog from './ProjectFilesDialog';
 import { openProjectObjectSourceEvent, type ProjectObjectSourceRequest } from '../utils/project-object-source';
-import { openScreenUISourceEvent, type OpenScreenUISource } from '../utils/screen-ui-preview';
-import { findScreenUICall } from '../utils/screen-ui-source';
+import { openScreenUISourceEvent, screenUIPreview, type OpenScreenUISource } from '../utils/screen-ui-preview';
+import { applyScreenUIMoveEvent, findScreenUICall, getScreenUIMoveEdits, trackScreenUIMoveDraft, type ApplyScreenUIMove } from '../utils/screen-ui-source';
 import { downloadBrowserProject, restoreBrowserProject } from '../utils/browser-project-archive';
 import { browserPreviewUrl, createScript, getCurrentScriptId, getScript, getFilesList, getSpriteImageFileError, readGameFolder, importGameFolder, importSpriteImage, type GameFolder } from '../utils/helpers';
 import { applyEditsToSource, Edit, instrumentCode, getSourceMapping, getSceneObjectCreation, getSceneObjectDeletion, getSceneObjectDuplication, getSceneObjectRename, getSpriteImageReplacement, getUniqueObjectSourceMapping, type CanvasPlacementTransaction } from '../utils/ast-utils';
@@ -56,7 +56,8 @@ const CodeEditor: React.FC<EditorProps> = ({ currentScriptId, onSave, onSelectSc
   const [importing, setImporting] = useState(false);
   const [importError, setImportError] = useState('');
   const [projectFiles, setProjectFiles] = useState<{
-    scriptId: string; request?: ProjectObjectSourceRequest; screenUI?: OpenScreenUISource['location']; trigger: HTMLButtonElement;
+    scriptId: string; request?: ProjectObjectSourceRequest; screenUI?: OpenScreenUISource['location'];
+    screenUIMove?: ApplyScreenUIMove; trigger: HTMLButtonElement;
   }>();
   const [dropGuide, setDropGuide] = useState<'code' | 'image'>();
   const [dropFeedback, setDropFeedback] = useState<{ scriptId: string; message: string; error: boolean }>();
@@ -620,12 +621,41 @@ const CodeEditor: React.FC<EditorProps> = ({ currentScriptId, onSave, onSelectSc
       if (applySourceEdits((event as CustomEvent<Edit[]>).detail)) event.preventDefault();
     };
 
+    const applyScreenUIMove = (event: Event) => {
+      const request = (event as CustomEvent<ApplyScreenUIMove>).detail;
+      const { location, trigger, offset } = request;
+      if (!location.writeVerified || location.scriptId !== currentScriptId ||
+          screenUIPreview.getSnapshot().source !== location) return;
+      openTool('editor');
+      if (!location.entry) {
+        setProjectFiles({ scriptId: currentScriptId, screenUI: location, screenUIMove: request, trigger });
+        return;
+      }
+      const model: editor.ITextModel | null = monacoEditorRef.current?.getModel();
+      const runningSource = normaliseEntryText(location.source);
+      const value = model?.getValue();
+      const exact = value !== undefined && normaliseEntryText(value) === runningSource;
+      const trusted = model && loadedEntrySource.current === runningSource && isTrustedEntryModel(model);
+      const runMatches = runningEntrySource.current?.scriptId === currentScriptId &&
+        runningEntrySource.current.source === runningSource;
+      const edits = model && value !== undefined && runMatches && (exact || trusted)
+        ? getScreenUIMoveEdits(value, location.kind, location, offset, location.source) : undefined;
+      const before = model?.getAlternativeVersionId();
+      if (!model || before === undefined || !edits || !applySourceEdits(edits)) {
+        setDropFeedback({ scriptId: currentScriptId, message: 'The Screen UI draft changed. Reset the game before applying this move.', error: true });
+        return;
+      }
+      trackScreenUIMoveDraft(model, request, before, edits);
+      setDropFeedback({ scriptId: currentScriptId, message: 'Applied Screen UI move. Save the script to keep it.', error: false });
+    };
+
     window.addEventListener('playground-insert-text', handleInsertText);
     window.addEventListener('playground-update-code', handleUpdateCodeEvent);
     window.addEventListener('playground-get-value', handleGetValueEvent);
     window.addEventListener('playground-sync-source-mapping', syncSourceMapping);
     window.addEventListener(renameEntryObjectEvent, renameEntryObject);
     window.addEventListener('playground-apply-placement', applyPlacement);
+    window.addEventListener(applyScreenUIMoveEvent, applyScreenUIMove);
     window.addEventListener('playground-update-sprite-image', replaceSpriteImage);
     window.addEventListener('playground-add-scene-object', addSceneObject);
     window.addEventListener(sceneObjectCodeEvent, addSceneObject);
@@ -666,6 +696,7 @@ const CodeEditor: React.FC<EditorProps> = ({ currentScriptId, onSave, onSelectSc
       window.removeEventListener('playground-sync-source-mapping', syncSourceMapping);
       window.removeEventListener(renameEntryObjectEvent, renameEntryObject);
       window.removeEventListener('playground-apply-placement', applyPlacement);
+      window.removeEventListener(applyScreenUIMoveEvent, applyScreenUIMove);
       window.removeEventListener('playground-update-sprite-image', replaceSpriteImage);
       window.removeEventListener('playground-add-scene-object', addSceneObject);
       window.removeEventListener(sceneObjectCodeEvent, addSceneObject);
@@ -935,6 +966,7 @@ const CodeEditor: React.FC<EditorProps> = ({ currentScriptId, onSave, onSelectSc
       {importError && <p className="import-game-error" role="alert">{importError}</p>}
       {projectFiles?.scriptId === currentScriptId && <ProjectFilesDialog key={currentScriptId} scriptId={currentScriptId}
         initialSource={projectFiles.request?.source} screenUISource={projectFiles.screenUI} prepareDraft={projectFiles.request?.prepareDraft}
+        screenUIMove={projectFiles.screenUIMove}
         onClose={() => {
           setProjectFiles(undefined);
           const { trigger } = projectFiles;

@@ -1,9 +1,10 @@
-import React, { useCallback, useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState, useSyncExternalStore } from 'react';
 import { Engine, Input, SpriteComponent, getViewportAlignment, snapToGrid, type GameObject, type ObjectManipulationPreview } from 'dino-ge';
 import { usePlayground } from '../context/PlaygroundContext';
 import type { GameRunError } from '../hooks/usePlaygroundScripts';
 import Toolbar from './Toolbar';
 import { ScreenUIOutline } from './ScreenUITools';
+import { screenUIPreview } from '../utils/screen-ui-preview';
 import Logo from './Logo';
 import { frameSceneObjectEvent, getAssetSource, getDefaultSceneObjectTag, getSceneArrowMovement, getSceneAssetPreviewType, getSceneSelectionBounds, getSceneSource, getSceneSpritePlacement, getSceneSpriteScale, isReplaceableSprite, isSceneFrameShortcut, nudgeSceneSelection, sceneAssetDragEvent, sceneAssetDragType, sceneKeyboardPlacementEvent, sceneObjectDefaults, sceneObjectDragType, sceneObjectKinds, scenePointerDragEvent, type SceneImageAsset, type SceneKeyboardPlacementRequest, type SceneObjectKind, type SceneObjectPlacement, type ScenePointerDrag, type ScenePoint } from '../utils/scene-objects';
 import { browserPreviewUrl, getSpriteImageFileError, importSpriteImage } from '../utils/helpers';
@@ -170,7 +171,8 @@ const Viewport: React.FC<{
 
   const viewportContainerRef = useRef<HTMLDivElement>(null);
   const sceneControlsRef = useRef<HTMLDivElement>(null);
-  const isEditingScene = !browserPreviewUrl && isPaused && isDebug;
+  const isEditingScreenUI = useSyncExternalStore(screenUIPreview.subscribe, () => screenUIPreview.getSnapshot().editing);
+  const isEditingScene = !isEditingScreenUI && !browserPreviewUrl && isPaused && isDebug;
   const savedCamera = useRef<{ canvas: HTMLCanvasElement; scene: typeof Engine.currentScene;
     x: number; y: number; zoom: number } | null>(null);
   const pan = useRef<CameraPan | null>(null);
@@ -1118,9 +1120,12 @@ const Viewport: React.FC<{
         isDebug={isDebug}
         isEditingScene={isEditingScene}
         arePanelsMinimized={arePanelsMinimized}
-        onTogglePause={isEditingScene ? toggleSceneEditing : togglePause}
+        onTogglePause={isEditingScreenUI ? () => {
+          if (screenUIPreview.finishEditing()) setIsPaused(false);
+          else openTool('inspector');
+        } : isEditingScene ? toggleSceneEditing : togglePause}
         onToggleDebug={toggleDebug}
-        onToggleSceneEditing={browserPreviewUrl ? undefined : toggleSceneEditing}
+        onToggleSceneEditing={browserPreviewUrl || isEditingScreenUI ? undefined : toggleSceneEditing}
         onTogglePanels={togglePanels}
         onRefresh={() => window.dispatchEvent(new CustomEvent('playground-refresh'))}
       />

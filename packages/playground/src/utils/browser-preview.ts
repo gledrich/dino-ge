@@ -84,7 +84,8 @@ export function startBrowserPreview(
   let startupStage = 'connecting to the isolated preview';
   let sourceRequest = 0;
   const screenUI = screenUIPreview.start(index =>
-    frame?.contentWindow?.postMessage({ type: 'preview-screen-ui-source', index, request: ++sourceRequest }, origin));
+    frame?.contentWindow?.postMessage({ type: 'preview-screen-ui-source', index, request: ++sourceRequest }, origin),
+  editing => frame?.contentWindow?.postMessage({ type: 'preview-screen-ui-editing', editing }, origin));
   const sendCommand = (command: SceneCommand) => frame?.contentWindow?.postMessage({
     type: 'preview-scene-command', ...command
   }, origin);
@@ -162,7 +163,8 @@ export function startBrowserPreview(
       void file.text().then(source => {
         const call = findScreenUICall(source, control.kind, location);
         if (call && request === sourceRequest) {
-          screenUI.setSource(index, { ...location, ...call, source, kind: control.kind, scriptId, entry: location.path === snapshot.entry });
+          screenUI.setSource(index, { ...location, ...call, source, kind: control.kind, scriptId,
+            entry: location.path === snapshot.entry, writeVerified: true });
         }
       }).catch(() => {});
     } else if (type === 'preview-console' && logLevels.has(level) && typeof message === 'string') {

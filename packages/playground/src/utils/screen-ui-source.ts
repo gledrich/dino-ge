@@ -1,6 +1,78 @@
-import { parse, type AnyNode, type CallExpression, type Position } from 'acorn';
+import { parse, type AnyNode, type CallExpression, type Position, type Property } from 'acorn';
+import type { editor } from 'monaco-editor';
+import type { Edit } from './ast-utils';
+import type { ScreenUISource } from './screen-ui-preview';
 
 export type ScreenUIControlKind = 'panel' | 'label' | 'image' | 'button' | 'progressBar';
+
+export const applyScreenUIMoveEvent = 'playground-apply-screen-ui-move';
+export type ApplyScreenUIMove = {
+  location: ScreenUISource;
+  offset: { x: number; y: number };
+  trigger: HTMLButtonElement;
+  applied: () => void;
+  reverted?: () => void;
+};
+
+type SourceSpan = { start: number; end: number };
+type ScreenUIMoveEdit = Edit & { property?: SourceSpan };
+
+function movedProperties(edits: readonly ScreenUIMoveEdit[]) {
+  let offset = 0;
+  return [...edits].sort((left, right) => left.start - right.start).map(edit => {
+    const property = edit.property ?? edit;
+    const change = edit.newText.length - (edit.end - edit.start);
+    const span = { start: property.start + offset, end: property.end + offset + change };
+    offset += change;
+    return span;
+  });
+}
+
+function trackMovedProperties(spans: readonly SourceSpan[], changes: readonly editor.IModelContentChange[]) {
+  const mapped: SourceSpan[] = [];
+  for (const span of spans) {
+    let offset = 0;
+    for (const change of changes) {
+      const start = change.rangeOffset;
+      const end = start + change.rangeLength;
+      if (end < span.start || (change.rangeLength > 0 && end === span.start)) {
+        offset += change.text.length - change.rangeLength;
+      } else if (start < span.end || (change.rangeLength === 0 && start === span.end)) {
+        return;
+      }
+    }
+    mapped.push({ start: span.start + offset, end: span.end + offset });
+  }
+  return mapped;
+}
+
+export function trackScreenUIMoveDraft(
+  model: editor.ITextModel, request: Pick<ApplyScreenUIMove, 'applied' | 'reverted'>,
+  beforeRevision: number, edits: readonly ScreenUIMoveEdit[],
+) {
+  let properties: SourceSpan[] | undefined = movedProperties(edits);
+  const revisions = new Map<number, SourceSpan[] | undefined>([
+    [beforeRevision, undefined], [model.getAlternativeVersionId(), properties],
+  ]);
+  const content = model.onDidChangeContent(event => {
+    const revision = model.getAlternativeVersionId();
+    const next = revisions.has(revision) ? revisions.get(revision)
+      : properties && trackMovedProperties(properties, event.changes);
+    const wasApplied = !!properties;
+    properties = next;
+    revisions.set(revision, properties);
+    if (properties && !wasApplied) request.applied();
+    if (!properties && wasApplied) request.reverted?.();
+  });
+  const close = () => {
+    content.dispose();
+    disposal.dispose();
+    window.removeEventListener('playground-before-run', close);
+  };
+  const disposal = model.onWillDispose(close);
+  window.addEventListener('playground-before-run', close);
+  request.applied();
+}
 
 interface SourcePosition {
   lineNumber: number;
@@ -61,10 +133,19 @@ export function resolveScreenUISource(stack: string, base: URL, blobEntry?: { ur
   }
 }
 
-function getDrawCalls(source: string, kind: ScreenUIControlKind): CallExpression[] {
+function inspectSource(source: string, kind: ScreenUIControlKind, includeContext = false) {
   const ast = parse(source, { ecmaVersion: 'latest', sourceType: 'module', locations: true });
   const calls: CallExpression[] = [];
-  const visit = (node: AnyNode) => {
+  const parents = new Map<AnyNode, AnyNode>();
+  const references = new Map<string, AnyNode[]>();
+  const visit = (node: AnyNode, parent?: AnyNode) => {
+    if (includeContext && parent) parents.set(node, parent);
+    if (includeContext && node.type === 'Identifier' &&
+        !(parent?.type === 'Property' && !parent.computed && parent.key === node)) {
+      const uses = references.get(node.name) ?? [];
+      uses.push(node);
+      references.set(node.name, uses);
+    }
     if (node.type === 'CallExpression' && node.callee.type === 'MemberExpression') {
       const { computed, property } = node.callee;
       if ((!computed && property.type === 'Identifier' && property.name === kind) ||
@@ -72,19 +153,32 @@ function getDrawCalls(source: string, kind: ScreenUIControlKind): CallExpression
     }
     for (const value of Object.values(node)) {
       for (const child of Array.isArray(value) ? value : [value]) {
-        if (child && typeof child === 'object' && 'type' in child) visit(child as AnyNode);
+        if (child && typeof child === 'object' && 'type' in child) visit(child as AnyNode, node);
       }
     }
   };
   visit(ast);
-  return calls.sort((a, b) => a.start - b.start);
+  return { ast, calls: calls.sort((a, b) => a.start - b.start), parents, references };
 }
 
-function calleeShape(call: CallExpression) {
-  return JSON.stringify(call.callee, (key, value: unknown) => {
+function nodeShape(node: AnyNode) {
+  return JSON.stringify(node, (key, value: unknown) => {
     if (['start', 'end', 'loc', 'raw'].includes(key)) return undefined;
     return typeof value === 'bigint' ? String(value) : value;
   });
+}
+
+function findMatchingCalls(calls: readonly CallExpression[], runtime: readonly CallExpression[], location: SourcePosition) {
+  const { lineNumber, column } = location;
+  if (!Number.isSafeInteger(lineNumber) || !Number.isSafeInteger(column) || lineNumber < 1 || column < 1) return;
+  const compare = (position: Position) => lineNumber - position.line || column - 1 - position.column;
+  const matches = runtime.filter(call => call.callee.loc &&
+    compare(call.callee.loc.start) >= 0 && compare(call.callee.loc.end) <= 0);
+  if (matches.length !== 1 || calls.length !== runtime.length) return;
+  const [runningCall] = matches;
+  const call = calls[runtime.indexOf(runningCall)];
+  if (call !== runningCall && nodeShape(call.callee) !== nodeShape(runningCall.callee)) return;
+  return { call, runningCall };
 }
 
 /**
@@ -94,25 +188,156 @@ function calleeShape(call: CallExpression) {
 export function findScreenUICall(
   source: string, kind: ScreenUIControlKind, location: SourcePosition, runtimeSource = source,
 ): ScreenUICallLocation | undefined {
-  const { lineNumber, column } = location;
-  if (!Number.isSafeInteger(lineNumber) || !Number.isSafeInteger(column) || lineNumber < 1 || column < 1) return;
-  const compare = (position: Position) => lineNumber - position.line || column - 1 - position.column;
   try {
-    const runtimeCalls = getDrawCalls(runtimeSource, kind);
-    const matches = runtimeCalls.filter(call => call.callee.loc &&
-      compare(call.callee.loc.start) >= 0 && compare(call.callee.loc.end) <= 0);
-    if (matches.length !== 1) return;
-    let call = matches[0];
-    if (source !== runtimeSource) {
-      const originalCalls = getDrawCalls(source, kind);
-      if (originalCalls.length !== runtimeCalls.length) return;
-      const original = originalCalls[runtimeCalls.indexOf(call)];
-      if (calleeShape(original) !== calleeShape(call)) return;
-      call = original;
-    }
-    const position = call.loc?.start;
-    if (position) return { lineNumber: position.line, column: position.column + 1, start: call.start, end: call.end };
+    const { calls } = inspectSource(source, kind);
+    const runtime = source === runtimeSource ? calls : inspectSource(runtimeSource, kind).calls;
+    const match = findMatchingCalls(calls, runtime, location);
+    const call = match?.call;
+    const position = call?.loc?.start;
+    if (call && position) return { lineNumber: position.line, column: position.column + 1, start: call.start, end: call.end };
   } catch {
     return;
   }
+}
+
+function propertyName(property: Pick<Property, 'key' | 'computed'>) {
+  if (!property.computed && property.key.type === 'Identifier') return property.key.name;
+  if (property.key.type === 'Literal' && typeof property.key.value === 'string') return property.key.value;
+}
+
+type ScreenFunction = Extract<AnyNode, { type: 'FunctionDeclaration' | 'FunctionExpression' | 'ArrowFunctionExpression' }>;
+
+/** Walk only single-execution contexts. Loops, inner callbacks and IIFEs stop the walk. */
+function getScreenFunction(node: AnyNode, parents: ReadonlyMap<AnyNode, AnyNode>): ScreenFunction | undefined {
+  for (let child = node, parent = parents.get(child); parent; child = parent, parent = parents.get(child)) {
+    switch (parent.type) {
+      case 'BlockStatement':
+      case 'ExpressionStatement':
+      case 'ReturnStatement':
+        break;
+      case 'IfStatement':
+        if (child !== parent.test) break;
+        return;
+      case 'FunctionDeclaration':
+      case 'FunctionExpression':
+      case 'ArrowFunctionExpression':
+        if (child === parent.body && !parent.async && !parent.generator && parent.params[0]?.type === 'Identifier') {
+          return parent;
+        }
+        return;
+      default:
+        return;
+    }
+  }
+}
+
+function isUniqueScreenDraw(call: CallExpression, scan: ReturnType<typeof inspectSource>) {
+  const { ast, parents, references } = scan;
+  const importedEngines = new Set<string>();
+  const importedNamespaces = new Set<string>();
+  for (const statement of ast.body) {
+    if (statement.type !== 'ImportDeclaration' || statement.source.value !== 'dino-ge') continue;
+    for (const specifier of statement.specifiers) {
+      if (specifier.type === 'ImportNamespaceSpecifier') importedNamespaces.add(specifier.local.name);
+      if (specifier.type === 'ImportSpecifier' && specifier.imported.type === 'Identifier' &&
+          specifier.imported.name === 'Engine') importedEngines.add(specifier.local.name);
+    }
+  }
+
+  const isTopLevel = (node: AnyNode) => {
+    const parent = parents.get(node);
+    if (parent?.type === 'Program') return true;
+    return parent?.type === 'ExportNamedDeclaration' && parent.declaration === node && parents.get(parent)?.type === 'Program';
+  };
+  const isEngineCallback = (callback: AnyNode) => {
+    const property = parents.get(callback);
+    if (property?.type !== 'Property' || property.value !== callback || property.kind !== 'init' ||
+        propertyName(property) !== 'drawUI') return false;
+    const options = parents.get(property);
+    if (options?.type !== 'ObjectExpression' || options.properties.some(field =>
+      field.type !== 'Property' || (field.computed && propertyName(field) === undefined)) ||
+      options.properties.filter(field => field.type === 'Property' && propertyName(field) === 'drawUI').length !== 1) return false;
+    const constructor = parents.get(options);
+    if (constructor?.type !== 'NewExpression' || constructor.arguments[0] !== options) return false;
+    const callee = constructor.callee;
+    if (!(callee.type === 'Identifier' && importedEngines.has(callee.name)) &&
+        !(callee.type === 'MemberExpression' && !callee.computed && callee.object.type === 'Identifier' &&
+          importedNamespaces.has(callee.object.name) && callee.property.type === 'Identifier' &&
+          callee.property.name === 'Engine')) return false;
+    const container = parents.get(constructor);
+    if (container?.type === 'ExpressionStatement') return isTopLevel(container);
+    const declaration = container?.type === 'VariableDeclarator' ? parents.get(container) : undefined;
+    return declaration?.type === 'VariableDeclaration' && isTopLevel(declaration);
+  };
+
+  const originalFunction = getScreenFunction(call, parents);
+  if (!originalFunction || call.callee.type !== 'MemberExpression' || call.callee.object.type !== 'Identifier' ||
+      originalFunction.params[0]?.type !== 'Identifier' || call.callee.object.name !== originalFunction.params[0].name) return false;
+
+  const visited = new Set<ScreenFunction>();
+  let current: ScreenFunction = originalFunction;
+  while (!visited.has(current)) {
+    visited.add(current);
+    if (current.type === 'FunctionExpression' && current.id &&
+        references.get(current.id.name)?.some(use => use !== current.id)) return false;
+    if (isEngineCallback(current)) return true;
+    if (current.type !== 'FunctionDeclaration' || !current.id || parents.get(current)?.type !== 'Program') return false;
+    const uses = references.get(current.id.name)?.filter(use => use !== current.id);
+    if (uses?.length !== 1) return false;
+    const [use] = uses;
+    if (isEngineCallback(use)) return true;
+    const helperCall = parents.get(use);
+    if (helperCall?.type !== 'CallExpression' || helperCall.callee !== use || helperCall.optional) return false;
+    const caller = getScreenFunction(helperCall, parents);
+    const argument = helperCall.arguments[0];
+    if (!caller || caller.params[0]?.type !== 'Identifier' || argument?.type !== 'Identifier' ||
+        caller.params[0].name !== argument.name) return false;
+    current = caller;
+  }
+  return false;
+}
+
+/** Rewrite a verified singleton draw call while retaining its original coordinate expressions. */
+export function getScreenUIMoveEdits(
+  source: string, kind: ScreenUIControlKind, position: SourcePosition, offset: { x: number; y: number }, runtimeSource = source,
+): ScreenUIMoveEdit[] | undefined {
+  if (![offset.x, offset.y].every(Number.isFinite) || (!offset.x && !offset.y)) return;
+  try {
+    const scan = inspectSource(source, kind, true);
+    const runtime = source === runtimeSource ? scan.calls : inspectSource(runtimeSource, kind).calls;
+    const match = findMatchingCalls(scan.calls, runtime, position);
+    if (match && isUniqueScreenDraw(match.call, scan)) return offsetDrawArguments(source, kind, offset, match);
+  } catch {
+    return;
+  }
+}
+
+function offsetDrawArguments(
+  source: string, kind: ScreenUIControlKind, offset: { x: number; y: number },
+  { call, runningCall }: { call: CallExpression; runningCall: CallExpression },
+) {
+  const argument = kind === 'image' ? 1 : 0;
+  const options = call.arguments[argument];
+  if (options?.type !== 'ObjectExpression' || options.properties.some(property =>
+    property.type !== 'Property' || (property.computed && propertyName(property) === undefined))) return;
+  if (call !== runningCall && nodeShape(options) !== nodeShape(runningCall.arguments[argument])) return;
+
+  const edits: ScreenUIMoveEdit[] = [];
+  for (const axis of ['x', 'y'] as const) {
+    const delta = offset[axis];
+    if (!delta) continue;
+    const matches = options.properties.filter((property): property is Property =>
+      property.type === 'Property' && propertyName(property) === axis);
+    if (matches.length !== 1 || matches[0].kind !== 'init' || matches[0].method) return;
+    const property = matches[0];
+    const { value } = property;
+    const literal = value.type === 'Literal' && typeof value.value === 'number' ? value.value + delta : undefined;
+    const newValue = literal !== undefined && Number.isFinite(literal) ? String(literal)
+      : `(${source.slice(value.start, value.end)}) ${delta > 0 ? '+' : '-'} ${Math.abs(delta)}`;
+    const span = { start: property.start, end: property.end };
+    edits.push(property.shorthand
+      ? { ...span, newText: `${axis}: ${newValue}`, property: span }
+      : { start: value.start, end: value.end, newText: newValue, property: span });
+  }
+  return edits;
 }

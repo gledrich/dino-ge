@@ -46,4 +46,41 @@ describe('Screen UI preview selection', () => {
     first.dispose();
     expect(preview.getSnapshot().frame?.controls[0]?.id).toBe('current');
   });
+
+  it('sends absolute offsets, preserves independent pending moves and restores discarded positions', () => {
+    const preview = createScreenUIPreview();
+    const updateEditing = jest.fn();
+    const run = preview.start(jest.fn(), updateEditing);
+    run.publish(frame(control('play'), control('quit')));
+    preview.select(0);
+    preview.beginEditing();
+    preview.move(12, -4);
+    preview.move(18, -4);
+    expect(updateEditing).toHaveBeenLastCalledWith({
+      positions: [{ index: 0, control: control('play'), x: 18, y: -4 }],
+    });
+    expect(preview.finishEditing()).toBe(false);
+    preview.select(1);
+    preview.move(0, 5);
+    preview.discardMove();
+    expect(preview.getSnapshot().moves).toHaveLength(1);
+    run.dispose();
+    expect(updateEditing).toHaveBeenLastCalledWith(undefined);
+  });
+
+  it('reverts and restores an applied move after the control changes draw order', () => {
+    const preview = createScreenUIPreview();
+    const run = preview.start(jest.fn());
+    run.publish(frame(control('play'), control('quit')));
+    preview.select(0);
+    preview.beginEditing();
+    preview.move(10, 0);
+    const applied = preview.markApplied(preview.getSnapshot().moves[0]);
+    run.publish(frame(control('quit'), control('play')));
+    expect(preview.getSnapshot().moves[0]?.index).toBe(1);
+    applied?.remove();
+    expect(preview.getSnapshot().moves).toHaveLength(0);
+    applied?.restore();
+    expect(preview.getSnapshot().moves[0]).toMatchObject({ index: 1, x: 10 });
+  });
 });

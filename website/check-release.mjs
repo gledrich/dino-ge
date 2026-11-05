@@ -128,6 +128,23 @@ try {
   assert.ok(game);
   const canvas = game.locator('#playground-canvas-container canvas');
   await canvas.waitFor();
+  await page.getByRole('tab', { name: 'Explorer', exact: true }).click();
+  await page.getByRole('region', { name: 'Screen UI', exact: true })
+    .getByRole('button', { name: 'AMBER RUINS', exact: true }).click();
+  const properties = page.getByRole('region', { name: 'Screen UI properties' });
+  await properties.getByRole('button', { name: 'Edit Screen UI', exact: true }).click();
+  const handle = page.getByRole('button', { name: 'Move AMBER RUINS', exact: true });
+  const start = await handle.boundingBox();
+  assert.ok(start);
+  // The mobile game extends above the website's editor container.
+  await page.mouse.move(start.x + start.width / 2, start.y + start.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(start.x + start.width / 2 + 20, start.y + start.height / 2, { steps: 4 });
+  await page.mouse.up();
+  assert.equal(Math.round((await handle.boundingBox()).x - start.x), 20);
+  await properties.getByRole('button', { name: 'Discard move', exact: true }).click();
+  assert.equal((await handle.boundingBox()).x, start.x);
+  await properties.getByRole('button', { name: 'Finish editing Screen UI', exact: true }).click();
   const toolbar = page.locator('.viewport-panel .toolbar');
   const drawer = page.locator('.mobile-dock-resize');
   const openToolbarBounds = await toolbar.boundingBox();

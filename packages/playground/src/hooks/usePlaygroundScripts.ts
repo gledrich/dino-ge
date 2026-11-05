@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useRef, useState, useSyncExternalStore } from 'react';
 import * as Dino from 'dino-ge';
 import { browserPreviewUrl, getScript, readProjectModule, setCurrentScriptId as rememberScriptId, updateScript } from '../utils/helpers';
 import { instrumentCode, rebaseModule } from '../utils/ast-utils';
@@ -33,6 +33,7 @@ export const usePlaygroundScripts = () => {
     pendingCanvasPlacements,
     setIsPaused 
   } = usePlayground();
+  const editingScreenUI = useSyncExternalStore(screenUIPreview.subscribe, () => screenUIPreview.getSnapshot().editing);
   const keepSceneOnSave = useRef(false);
   useEffect(() => {
     const reportError = ({ detail }: CustomEvent<Dino.EngineRuntimeError>) => setRuntimeError(detail);
@@ -47,10 +48,10 @@ export const usePlaygroundScripts = () => {
     stopTrackingSources.current = undefined;
   }, []);
   useLayoutEffect(() => {
-    keepSceneOnSave.current = (isPaused && isDebug) || pendingCanvasPlacements.size > 0;
+    keepSceneOnSave.current = (isPaused && isDebug && !editingScreenUI) || pendingCanvasPlacements.size > 0;
     previewControls.current = { paused: isPaused, debug: isDebug };
     browserPreview.current?.setControls(previewControls.current);
-  }, [isPaused, isDebug, pendingCanvasPlacements]);
+  }, [isPaused, isDebug, editingScreenUI, pendingCanvasPlacements]);
 
   const updatePlayground = useCallback(async (fromSave = false) => {
     if (!isViewportReady) return;
@@ -62,7 +63,7 @@ export const usePlaygroundScripts = () => {
       if (run === runId.current) setRuntimeError({ phase: 'script', error });
       return;
     }
-    if (run !== runId.current || (fromSave && keepSceneOnSave.current)) return;
+    if (run !== runId.current || (fromSave && (keepSceneOnSave.current || screenUIPreview.hasPendingMoves()))) return;
     const result = instrumentCode(scriptText, false, currentScriptId);
     window.dispatchEvent(new CustomEvent('playground-syntax-error', { detail: result.error ?? null }));
     if (result.error) return;
@@ -162,15 +163,20 @@ export const usePlaygroundScripts = () => {
           const isEntry = position.path === entryPath;
           if (!isEntry && !isUneditedProjectRunModule(currentScriptId, run, position.path)) return;
           const request = sourceRequest;
-          const loadSource = isEntry ? Promise.resolve(scriptText)
-            : readProjectModule(currentScriptId, position.path, sources.signal).then(file => file.value);
-          void loadSource.then(source => {
+          const address = new URL(position.path.split('/').map(encodeURIComponent).join('/'), sourceBase).href;
+          const loadSource = isEntry ? Promise.resolve({ value: scriptText, revision: undefined })
+            : readProjectModule(currentScriptId, position.path, sources.signal);
+          void loadSource.then(({ value: source, revision }) => {
+            const runningRevision = performance.getEntriesByName(address, 'resource').flatMap(resource =>
+              (resource as PerformanceResourceTiming).serverTiming ?? []).find(timing => timing.name === 'dino-source')?.description;
+            if (!isEntry && runningRevision && runningRevision !== revision) return;
             const call = findScreenUICall(source, control.kind, position, isEntry ? entry : source);
             if (call && request === sourceRequest) {
-              screenUI.setSource(drawn.index, { ...position, ...call, source, kind: control.kind, scriptId: currentScriptId, entry: isEntry });
+              screenUI.setSource(drawn.index, { ...position, ...call, source, kind: control.kind, scriptId: currentScriptId,
+                entry: isEntry, writeVerified: isEntry || !!revision && runningRevision === revision });
             }
           }).catch(() => {});
-        }, () => sourceIndex);
+        }, () => sourceIndex, screenUIPreview.getEditing);
         stopScreenUI = () => {
           unsubscribe();
           screenUI.dispose();
@@ -193,7 +199,7 @@ export const usePlaygroundScripts = () => {
 
   const handleRefresh = useCallback(async (editorValue: string, fromSave = false) => {
     const activeRun = runId.current;
-    const keepCurrentScene = fromSave && keepSceneOnSave.current;
+    const keepCurrentScene = fromSave && (keepSceneOnSave.current || screenUIPreview.hasPendingMoves());
     try {
       await updateScript(editorValue, false, currentScriptId);
     } catch (error) {
@@ -201,7 +207,7 @@ export const usePlaygroundScripts = () => {
       if (activeRun === runId.current) setRuntimeError({ phase: 'script', error });
       return;
     }
-    if (fromSave && (keepCurrentScene || keepSceneOnSave.current || activeRun !== runId.current)) return;
+    if (fromSave && (keepCurrentScene || keepSceneOnSave.current || screenUIPreview.hasPendingMoves() || activeRun !== runId.current)) return;
     await updatePlayground(fromSave);
     if (!fromSave || !keepSceneOnSave.current) setIsPaused(false);
   }, [currentScriptId, updatePlayground, setIsPaused]);
@@ -247,7 +253,7 @@ export const usePlaygroundScripts = () => {
 
   const requestRunChange = useCallback((change: RunChange) => {
     if (pendingRunChange || (change.kind === 'switch' && change.scriptId === currentScriptId)) return;
-    if (pendingCanvasPlacements.size) setPendingRunChange(change);
+    if (pendingCanvasPlacements.size || screenUIPreview.hasPendingMoves()) setPendingRunChange(change);
     else performRunChange(change);
   }, [currentScriptId, pendingCanvasPlacements.size, pendingRunChange, performRunChange]);
 

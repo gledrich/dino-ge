@@ -1,5 +1,12 @@
-import { expect, test } from '@jest/globals';
-import { findScreenUICall, resolveScreenUISource } from './screen-ui-source';
+import { expect, jest, test } from '@jest/globals';
+import type { editor } from 'monaco-editor';
+import { findScreenUICall, getScreenUIMoveEdits, resolveScreenUISource, trackScreenUIMoveDraft } from './screen-ui-source';
+
+function applyEdits(source: string, edits: NonNullable<ReturnType<typeof getScreenUIMoveEdits>>) {
+  return [...edits].sort((left, right) => right.start - left.start).reduce(
+    (text, { start, end, newText }) => text.slice(0, start) + newText + text.slice(end), source,
+  );
+}
 
 const hostedRun = new URL('https://preview.example/run/current/');
 const engineFrame = '    at ScreenUI.button (https://preview.example/built/index.js:3:810)';
@@ -75,4 +82,116 @@ test('maps a verified draw call into its auto-formatted editor text', () => {
   expect(findScreenUICall(formatted, 'label', { lineNumber: 1, column: 28 }, runtime)).toEqual({
     lineNumber: 2, column: 3, start: 17, end: 37,
   });
+});
+
+test('adds a position offset without replacing a responsive calculation or a shorthand coordinate', () => {
+  const source = [
+    "import { Engine as GameEngine } from 'dino-ge';",
+    'new GameEngine({ drawUI(ui) {',
+    '  const y = ui.height - 24;',
+    "  ui.label({ x: ui.width / 2, y, text: 'Title' });",
+    '} });',
+  ].join('\n');
+  const edits = getScreenUIMoveEdits(source, 'label', { lineNumber: 4, column: 3 }, { x: 12, y: -4 });
+  expect(edits).toBeDefined();
+  expect(applyEdits(source, edits!)).toContain("ui.label({ x: (ui.width / 2) + 12, y: (y) - 4, text: 'Title' });");
+});
+
+test('supports a named draw callback and a helper called once in that callback', () => {
+  const source = [
+    "import { Engine } from 'dino-ge';",
+    'function drawTitle(ui) {',
+    "  ui.label({ x: ui.width / 2, y: 20, text: 'Title' });",
+    '}',
+    'function drawUI(ui) { drawTitle(ui); }',
+    'export const game = new Engine({ drawUI });',
+  ].join('\n');
+  const edits = getScreenUIMoveEdits(source, 'label', { lineNumber: 3, column: 3 }, { x: 0, y: 6 });
+  expect(edits).toBeDefined();
+  expect(applyEdits(source, edits!)).toContain("ui.label({ x: ui.width / 2, y: 26, text: 'Title' });");
+});
+
+test.each([
+  'for (let i = 0; i < 2; i++) drawTitle(ui);',
+  'drawTitle(ui); drawTitle(ui);',
+  '[0, 1].forEach(() => drawTitle(ui));',
+])('rejects draw sites that can be shared by several control instances: %s', body => {
+  const source = [
+    "import { Engine } from 'dino-ge';",
+    "function drawTitle(ui) { ui.label({ x: 10, y: 20, text: 'Title' }); }",
+    `function drawUI(ui) { ${body} }`,
+    'new Engine({ drawUI });',
+  ].join('\n');
+  expect(getScreenUIMoveEdits(source, 'label', { lineNumber: 2, column: 26 }, { x: 3, y: 5 })).toBeUndefined();
+});
+
+test('rejects spread positions and a draw callback that is also called by user code', () => {
+  const source = [
+    "import { Engine } from 'dino-ge';",
+    "function drawUI(ui) { ui.label({ x: 10, y: 20, text: 'Title' }); }",
+    'new Engine({ drawUI });',
+    'drawUI(otherUi);',
+  ].join('\n');
+  const offset = { x: 3, y: 5 };
+  expect(getScreenUIMoveEdits(source, 'label', { lineNumber: 2, column: 23 }, offset)).toBeUndefined();
+  const spread = source.replace('drawUI(otherUi);', '').replace("text: 'Title'", '...options');
+  expect(getScreenUIMoveEdits(spread, 'label', { lineNumber: 2, column: 23 }, offset)).toBeUndefined();
+});
+
+test('rejects a draft whose draw options no longer match the running call', () => {
+  const runtime = [
+    "import { Engine } from 'dino-ge';",
+    "new Engine({ drawUI(ui) { ui.label({ x: 10, y: 20, text: 'Title' }); } });",
+  ].join('\n');
+  const position = { lineNumber: 2, column: 27 };
+  expect(getScreenUIMoveEdits(runtime, 'label', position, { x: 4, y: 0 })).toBeDefined();
+  const draft = runtime.replace('x: 10', 'x: 14');
+  expect(getScreenUIMoveEdits(draft, 'label', position, { x: 4, y: 0 }, runtime)).toBeUndefined();
+});
+
+test('rejects a recursive draw callback', () => {
+  const source = [
+    "import { Engine } from 'dino-ge';",
+    'new Engine({ drawUI: function draw(ui, depth = 0) {',
+    "  ui.label({ x: 10, y: 20, text: 'Title' });",
+    '  if (depth < 2) draw(ui, depth + 1);',
+    '} });',
+  ].join('\n');
+  expect(getScreenUIMoveEdits(source, 'label', { lineNumber: 3, column: 3 }, { x: 4, y: 0 })).toBeUndefined();
+});
+
+test('keeps a move preview across unrelated edits and restores it through undo and redo', () => {
+  type Change = Pick<editor.IModelContentChange, 'rangeOffset' | 'rangeLength' | 'text'>;
+  let revision = 2;
+  let change: ((event: { changes: Change[] }) => void) | undefined;
+  const model = {
+    getAlternativeVersionId: () => revision,
+    onDidChangeContent(listener: typeof change) {
+      change = listener;
+      return { dispose: () => { change = undefined; } };
+    },
+    onWillDispose: () => ({ dispose() {} }),
+  } as unknown as editor.ITextModel;
+  const applied = jest.fn();
+  const reverted = jest.fn();
+  trackScreenUIMoveDraft(model, { applied, reverted }, 1, [{ start: 20, end: 22, newText: '100' }]);
+  const edit = (version: number, rangeOffset: number, rangeLength: number, text: string) => {
+    revision = version;
+    change?.({ changes: [{ rangeOffset, rangeLength, text }] });
+  };
+  expect(applied).toHaveBeenCalledTimes(1);
+  edit(3, 0, 0, '// title\n');
+  expect(reverted).not.toHaveBeenCalled();
+  edit(4, 29, 3, '200');
+  expect(reverted).toHaveBeenCalledTimes(1);
+  edit(3, 29, 3, '100');
+  expect(applied).toHaveBeenCalledTimes(2);
+  edit(2, 0, 9, '');
+  expect(reverted).toHaveBeenCalledTimes(1);
+  edit(1, 20, 3, '20');
+  expect(reverted).toHaveBeenCalledTimes(2);
+  edit(2, 20, 2, '100');
+  expect(applied).toHaveBeenCalledTimes(3);
+  window.dispatchEvent(new Event('playground-before-run'));
+  expect(change).toBeUndefined();
 });
