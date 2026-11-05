@@ -2641,6 +2641,55 @@ new Engine({
   await expect(page.getByRole('spinbutton', { name: 'Y', exact: true })).toHaveValue('155.00');
 });
 
+test('edits and places objects in a scene that uses a Dino GE namespace import', async ({ page }) => {
+  let source = `import * as GE from 'dino-ge';
+class Workshop extends GE.Scene {
+  onLoad() {
+    new GE.Rectangle({ tag: 'Platform', position: new GE.Vector2(320, 235), width: 64, height: 40 });
+  }
+}
+function checkForeignNamespace(GE) {
+  return new GE.Rectangle({ tag: 'foreign' }).__sourceId;
+}
+if (checkForeignNamespace({ Rectangle: class { constructor(options) { Object.assign(this, options); } } })) {
+  throw new Error('Instrumented a shadowed namespace');
+}
+new GE.Engine({ onLoad() { GE.Engine.currentScene = new Workshop(); }, update() {} },
+  { containerId: 'playground-canvas-container' });`;
+  await page.route('**/files', route => route.fulfill({ json: ['script'] }));
+  await page.route('**/api/scripts/script', route => {
+    if (route.request().method() === 'PUT') {
+      source = route.request().postDataJSON().data;
+      return route.fulfill({ json: { success: true } });
+    }
+    return route.fulfill({ json: source });
+  });
+  await page.goto('/');
+  const platform = page.getByRole('button', { name: 'Platform', exact: true });
+  await expect(platform).toBeVisible();
+  await page.getByRole('button', { name: 'Edit scene', exact: true }).click();
+  await platform.click();
+  await page.getByRole('region', { name: 'Scene viewport' }).press('Shift+ArrowRight');
+  await page.getByRole('button', { name: 'Apply placement to code', exact: true }).click({ timeout: 3000 });
+
+  await page.getByRole('button', { name: 'Duplicate object', exact: true }).click();
+  const copy = page.getByRole('button', { name: 'Platform copy', exact: true });
+  await expect(copy).toHaveAttribute('aria-pressed', 'true');
+  await expect(page.getByRole('spinbutton', { name: 'X', exact: true })).toHaveValue('354.00');
+  await page.getByRole('button', { name: 'Add circle', exact: true }).dragTo(page.locator('#canvas'), {
+    targetPosition: { x: 545, y: 220 },
+  });
+  const circle = page.getByRole('button', { name: 'New circle', exact: true });
+  await expect(circle).toHaveAttribute('aria-pressed', 'true');
+  await page.getByRole('button', { name: 'Save script', exact: true }).click();
+  await expect.poll(() => source).toContain('new GE.Vector2(330, 235)');
+  expect(source).toContain('new GE.Vector2(354, 259)');
+  await page.reload();
+  await expect(platform).toBeVisible();
+  await expect(copy).toBeVisible();
+  await expect(circle).toBeVisible();
+});
+
 test('drops a loaded project image as a sprite and reopens it using a relative asset path', async ({ page }) => {
   const id = 'sprite-demo/src/index';
   let source = `import { Engine, Loader } from 'dino-ge';

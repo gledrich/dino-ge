@@ -23,6 +23,7 @@ export interface ObjectSourceMapping {
   // Boundaries of the ObjectExpression { ... }
   contentStart: number;
   contentEnd: number;
+  vectorConstructor?: string;
   hasDynamicProperties: boolean;
   properties: Record<string, PropertyLocation>;
   standalone?: { start: number; end: number; options?: Record<string, unknown>; canDuplicate: boolean };
@@ -45,7 +46,7 @@ export const getSourceMapping = () => sourceMappingRegistry;
 /**
  * Recursively maps properties of an ObjectExpression.
  */
-const mapProperties = (objExpr: any, imports: Map<string, string>, code: string): Record<string, PropertyLocation> => {
+const mapProperties = (objExpr: any, imports: DinoImports, code: string): Record<string, PropertyLocation> => {
   const mapping: Record<string, PropertyLocation> = {};
   if (!objExpr || objExpr.type !== 'ObjectExpression') return mapping;
 
@@ -65,7 +66,7 @@ const mapProperties = (objExpr: any, imports: Map<string, string>, code: string)
 
       // Handle Vector2 instantiations
       if (prop.value.type === 'NewExpression' && 
-          (prop.value.callee.name === 'Vector2' || imports.get(prop.value.callee.name) === 'Vector2' ||
+          (prop.value.callee.name === 'Vector2' || resolveDinoImport(prop.value.callee, imports)?.name === 'Vector2' ||
             prop.value.callee.property?.name === 'Vector2')) {
         propLoc.vectorConstructor = code.slice(prop.value.callee.start, prop.value.callee.end);
         propLoc.args = prop.value.arguments.map((arg: any) => ({
@@ -87,30 +88,106 @@ const mapProperties = (objExpr: any, imports: Map<string, string>, code: string)
   return mapping;
 };
 
-function dinoImports(ast: acorn.Program): Map<string, string> {
-  const imports = new Map<string, string>();
+interface DinoImports {
+  named: Map<string, string>;
+  namespaces: Map<string, acorn.Node[]>;
+}
+
+function collectNamespaceShadows(ast: acorn.Program, namespaces: DinoImports['namespaces']) {
+  const bind = (pattern: acorn.Pattern | null | undefined, scope: acorn.Node) => {
+    if (pattern?.type === 'Identifier') namespaces.get(pattern.name)?.push(scope);
+    else if (pattern?.type === 'RestElement') bind(pattern.argument, scope);
+    else if (pattern?.type === 'AssignmentPattern') bind(pattern.left, scope);
+    else if (pattern?.type === 'ArrayPattern') pattern.elements.forEach(element => bind(element, scope));
+    else if (pattern?.type === 'ObjectPattern') pattern.properties.forEach(property =>
+      bind(property.type === 'RestElement' ? property.argument : property.value, scope));
+  };
+  const visit = (node: acorn.AnyNode, block: acorn.Node, variableScope: acorn.Node) => {
+    if (node.type === 'FunctionDeclaration' || node.type === 'ClassDeclaration') bind(node.id, block);
+    switch (node.type) {
+      case 'FunctionDeclaration':
+      case 'FunctionExpression':
+      case 'ArrowFunctionExpression':
+        block = node;
+        variableScope = node.body;
+        if (node.type !== 'ArrowFunctionExpression') bind(node.id, block);
+        node.params.forEach(param => bind(param, block));
+        break;
+      case 'ClassDeclaration':
+      case 'ClassExpression':
+        block = node;
+        bind(node.id, block);
+        break;
+      case 'StaticBlock':
+        variableScope = node;
+        block = node;
+        break;
+      case 'CatchClause':
+        block = node;
+        bind(node.param, block);
+        break;
+      case 'BlockStatement':
+      case 'SwitchStatement':
+      case 'ForStatement':
+      case 'ForInStatement':
+      case 'ForOfStatement':
+        block = node;
+        break;
+      case 'VariableDeclaration':
+        node.declarations.forEach(declaration => bind(declaration.id, node.kind === 'var' ? variableScope : block));
+        break;
+    }
+    for (const value of Object.values(node)) {
+      for (const child of Array.isArray(value) ? value : [value]) {
+        if (child && typeof child === 'object' && 'type' in child) visit(child as acorn.AnyNode, block, variableScope);
+      }
+    }
+  };
+  visit(ast, ast, ast);
+}
+
+function dinoImports(ast: acorn.Program): DinoImports {
+  const named = new Map<string, string>();
+  const namespaces = new Map<string, acorn.Node[]>();
   for (const node of ast.body) {
     if (node.type !== 'ImportDeclaration' || node.source.value !== 'dino-ge') continue;
     for (const specifier of node.specifiers) {
       if (specifier.type === 'ImportSpecifier' && specifier.imported.type === 'Identifier') {
-        imports.set(specifier.local.name, specifier.imported.name);
+        named.set(specifier.local.name, specifier.imported.name);
+      } else if (specifier.type === 'ImportNamespaceSpecifier') {
+        namespaces.set(specifier.local.name, []);
       }
     }
   }
-  return imports;
+  if (namespaces.size) collectNamespaceShadows(ast, namespaces);
+  return { named, namespaces };
 }
 
-function sceneDeclarations(ast: acorn.Program, imports: Map<string, string>) {
+function resolveDinoImport(reference: acorn.Expression | acorn.Super | null | undefined, imports: DinoImports) {
+  if (reference?.type === 'Identifier') {
+    const name = imports.named.get(reference.name);
+    return name ? { name } : undefined;
+  }
+  if (reference?.type !== 'MemberExpression' || reference.object.type !== 'Identifier') return;
+  const namespace = reference.object.name;
+  const shadows = imports.namespaces.get(namespace);
+  if (!shadows || shadows.some(scope => reference.start >= scope.start && reference.end <= scope.end)) return;
+  const { property, computed } = reference;
+  if (!computed && property.type === 'Identifier') return { name: property.name, namespace };
+  if (computed && property.type === 'Literal' && typeof property.value === 'string') return { name: property.value, namespace };
+}
+
+function sceneDeclarations(ast: acorn.Program, imports: DinoImports) {
   return ast.body.flatMap(node => {
     const declaration = node.type === 'ExportNamedDeclaration' || node.type === 'ExportDefaultDeclaration'
       ? node.declaration : node;
     return declaration?.type === 'ClassDeclaration' && declaration.id &&
-      declaration.superClass?.type === 'Identifier' && imports.get(declaration.superClass.name) === 'Scene'
+      resolveDinoImport(declaration.superClass, imports)?.name === 'Scene'
       ? [declaration] : [];
   });
 }
 
-function readSceneObjectOptions(node: acorn.ObjectExpression, imports: Map<string, string>, reuseSpriteImage: boolean) {
+function readSceneObjectOptions(node: acorn.ObjectExpression, imports: DinoImports, reuseSpriteImage: boolean) {
   const readOptions = (node: any, root = false): Record<string, unknown> => {
     if (node.type !== 'ObjectExpression') throw new Error('Expected constructor options');
     const options = new Map<string, unknown>();
@@ -133,7 +210,7 @@ function readSceneObjectOptions(node: acorn.ObjectExpression, imports: Map<strin
       return node.operator === '-' ? -node.argument.value : node.argument.value;
     }
     if (node.type === 'ObjectExpression') return readOptions(node);
-    if (node.type === 'NewExpression' && imports.get(node.callee.name) === 'Vector2') {
+    if (node.type === 'NewExpression' && resolveDinoImport(node.callee, imports)?.name === 'Vector2') {
       const [x, y] = node.arguments.map(readValue);
       if (node.arguments.length === 2 && typeof x === 'number' && typeof y === 'number') return new Vector2(x, y);
     }
@@ -147,15 +224,15 @@ function readSceneObjectOptions(node: acorn.ObjectExpression, imports: Map<strin
   }
 }
 
-function getStandaloneConstructor(statement: acorn.ExpressionStatement, imports: Map<string, string>) {
+function getStandaloneConstructor(statement: acorn.ExpressionStatement, imports: DinoImports) {
   const { expression } = statement;
   const callee = expression.type === 'CallExpression' ? expression.callee : undefined;
   const isPlay = callee?.type === 'MemberExpression' && !callee.computed &&
     callee.property.type === 'Identifier' && callee.property.name === 'play' &&
     expression.type === 'CallExpression' && !expression.arguments.length;
   const constructor = isPlay ? callee.object : expression;
-  if (constructor.type !== 'NewExpression' || constructor.callee.type !== 'Identifier' || constructor.arguments.length !== 1) return;
-  const type = imports.get(constructor.callee.name);
+  if (constructor.type !== 'NewExpression' || constructor.arguments.length !== 1) return;
+  const type = resolveDinoImport(constructor.callee, imports)?.name;
   const options = constructor.arguments[0];
   if (options.type !== 'ObjectExpression' ||
       !(isPlay ? type === 'Sprite' : sceneObjectKinds.some(kind => kind === type))) return;
@@ -235,15 +312,19 @@ export const instrumentCode = (code: string, trackEditorSource = true, scriptId?
     }
   }
 
-  const isGameObject = (node: any, args: any[]) => {
-    if (node.callee.type !== 'Identifier' || args.length === 0 || args[0].type !== 'ObjectExpression') return false;
-    
-    // Broad heuristic: known Dino GE classes OR any class instantiation that takes an object with a 'tag' property
-    const knownClasses = ['Sprite', 'Rectangle', 'Circle', 'Line', 'Text', 'Tilemap'];
-    if (knownClasses.includes(imports.get(node.callee.name) ?? node.callee.name)) return true;
-    
-    const hasTag = args[0].properties.some((p: any) => p.key?.type === 'Identifier' && p.key.name === 'tag');
-    return hasTag;
+  const knownClasses = ['Sprite', 'Rectangle', 'Circle', 'Line', 'Text', 'Tilemap'];
+  const getGameObject = (node: any) => {
+    if (node.arguments[0]?.type !== 'ObjectExpression') return;
+    const imported = resolveDinoImport(node.callee, imports);
+    if (imported?.namespace && knownClasses.includes(imported.name)) {
+      return { constructorName: `${imported.namespace}.${imported.name}`, type: imported.name, namespace: imported.namespace };
+    }
+    if (node.callee.type !== 'Identifier') return;
+    const constructorName = node.callee.name;
+    const type = imported?.name ?? constructorName;
+    // Keep tracking tagged constructor calls written with a bare identifier.
+    const hasTag = node.arguments[0].properties.some((p: any) => p.key?.type === 'Identifier' && p.key.name === 'tag');
+    if (knownClasses.includes(type) || hasTag) return { constructorName, type };
   };
 
   const standaloneStatements = new Map<number, acorn.ExpressionStatement>();
@@ -257,32 +338,33 @@ export const instrumentCode = (code: string, trackEditorSource = true, scriptId?
     if (node.type === 'NewExpression') {
       const args = node.arguments;
       
-      if (isGameObject(node, args)) {
+      const object = getGameObject(node);
+      if (object) {
         const props = args[0].properties;
         
         // Deterministic ID based on type, tag, and occurrence
         const tagProp = props.find((p: any) => p.key?.name === 'tag');
         const tagValue = (tagProp && tagProp.value.type === 'Literal') ? String(tagProp.value.value) : 'no-tag';
-        const type = node.callee.name;
-        const idKey = `${type}-${tagValue}`;
+        const { constructorName, type, namespace } = object;
+        const idKey = `${constructorName}-${tagValue}`;
         const index = occurrenceCounts[idKey] || 0;
         occurrenceCounts[idKey] = index + 1;
         const sourceId = `${idKey}-${index}`;
         
         // Record property locations (using original offsets)
         if (trackEditorSource) {
-          const importedType = imports.get(type) ?? type;
           const properties = mapProperties(args[0], imports, code);
           const statement = standaloneStatements.get(node.start);
-          const generated = type.startsWith('DinoPlace');
-          const options = statement && readSceneObjectOptions(args[0], imports, generated && importedType === 'Sprite');
-          const safeOptions = options && (generated || importedType !== 'Sprite' || typeof options.img === 'string');
+          const generated = !namespace && constructorName.startsWith('DinoPlace');
+          const options = statement && readSceneObjectOptions(args[0], imports, generated && type === 'Sprite');
+          const safeOptions = options && (generated || type !== 'Sprite' || typeof options.img === 'string');
           const canDuplicate = !!safeOptions && typeof options.tag === 'string' && properties.position?.args?.length === 2 &&
             properties.position.args.every(arg => arg.numeric);
           sourceMappingRegistry[sourceId] = {
-            sourceId, type: importedType, start: node.start, end: node.end,
+            sourceId, type, start: node.start, end: node.end,
             contentStart: args[0].start + 1, // After {
             contentEnd: args[0].end - 1,    // Before }
+            vectorConstructor: namespace && `${namespace}.Vector2`,
             hasDynamicProperties: props.some((prop: any) => prop.type !== 'Property' || prop.computed ||
               (prop.key.type === 'Literal' && prop.key.value === 'position')),
             properties,
@@ -424,7 +506,7 @@ export function getSceneObjectCreation(source: string, placement: SceneObjectPla
   const imports = dinoImports(ast);
   const configurations: acorn.ObjectExpression[] = [];
   const visit = (node: any) => {
-    if (node.type === 'NewExpression' && imports.get(node.callee.name) === 'Engine' &&
+    if (node.type === 'NewExpression' && resolveDinoImport(node.callee, imports)?.name === 'Engine' &&
       node.arguments[0]?.type === 'ObjectExpression') {
       configurations.push(node.arguments[0]);
     }
@@ -469,7 +551,7 @@ export function getSceneObjectCreation(source: string, placement: SceneObjectPla
 
   const addedImports: string[] = [];
   const binding = (name: string) => {
-    const existing = Array.from(imports).find(([local, exported]) => exported === name && local.startsWith('DinoPlace'));
+    const existing = Array.from(imports.named).find(([local, exported]) => exported === name && local.startsWith('DinoPlace'));
     if (existing) return existing[0];
     const base = `DinoPlace${name}`;
     let local = base;
@@ -554,6 +636,7 @@ export const getSurgicalEdit = (
 ): Edit | null => {
   const mapping = sourceMappingRegistry[sourceId];
   if (!mapping) return null;
+  const vectorConstructor = mapping.vectorConstructor ?? 'Vector2';
 
   // Map prefix paths (e.g., _physics -> physics)
   let actualPath = propertyPath;
@@ -637,7 +720,7 @@ export const getSurgicalEdit = (
       return {
         start: found.mapping.valueStart,
         end: found.mapping.valueEnd,
-        newText: `new Vector2(${x}, ${y})`
+        newText: `new ${vectorConstructor}(${x}, ${y})`
       };
     }
   }
@@ -676,7 +759,7 @@ export const getSurgicalEdit = (
       if (paths.length === 3 && (paths[2] === 'x' || paths[2] === 'y')) {
         const x = paths[2] === 'x' ? value : getRuntimeValue(`physics.${subProp}.x`);
         const y = paths[2] === 'y' ? value : getRuntimeValue(`physics.${subProp}.y`);
-        insertionText = ` ${subProp}: new Vector2(${x}, ${y}),`;
+        insertionText = ` ${subProp}: new ${vectorConstructor}(${x}, ${y}),`;
       }
 
       return {
@@ -693,7 +776,7 @@ export const getSurgicalEdit = (
     } else if (paths.length === 2 && (paths[1] === 'x' || paths[1] === 'y')) {
       const x = paths[1] === 'x' ? value : getRuntimeValue(`${topProp}.x`);
       const y = paths[1] === 'y' ? value : getRuntimeValue(`${topProp}.y`);
-      insertionText += `new Vector2(${x}, ${y}),`;
+      insertionText += `new ${vectorConstructor}(${x}, ${y}),`;
     } else if (paths[0] === 'physics') {
       // Special handling for nested physics insertion to keep it clean
       insertionText += `{ `;
@@ -702,7 +785,7 @@ export const getSurgicalEdit = (
       } else if (paths.length === 3 && (paths[2] === 'x' || paths[2] === 'y')) {
         const x = paths[2] === 'x' ? value : getRuntimeValue(`physics.${paths[1]}.x`);
         const y = paths[2] === 'y' ? value : getRuntimeValue(`physics.${paths[1]}.y`);
-        insertionText += `${paths[1]}: new Vector2(${x}, ${y}) `;
+        insertionText += `${paths[1]}: new ${vectorConstructor}(${x}, ${y}) `;
       }
       insertionText += `},`;
     } else {
