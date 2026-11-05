@@ -23,6 +23,8 @@ export interface TilemapProps {
   position: Vector2;
   /** Rendering order. */
   zIndex?: number;
+  /** Set to false to keep pixel art sharp when scaled. Defaults to the canvas setting. */
+  imageSmoothing?: boolean;
 }
 
 const defaultProps = {
@@ -121,12 +123,14 @@ export default class Tilemap extends GameObject {
     this.transform.position = props.position;
 
     // TilemapComponent will automatically create/update BoundsComponent via onAttach
-    this.addComponent(new TilemapComponent(
+    const component = new TilemapComponent(
       this.tileset,
       this.data,
       this.tileSize,
       this.tilesetCols
-    ));
+    );
+    component.imageSmoothing = props.imageSmoothing;
+    this.addComponent(component);
 
     this.registerSelf();
   }

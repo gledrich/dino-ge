@@ -13,6 +13,8 @@ export default class TilemapComponent extends RenderComponent {
   tileSize: number;
   /** Number of columns in the tileset image. */
   tilesetCols: number;
+  /** Override canvas image smoothing for this tilemap only. */
+  imageSmoothing?: boolean;
 
   constructor(tileset: HTMLImageElement, data: number[][], tileSize: number, tilesetCols: number) {
     super();
@@ -58,6 +60,7 @@ export default class TilemapComponent extends RenderComponent {
     const { worldPosition, worldRotation, worldScale } = this.gameObject.transform;
 
     ctx.save();
+    if (this.imageSmoothing !== undefined) ctx.imageSmoothingEnabled = this.imageSmoothing;
     ctx.translate(worldPosition.x, worldPosition.y);
     if (worldRotation !== 0) ctx.rotate(worldRotation);
     ctx.scale(worldScale.x, worldScale.y);

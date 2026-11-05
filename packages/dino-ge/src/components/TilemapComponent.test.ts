@@ -52,6 +52,24 @@ describe('TilemapComponent', () => {
     expect(mockCtx.save).not.toHaveBeenCalled();
   });
 
+  it('can draw pixel art without changing smoothing for other objects', () => {
+    const component = Object.assign(new TilemapComponent(mockTileset, mockData, 16, 1), { imageSmoothing: false });
+    component.gameObject = new MockGameObject('test', 0);
+    const ctx = {
+      imageSmoothingEnabled: true,
+      save: jest.fn(),
+      restore: jest.fn(() => { ctx.imageSmoothingEnabled = true; }),
+      translate: jest.fn(),
+      scale: jest.fn(),
+      drawImage: jest.fn(() => { expect(ctx.imageSmoothingEnabled).toBe(false); }),
+    };
+
+    component.draw(ctx as unknown as CanvasRenderingContext2D);
+
+    expect(ctx.drawImage).toHaveBeenCalledTimes(3);
+    expect(ctx.imageSmoothingEnabled).toBe(true);
+  });
+
   it('applies rotation during draw', () => {
     const component = new TilemapComponent(mockTileset, mockData, 16, 1);
     const obj = new MockGameObject('test', 0);
