@@ -428,6 +428,21 @@ describe('Engine', () => {
     (engine as unknown as { _update: (ts: number) => void })._update(1000); // Should return immediately
   });
 
+  it('keeps drawing a scene with only a setup callback', () => {
+    const requestFrame = jest.spyOn(window, 'requestAnimationFrame').mockReturnValue(1);
+    const onLoad = jest.fn();
+    new Engine({ onLoad });
+    jest.advanceTimersByTime(0);
+    expect(onLoad).toHaveBeenCalledTimes(1);
+
+    const draw = mockCtx.fillRect as jest.Mock;
+    draw.mockClear();
+    requestFrame.mock.calls[0][0](16);
+
+    expect(draw).toHaveBeenCalled();
+    expect(requestFrame).toHaveBeenCalledTimes(2);
+  });
+
   it('stops an old game’s pending callbacks and disposes its resources once', () => {
     const onLoad = jest.fn();
     const onDispose = jest.fn();

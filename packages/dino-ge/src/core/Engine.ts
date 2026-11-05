@@ -35,8 +35,8 @@ export interface EngineOpts {
 export interface EngineCallbacks {
   /** Called once after the engine is initialised. */
   onLoad?: () => void;
-  /** Called every frame for game logic and rendering. */
-  update: () => void;
+  /** Called every unpaused frame for game logic. */
+  update?: () => void;
   /** Optional callback for physics or fixed-step logic. */
   fixedUpdate?: () => void;
   /** Draws game-owned interface elements after the world. */
@@ -496,7 +496,7 @@ export default class Engine {
         Engine.currentScene.update();
       }
 
-      this.callbacks.update();
+      this.callbacks.update?.();
       this._draw();
     } else {
       // Still allow drawing in paused mode if debug is on or for initial frame
