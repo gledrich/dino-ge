@@ -12,6 +12,15 @@ export type GameFolder = { name: string; files: { path: string; file: File }[] }
 export const spriteImageTypes = ['image/png', 'image/jpeg', 'image/gif', 'image/webp'];
 export const maxSpriteImageBytes = 5 * 1024 * 1024;
 
+export interface StoredSpriteImage { name: string; url: string }
+
+export async function listSpriteImages(id: string, signal: AbortSignal): Promise<StoredSpriteImage[]> {
+  const response = await fetch(`${scriptEndpoint(id)}/assets`, { signal });
+  if (response.status === 404) return [];
+  if (!response.ok) throw new Error('Could not load workspace images.');
+  return response.json();
+}
+
 export async function storeSpriteImage(file: File, id: string): Promise<string> {
   const query = new URLSearchParams({ name: file.name });
   const response = await fetch(`${scriptEndpoint(id)}/assets?${query}`, {

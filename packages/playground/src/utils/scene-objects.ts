@@ -16,25 +16,7 @@ export function getSceneSpriteScale(image: HTMLImageElement): number {
   return Math.min(1, 128 / Math.max(image.naturalWidth, image.naturalHeight));
 }
 
-export function getSceneAssets(): { tag: string; image: HTMLImageElement }[] {
-  const { Engine, Loader, SpriteComponent } = Dino;
-  const assets = Loader.getLoadedAssets();
-  const sources = new Set(assets.map(asset => asset.image.src));
-  const tags = new Set(assets.map(asset => asset.tag));
-  for (const object of Engine.currentScene?.objects ?? Engine.objects) {
-    const image = object.getComponent(SpriteComponent)?.img;
-    if (!image?.naturalWidth || sources.has(image.src)) continue;
-    const url = new URL(image.src);
-    if (url.origin !== location.origin || !url.pathname.includes('/_dino-assets/')) continue;
-    const label = object.metadata.tag.replace(/ sprite(?: \d+)?$/, '') || 'Imported image';
-    let tag = label;
-    for (let i = 2; tags.has(tag); i++) tag = `${label} ${i}`;
-    sources.add(image.src);
-    tags.add(tag);
-    assets.push({ tag, image });
-  }
-  return assets;
-}
+export interface SceneImageAsset { tag: string; image: HTMLImageElement }
 
 export interface ScenePoint { x: number; y: number }
 

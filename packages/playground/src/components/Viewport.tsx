@@ -3,7 +3,7 @@ import { Engine, SpriteComponent, snapToGrid, type ObjectManipulationPreview } f
 import { usePlayground } from '../context/PlaygroundContext';
 import Toolbar from './Toolbar';
 import Logo from './Logo';
-import { getAssetSource, getSceneAssetPreviewType, getSceneAssets, getSceneSource, getSceneSpriteScale, nudgeSceneSelection, sceneAssetDragType, sceneObjectDefaults, sceneObjectDragType, sceneObjectKinds, type SceneObjectKind, type SceneObjectPlacement, type ScenePoint } from '../utils/scene-objects';
+import { getAssetSource, getSceneAssetPreviewType, getSceneSource, getSceneSpriteScale, nudgeSceneSelection, sceneAssetDragType, sceneObjectDefaults, sceneObjectDragType, sceneObjectKinds, type SceneImageAsset, type SceneObjectKind, type SceneObjectPlacement, type ScenePoint } from '../utils/scene-objects';
 import { maxSpriteImageBytes, spriteImageTypes, storeSpriteImage } from '../utils/helpers';
 
 const shapePreviewDimensions: Partial<Record<SceneObjectKind, { width: number; height: number }>> = {
@@ -13,7 +13,6 @@ const shapePreviewDimensions: Partial<Record<SceneObjectKind, { width: number; h
   Text: sceneObjectDefaults.Text,
 };
 const sceneGridSizes = [8, 16, 32, 64];
-type PlacementImage = { tag: string; image: HTMLImageElement };
 
 function TextDropPreview() {
   const { width, height, text, colour, backgroundColour, fontSize, font } = sceneObjectDefaults.Text;
@@ -66,6 +65,7 @@ const Viewport: React.FC = () => {
   const placementStep = isGridSnapping ? sceneGridSize : 1;
   const [placementStatus, setPlacementStatus] = useState<{ message: string; error?: boolean; pending?: boolean }>();
   const importingImage = useRef(false);
+  const draggedAsset = useRef<SceneImageAsset | null>(null);
   const [manipulationReadout, setManipulationReadout] = useState('');
   const [dropGuide, setDropGuide] = useState<{
     x: number; y: number; left: number; top: number; kind?: SceneObjectKind;
@@ -123,7 +123,7 @@ const Viewport: React.FC = () => {
     return canvas ? getCanvasPlacement(canvas, placementStep, clientX, clientY) : undefined;
   }, [placementStep]);
 
-  const addObject = useCallback((kind: SceneObjectKind | 'Sprite', point?: ScenePoint, asset?: PlacementImage) => {
+  const addObject = useCallback((kind: SceneObjectKind | 'Sprite', point?: ScenePoint, asset?: SceneImageAsset) => {
     const rejectPlacement = (message: string) => {
       setPlacementStatus({ message, error: true });
       return false;
@@ -171,8 +171,7 @@ const Viewport: React.FC = () => {
     if (addObject(kind, getPlacementPoint(x, y))) enterSceneEditing();
   }, [addObject, enterSceneEditing, getPlacementPoint]);
 
-  const placeLoadedImage = useCallback((tag: string, x?: number, y?: number) => {
-    const asset = getSceneAssets().find(item => item.tag === tag);
+  const placeLoadedImage = useCallback((asset: SceneImageAsset, x?: number, y?: number) => {
     addObject('Sprite', getPlacementPoint(x, y), asset);
   }, [addObject, getPlacementPoint]);
 
@@ -198,6 +197,7 @@ const Viewport: React.FC = () => {
       await image.decode();
       if (!run.isConnected) return;
       image.src = await storeSpriteImage(file, currentScriptId);
+      window.dispatchEvent(new CustomEvent('playground-workspace-images-changed', { detail: currentScriptId }));
       await image.decode();
       if (!run.isConnected) return;
       if (scene !== Engine.currentScene) return reject('The active scene changed. Drop the image again to place it there.');
@@ -241,9 +241,18 @@ const Viewport: React.FC = () => {
 
   useEffect(() => {
     if (!isEditingScene) return;
-    const placeAsset = (event: Event) => placeLoadedImage((event as CustomEvent<string>).detail);
+    const placeAsset = (event: Event) => placeLoadedImage((event as CustomEvent<SceneImageAsset>).detail);
+    const trackAssetDrag = (event: Event) => { draggedAsset.current = (event as CustomEvent<SceneImageAsset | null>).detail; };
+    const clearAssetDrag = () => { draggedAsset.current = null; };
     window.addEventListener('playground-place-asset', placeAsset);
-    return () => window.removeEventListener('playground-place-asset', placeAsset);
+    window.addEventListener('playground-drag-scene-asset', trackAssetDrag);
+    window.addEventListener('playground-before-run', clearAssetDrag);
+    return () => {
+      window.removeEventListener('playground-place-asset', placeAsset);
+      window.removeEventListener('playground-drag-scene-asset', trackAssetDrag);
+      window.removeEventListener('playground-before-run', clearAssetDrag);
+      clearAssetDrag();
+    };
   }, [placeLoadedImage, isEditingScene]);
 
   const toggleSceneEditing = () => {
@@ -386,8 +395,8 @@ const Viewport: React.FC = () => {
           if (!point) return;
           const rect = event.currentTarget.getBoundingClientRect();
           const kind = sceneObjectKinds.find(item => types.includes(`${sceneObjectDragType}-${item.toLowerCase()}`));
-          const asset = types.includes(sceneAssetDragType)
-            ? getSceneAssets().find(item => types.includes(getSceneAssetPreviewType(item.tag))) : undefined;
+          const dragged = draggedAsset.current;
+          const asset = dragged && types.includes(getSceneAssetPreviewType(dragged.tag)) ? dragged : undefined;
           const dimensions = kind && shapePreviewDimensions[kind];
           const spriteScale = asset ? getSceneSpriteScale(asset.image) : 1;
           const width = asset ? asset.image.naturalWidth * spriteScale : dimensions?.width;
@@ -408,7 +417,11 @@ const Viewport: React.FC = () => {
           }
           if (isEditingScene && event.dataTransfer.types.includes(sceneAssetDragType)) {
             event.preventDefault();
-            placeLoadedImage(event.dataTransfer.getData(sceneAssetDragType), event.clientX, event.clientY);
+            const asset = draggedAsset.current;
+            draggedAsset.current = null;
+            if (asset?.tag === event.dataTransfer.getData(sceneAssetDragType)) {
+              placeLoadedImage(asset, event.clientX, event.clientY);
+            }
             return;
           }
           const kind = sceneObjectKinds.find(item => item === event.dataTransfer.getData(sceneObjectDragType));

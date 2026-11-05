@@ -176,7 +176,7 @@ export const run = window.gameRuns;`);
   }
 });
 
-test('imports a dropped image beside the project script and restores its sprite after reload', async ({ page }) => {
+test('keeps an imported image available after deleting its sprite and reloading', async ({ page }) => {
   const workspace = await mkdtemp(join(tmpdir(), 'dino-ge-sprite-import-'));
   const scripts = join(workspace, 'scripts');
   const entry = join(scripts, 'demo/src/index.js');
@@ -210,10 +210,11 @@ new Engine({ onLoad() {}, update() {} }, { containerId: 'playground-canvas-conta
     const box = (await canvas.boundingBox())!;
     const transfer = await page.evaluateHandle(async () => {
       const image = document.createElement('canvas');
-      image.width = image.height = 16;
+      image.width = 64;
+      image.height = 48;
       const context = image.getContext('2d')!;
       context.fillStyle = '#f94144';
-      context.fillRect(0, 0, 16, 16);
+      context.fillRect(0, 0, 64, 48);
       const blob = await new Promise<Blob>(resolve => image.toBlob(value => resolve(value!), 'image/png'));
       const data = new DataTransfer();
       data.items.add(new File([blob], 'gem.png', { type: 'image/png' }));
@@ -237,10 +238,26 @@ new Engine({ onLoad() {}, update() {} }, { containerId: 'playground-canvas-conta
     await expect(sprite).toBeVisible();
     await expect.poll(() => canvas.evaluate((element: HTMLCanvasElement) =>
       Array.from(element.getContext('2d')!.getImageData(247, 177, 1, 1).data))).toEqual([249, 65, 68, 255]);
+    await page.getByRole('button', { name: 'Edit scene', exact: true }).click();
+    await sprite.click();
+    await page.getByRole('button', { name: 'Delete object', exact: true }).click();
+    await expect(sprite).toHaveCount(0);
+    const savedDeletion = page.waitForResponse(response => response.request().method() === 'PUT' &&
+      response.url().endsWith('/api/scripts/demo%2Fsrc%2Findex'));
+    await page.getByRole('button', { name: 'Save script', exact: true }).click();
+    expect((await savedDeletion).ok()).toBe(true);
+    await page.reload();
+    await page.getByRole('combobox', { name: 'Current script' }).selectOption('demo/src/index');
+    await expect(canvas).toBeVisible();
+    await expect(sprite).toHaveCount(0);
     await page.getByRole('button', { name: 'Choose sprite image', exact: true }).click();
     await page.getByRole('button', { name: 'Edit scene', exact: true }).click();
-    await page.getByRole('button', { name: 'Add gem as sprite', exact: true }).click();
-    await expect(page.getByRole('button', { name: 'gem sprite 2', exact: true })).toHaveAttribute('aria-pressed', 'true');
+    await page.getByRole('button', { name: 'Add gem as sprite', exact: true }).dragTo(canvas, {
+      targetPosition: { x: 280, y: 185 },
+    });
+    await expect(sprite).toHaveAttribute('aria-pressed', 'true');
+    await expect(page.getByRole('spinbutton', { name: 'Width', exact: true })).toHaveValue('64.00');
+    await expect(page.getByRole('spinbutton', { name: 'X', exact: true })).toHaveValue('280.00');
   } finally {
     if (server.exitCode === null) {
       server.kill();
