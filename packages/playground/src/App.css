@@ -87,6 +87,7 @@
   opacity: 0.65;
   cursor: not-allowed;
 }
+.scene-pan-ready canvas { cursor: grab !important; }
 .scene-panning canvas { cursor: grabbing !important; }
 .scene-edit-hint { color: var(--text-secondary); font-size: 11px; line-height: 1.45; }
 .scene-review-changes { justify-self: start; pointer-events: auto; }

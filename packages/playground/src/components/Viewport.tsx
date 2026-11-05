@@ -66,6 +66,14 @@ interface KeyboardPlacement extends SceneKeyboardPlacementRequest {
   point: ScenePoint;
 }
 
+interface CameraPan {
+  id: number;
+  canvas: HTMLCanvasElement;
+  scene: typeof Engine.currentScene;
+  pointer: ScenePoint;
+  origin: ScenePoint;
+}
+
 const Viewport: React.FC = () => {
   const { 
     currentScriptId,
@@ -90,8 +98,10 @@ const Viewport: React.FC = () => {
   const isEditingScene = isPaused && isDebug;
   const savedCamera = useRef<{ canvas: HTMLCanvasElement; scene: typeof Engine.currentScene;
     x: number; y: number; zoom: number } | null>(null);
-  const pan = useRef<{ id: number; x: number; y: number } | null>(null);
+  const pan = useRef<CameraPan | null>(null);
   const [isPanning, setIsPanning] = useState(false);
+  const [isPanTool, setIsPanTool] = useState(false);
+  const [isSpacePan, setIsSpacePan] = useState(false);
   const [isGridSnapping, setIsGridSnapping] = useState(false);
   const [sceneGridSize, setSceneGridSize] = useState(16);
   const [keepProportions, setKeepProportions] = useState(false);
@@ -102,6 +112,7 @@ const Viewport: React.FC = () => {
   const draggedAsset = useRef<SceneImageAsset | null>(null);
   const [manipulationReadout, setManipulationReadout] = useState('');
   const [keyboardPlacement, setKeyboardPlacement] = useState<KeyboardPlacement>();
+  const isPanReady = isEditingScene && (isPanTool || isSpacePan) && !keyboardPlacement;
   const historyBlockedReason = keyboardPlacement || manipulationReadout
     ? 'Finish or cancel the current edit before using code history.'
     : pendingCanvasPlacements.size > 0 ? 'Apply or discard canvas changes before using code history.' : '';
@@ -467,27 +478,46 @@ const Viewport: React.FC = () => {
     savedCamera.current = { canvas, scene, x: position.x, y: position.y, zoom };
   };
 
+  const endPan = useCallback((cancel = false) => {
+    const drag = pan.current;
+    if (!drag) return;
+    pan.current = null;
+    setIsPanning(false);
+    if (cancel && drag.canvas.isConnected && drag.scene === Engine.currentScene) {
+      Engine.camera.position.set(drag.origin.x, drag.origin.y);
+    }
+    if (drag.canvas.hasPointerCapture(drag.id)) drag.canvas.releasePointerCapture(drag.id);
+  }, []);
+
   const restoreCamera = useCallback(() => {
     const saved = savedCamera.current;
     savedCamera.current = null;
-    pan.current = null;
-    setIsPanning(false);
+    endPan();
     if (saved?.canvas.isConnected && saved.scene === Engine.currentScene) {
       Engine.camera.position.set(saved.x, saved.y);
       Engine.camera.zoom = saved.zoom;
     }
-  }, []);
+  }, [endPan]);
 
   useEffect(() => {
     if (!isEditingScene) return;
+    const cancelNavigation = () => {
+      setIsSpacePan(false);
+      endPan(true);
+    };
     window.addEventListener('playground-before-run', restoreCamera);
+    window.addEventListener('blur', cancelNavigation);
     return () => {
       window.removeEventListener('playground-before-run', restoreCamera);
+      window.removeEventListener('blur', cancelNavigation);
+      setIsPanTool(false);
+      setIsSpacePan(false);
       restoreCamera();
     };
-  }, [isEditingScene, restoreCamera]);
+  }, [isEditingScene, endPan, restoreCamera]);
 
   const zoomView = (factor: number) => {
+    if (pan.current) return;
     const canvas = viewportContainerRef.current?.querySelector<HTMLCanvasElement>('canvas#canvas');
     if (!canvas || !canvas.width || !canvas.height) return;
     const { position, zoom } = Engine.camera;
@@ -500,7 +530,7 @@ const Viewport: React.FC = () => {
   };
 
   const frameSelection = () => {
-    if (!selectedObject || keyboardPlacement || Input.isManipulatingObject) return;
+    if (!selectedObject || keyboardPlacement || pan.current || Input.isManipulatingObject) return;
     const canvas = viewportContainerRef.current?.querySelector<HTMLCanvasElement>('canvas#canvas');
     const view = canvas?.getBoundingClientRect();
     if (!canvas?.width || !canvas.height || !view?.height) return;
@@ -581,41 +611,62 @@ const Viewport: React.FC = () => {
         </div>
       )}
       <div id="playground-canvas-container" ref={viewportContainerRef}
-        className={isPanning ? 'scene-panning' : undefined}
+        className={isPanning ? 'scene-panning' : isPanReady ? 'scene-pan-ready' : undefined}
         style={isEditingScene ? { touchAction: 'none' } : undefined}
         role={isEditingScene || keyboardPlacement ? 'region' : undefined}
         aria-label={isEditingScene || keyboardPlacement ? 'Scene viewport' : undefined}
         aria-describedby={keyboardPlacement ? 'scene-placement-keyboard-hint' : isEditingScene ? 'scene-keyboard-hint' : undefined}
         tabIndex={isEditingScene ? 0 : -1}
         onBlur={event => {
-          if (keyboardPlacement && !event.currentTarget.contains(event.relatedTarget)) cancelKeyboardPlacement();
+          if (event.currentTarget.contains(event.relatedTarget)) return;
+          setIsSpacePan(false);
+          if (keyboardPlacement) cancelKeyboardPlacement();
         }}
         onPointerDownCapture={event => {
           if (keyboardPlacement) cancelKeyboardPlacement();
-          if (!isEditingScene || event.button !== 1 || !(event.target instanceof HTMLCanvasElement)) return;
+          if (!isEditingScene || !(event.target instanceof HTMLCanvasElement)) return;
+          if (pan.current) {
+            event.preventDefault();
+            event.stopPropagation();
+            return;
+          }
+          const canPan = event.button === 1 || (event.button === 0 && isPanReady);
+          if (!canPan || !event.isPrimary || Input.isManipulatingObject) return;
           event.preventDefault();
           event.stopPropagation();
-          rememberCamera(event.target);
-          pan.current = { id: event.pointerId, x: event.clientX, y: event.clientY };
-          event.target.setPointerCapture(event.pointerId);
+          const canvas = event.target;
+          rememberCamera(canvas);
+          const { x, y } = Engine.camera.position;
+          pan.current = { id: event.pointerId, canvas, scene: Engine.currentScene,
+            pointer: { x: event.clientX, y: event.clientY }, origin: { x, y } };
+          event.currentTarget.focus({ preventScroll: true });
+          canvas.setPointerCapture(event.pointerId);
           setIsPanning(true);
         }}
         onPointerMove={event => {
           const drag = pan.current;
-          if (!drag || drag.id !== event.pointerId || !(event.target instanceof HTMLCanvasElement)) return;
-          const canvas = event.target;
+          if (!drag || drag.id !== event.pointerId) return;
+          if (drag.scene !== Engine.currentScene) {
+            endPan();
+            return;
+          }
+          const { canvas, pointer } = drag;
           const bounds = canvas.getBoundingClientRect();
           const { position, zoom } = Engine.camera;
           if (!bounds.width || !bounds.height) return;
-          position.set(position.x - (event.clientX - drag.x) * canvas.width / bounds.width / zoom,
-            position.y - (event.clientY - drag.y) * canvas.height / bounds.height / zoom);
-          drag.x = event.clientX;
-          drag.y = event.clientY;
+          position.set(position.x - (event.clientX - pointer.x) * canvas.width / bounds.width / zoom,
+            position.y - (event.clientY - pointer.y) * canvas.height / bounds.height / zoom);
+          pointer.x = event.clientX;
+          pointer.y = event.clientY;
+        }}
+        onPointerUp={event => {
+          if (pan.current?.id === event.pointerId) endPan();
+        }}
+        onPointerCancel={event => {
+          if (pan.current?.id === event.pointerId) endPan(true);
         }}
         onLostPointerCapture={event => {
-          if (pan.current?.id !== event.pointerId) return;
-          pan.current = null;
-          setIsPanning(false);
+          if (pan.current?.id === event.pointerId) endPan(true);
         }}
         onDragOver={event => {
           const types = event.dataTransfer.types;
@@ -662,6 +713,14 @@ const Viewport: React.FC = () => {
           }
           if (isEditingScene && (event.target === event.currentTarget || event.target instanceof HTMLCanvasElement)) {
             const key = event.key.toLowerCase();
+            if ((key === 'escape' && pan.current) ||
+                (key === ' ' && !keyboardPlacement && !event.altKey && !event.ctrlKey && !event.metaKey && !Input.isManipulatingObject)) {
+              event.preventDefault();
+              event.stopPropagation();
+              if (key === 'escape') endPan(true);
+              else setIsSpacePan(true);
+              return;
+            }
             const isHistoryShortcut = !event.altKey && (event.ctrlKey || event.metaKey) &&
               (key === 'z' || (key === 'y' && event.ctrlKey && !event.metaKey && !event.shiftKey));
             const isFrameShortcut = key === 'f' && !event.ctrlKey && !event.metaKey && !event.altKey && !event.shiftKey;
@@ -674,6 +733,9 @@ const Viewport: React.FC = () => {
             }
           }
           if (event.key === 'Enter' || event.key === ' ') suppressGameActivation(event);
+        }}
+        onKeyUpCapture={event => {
+          if (event.key === ' ' && isSpacePan) setIsSpacePan(false);
         }}
       />
       {(isEditingScene || keyboardPlacement || placementStatus?.error || placementStatus?.pending) && (
@@ -700,6 +762,11 @@ const Viewport: React.FC = () => {
               </div>
             </div>
             <div className="scene-object-options" role="group" aria-label="Scene camera and grid">
+              <button type="button" className="scene-control scene-icon-control" aria-label="Pan view"
+                title="Pan view · Drag with mouse, touch or pen" aria-pressed={isPanTool}
+                disabled={!!keyboardPlacement || !!manipulationReadout} onClick={() => setIsPanTool(enabled => !enabled)}>
+                <i className="fa-solid fa-hand" aria-hidden="true" />
+              </button>
               <button type="button" className="scene-control scene-icon-control" aria-label="Zoom out" title="Zoom out"
                 onClick={() => zoomView(1 / 1.25)}><i className="fa-solid fa-magnifying-glass-minus" aria-hidden="true" /></button>
               <button type="button" className="scene-control scene-icon-control" aria-label="Zoom in" title="Zoom in"
@@ -708,16 +775,16 @@ const Viewport: React.FC = () => {
               <button type="button" className="scene-control" aria-label="Frame selection" title="Frame selected object or group (F)"
                 aria-keyshortcuts="F" disabled={!selectedObject || !!keyboardPlacement || !!manipulationReadout}
                 onClick={frameSelection}>Frame</button>
-              <button type="button" className="scene-control"
+              <button type="button" className="scene-control" aria-label="Snap to grid"
                 aria-pressed={isGridSnapping} title={`Snap moves, resizes and drops to the ${sceneGridSize} px grid`}
-                onClick={() => setIsGridSnapping(enabled => !enabled)}>Snap to grid</button>
+                onClick={() => setIsGridSnapping(enabled => !enabled)}>Grid snap</button>
               <select className="scene-control scene-grid-size" aria-label="Grid cell size" value={sceneGridSize}
                 onChange={event => setSceneGridSize(Number(event.target.value))}>
                 {sceneGridSizes.map(size => <option key={size} value={size}>{size} px</option>)}
               </select>
             </div>
             {!keyboardPlacement && <span id="scene-keyboard-hint" className="scene-edit-hint">
-              Middle drag pans · {isGridSnapping ? 'Arrows move 1 cell · Shift moves 10 cells' : 'Arrows move 1 px · Shift moves 10 px'}<br />
+              {isPanTool ? 'Hand tool active · Drag to pan' : 'Space or middle drag pans'} · {isGridSnapping ? 'Arrows move 1 cell · Shift moves 10 cells' : 'Arrows move 1 px · Shift moves 10 px'}<br />
               F frames selection · Alt/Option-click cycles overlapping objects<br />
               Round handle rotates · Square resizes · Shift constrains · Esc cancels<br />
               {historyBlockedReason || 'Ctrl/⌘+Z undoes · Add Shift to redo'}

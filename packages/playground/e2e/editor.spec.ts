@@ -494,6 +494,37 @@ new Engine({ onLoad() {
   const session = await page.context().newCDPSession(page);
   const readout = page.getByRole('group', { name: 'Current scene gesture' });
   const x = page.getByRole('spinbutton', { name: 'X', exact: true });
+  const cameraX = () => page.evaluate(() => {
+    const { Engine } = window as unknown as { Engine: { camera: { position: { x: number } } } };
+    return Engine.camera.position.x;
+  });
+  const panTool = page.getByRole('button', { name: 'Pan view', exact: true });
+  await panTool.click();
+  await expect(panTool).toHaveAttribute('aria-pressed', 'true');
+  await session.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [screen(380, 244)] });
+  await session.send('Input.dispatchTouchEvent', { type: 'touchMove', touchPoints: [screen(428, 244)] });
+  await expect.poll(cameraX).toBeCloseTo(-48, 0);
+  await expect(readout).toHaveCount(0);
+  await expect(platform).toHaveAttribute('aria-pressed', 'false');
+  await session.send('Input.dispatchTouchEvent', { type: 'touchCancel', touchPoints: [] });
+  await expect.poll(cameraX).toBe(0);
+
+  const pen = { pointerType: 'pen' as const };
+  await session.send('Input.dispatchMouseEvent', {
+    type: 'mousePressed', ...screen(380, 244), ...pen, button: 'left', buttons: 1, clickCount: 1,
+  });
+  await session.send('Input.dispatchMouseEvent', {
+    type: 'mouseMoved', ...screen(428, 244), ...pen, buttons: 1,
+  });
+  await session.send('Input.dispatchMouseEvent', {
+    type: 'mouseReleased', ...screen(428, 244), ...pen, button: 'left', buttons: 0, clickCount: 1,
+  });
+  await expect.poll(cameraX).toBeCloseTo(-48, 0);
+  await expect(platform).toHaveAccessibleDescription('');
+  await panTool.click();
+  await page.getByRole('button', { name: 'Reset view', exact: true }).click();
+  await expect.poll(cameraX).toBe(0);
+
   await session.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [screen(380, 244)] });
   await session.send('Input.dispatchTouchEvent', { type: 'touchMove', touchPoints: [screen(428, 244)] });
   await expect(readout).toContainText('Move');
@@ -1287,6 +1318,18 @@ new Engine({ onLoad() {
 
   const canvas = page.locator('#canvas');
   const box = (await canvas.boundingBox())!;
+  await page.getByRole('region', { name: 'Scene viewport' }).focus();
+  await page.keyboard.down('Space');
+  await page.mouse.move(box.x + 210, box.y + 180);
+  await expect(canvas).toHaveCSS('cursor', 'grab');
+  await page.mouse.down();
+  await page.mouse.move(box.x + 260, box.y + 210, { steps: 5 });
+  await expect.poll(readCamera).toMatchObject({ x: expect.closeTo(-10, 0), y: expect.closeTo(0, 0), zoom: 1 });
+  await page.keyboard.up('Space');
+  await page.keyboard.press('Escape');
+  await page.mouse.up();
+  await expect.poll(readCamera).toEqual({ x: 40, y: 30, zoom: 1 });
+
   await page.mouse.move(box.x + 210, box.y + 180);
   await page.mouse.down({ button: 'middle' });
   await page.mouse.move(box.x + 260, box.y + 210, { steps: 5 });
