@@ -309,6 +309,8 @@ export const makeExternal = () => new Rectangle({ tag: 'External platform', posi
   await expect(source).toHaveCount(0);
   await page.getByRole('button', { name: 'External platform', exact: true }).click();
   await expect(source).toHaveCount(0);
+  await expect(page.getByRole('button', { name: 'Save X to code', exact: true })).toHaveCount(0);
+  await expect(page.getByText('Inspector edits affect the live scene.')).toBeVisible();
   await page.getByRole('button', { name: 'Imported platform', exact: true }).click();
   await source.click({ timeout: 3000 });
   const dialog = page.getByRole('dialog', { name: 'Project files', exact: true });
@@ -341,19 +343,21 @@ export const makeExternal = () => new Rectangle({ tag: 'External platform', posi
 });
 
 test('reviews and saves canvas moves in the module that created the objects', async ({ page }) => {
+  await page.setViewportSize({ width: 768, height: 800 });
   const id = 'module-placement/index';
-  const original = `import { Rectangle, Vector2 } from 'dino-ge';
+  const original = `import { Line, Rectangle, Vector2 } from 'dino-ge';
 export const makePlatform = () => new Rectangle({ tag: 'Platform', position: new Vector2(90, 60), width: 64, height: 20 }); export const makeWall = () => new Rectangle({ tag: 'Wall', position: new Vector2(160, 60), width: 20, height: 64 });
 export const makeQuoted = () => new Rectangle({ tag: 'Quoted', position: new Vector2(260, 60), width: 20, height: 64, 'rotation': 0 });
-export const makeShadowed = (Vector2) => new Rectangle({ tag: 'Shadowed', position: new Vector2(360, 60), width: 20, height: 64 });`;
+export const makeShadowed = (Vector2) => new Rectangle({ tag: 'Shadowed', position: new Vector2(360, 60), width: 20, height: 64 });
+export const makeLine = () => new Line({ tag: 'Line', p1: new Vector2(30, 20), p2: new Vector2(80, 20) });`;
   let module = original;
   let rejectSave = true;
   await page.route('**/files', route => route.fulfill({ json: ['script', id] }));
   await page.route('**/api/scripts/script', route => route.fulfill({ json: '' }));
   await page.route(`**/api/scripts/${encodeURIComponent(id)}`, route => route.fulfill({ json: `
 import { Engine, Vector2 } from 'dino-ge';
-import { makePlatform, makeWall, makeQuoted, makeShadowed } from './platform.js';
-new Engine({ onLoad() { makePlatform(); makeWall(); makeQuoted(); makeShadowed(Vector2); } }, { containerId: 'playground-canvas-container' });` }));
+import { makeLine, makePlatform, makeWall, makeQuoted, makeShadowed } from './platform.js';
+new Engine({ onLoad() { makePlatform(); makeWall(); makeQuoted(); makeShadowed(Vector2); makeLine(); } }, { containerId: 'playground-canvas-container' });` }));
   await page.route(`**/api/scripts/${encodeURIComponent(id)}/modules`, route => route.fulfill({ json: ['platform.js'] }));
   await page.route(`**/api/scripts/${encodeURIComponent(id)}/modules?*`, route => {
     if (route.request().method() === 'PUT') {
@@ -378,6 +382,22 @@ new Engine({ onLoad() { makePlatform(); makeWall(); makeQuoted(); makeShadowed(V
   await page.getByRole('button', { name: 'Edit scene', exact: true }).click();
   const apply = page.getByRole('button', { name: 'Review placement in module', exact: true });
   const dialog = page.getByRole('dialog', { name: 'Project files', exact: true });
+  const line = page.getByRole('button', { name: 'Line', exact: true });
+  await line.click();
+  const x = page.getByRole('spinbutton', { name: 'X', exact: true });
+  const startX = page.getByRole('spinbutton', { name: 'Start X', exact: true });
+  const lineGeometry = () => page.evaluate(() => {
+    const { Engine } = window as unknown as { Engine: { selectedObject: { x1: number; transform: { position: { x: number } } } } };
+    return { origin: Engine.selectedObject.transform.position.x, start: Engine.selectedObject.x1 };
+  });
+  await expect(x).toHaveValue('30.00');
+  await startX.fill('50');
+  expect(await lineGeometry()).toEqual({ origin: 30, start: 50 });
+  await page.getByRole('button', { name: 'Undo canvas edit', exact: true }).click();
+  expect(await lineGeometry()).toEqual({ origin: 30, start: 30 });
+  await x.fill('40');
+  expect(await lineGeometry()).toEqual({ origin: 40, start: 30 });
+  await page.getByRole('button', { name: 'Discard canvas changes', exact: true }).click();
   for (const [tag, reason] of [['Quoted', 'literal tag and options'], ['Shadowed', 'literal transform options']]) {
     const unsafe = page.getByRole('button', { name: tag, exact: true });
     await unsafe.click();
@@ -390,7 +410,6 @@ new Engine({ onLoad() { makePlatform(); makeWall(); makeQuoted(); makeShadowed(V
   }
   await platform.click();
   await platform.press('Shift+ArrowRight');
-  const x = page.getByRole('spinbutton', { name: 'X', exact: true });
   await expect(x).toHaveValue('100.00');
   await apply.click({ timeout: 3000 });
   await expect(dialog.locator('.monaco-editor')).toContainText('new Vector2(100, 60)');
@@ -424,9 +443,25 @@ new Engine({ onLoad() { makePlatform(); makeWall(); makeQuoted(); makeShadowed(V
     return position && line ? line.slice(position.column - 1) : '';
   })).toMatch(/^(?:new )?(?:Rectangle)?\(\{ tag: 'Wall'/);
   await dialog.getByRole('button', { name: 'Close', exact: true }).click();
-  await wall.press('Shift+ArrowDown');
+  const y = page.getByRole('spinbutton', { name: 'Y', exact: true });
+  await y.click();
+  await y.fill('8');
+  await expect(y).toBeInViewport();
+  await y.fill('80');
+  await expect(wall).toHaveAccessibleDescription('Pending canvas changes', { timeout: 3000 });
+  await page.getByRole('button', { name: 'Undo canvas edit', exact: true }).click();
+  await expect(y).toHaveValue('70.00');
+  await expect(wall).not.toHaveAccessibleDescription('Pending canvas changes');
+  await page.getByRole('button', { name: 'Redo canvas edit', exact: true }).click();
+  await expect(y).toHaveValue('80.00');
+  const width = page.getByRole('spinbutton', { name: 'Width', exact: true });
+  await width.fill('0');
+  expect(await width.evaluate((element: HTMLInputElement) => element.validity.rangeUnderflow)).toBe(true);
+  await expect(width).toHaveAccessibleDescription('Enter a positive dimension.');
+  await width.fill('24');
   await apply.click();
   await expect(dialog.locator('.monaco-editor')).toContainText('new Vector2(160, 80)');
+  await expect(dialog.locator('.monaco-editor')).toContainText('width: 24');
   await save.click();
   await expect(dialog.getByRole('status')).toContainText('Saved');
   await dialog.getByRole('button', { name: 'Close', exact: true }).click();
@@ -459,6 +494,7 @@ new Engine({ onLoad() { makePlatform(); makeWall(); makeQuoted(); makeShadowed(V
   await expect(x).toHaveValue('100.00');
   await wall.click();
   await expect(page.getByRole('spinbutton', { name: 'Y', exact: true })).toHaveValue('80.00');
+  await expect(width).toHaveValue('24.00');
 });
 
 test('keeps an imported image available after deleting its sprite and reloading', async ({ page }) => {

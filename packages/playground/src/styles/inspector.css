@@ -127,9 +127,11 @@
 .prop-colour-label input:focus-visible { outline: 2px solid var(--accent-primary); outline-offset: 1px; }
 .save-prop-icon:disabled { color: var(--text-secondary); opacity: 0.5; cursor: not-allowed; }
 
-.colour-input-group { flex-wrap: wrap; }
+.colour-input-group,
+.input-group-invalid { flex-wrap: wrap; }
 .prop-row .colour-input-group input[type="text"] { min-width: 0; width: 0; }
 .prop-validation { flex-basis: 100%; color: var(--text-secondary); font-size: 11px; line-height: 1.4; }
+.prop-module-indicator { flex: none; color: var(--accent-primary); font-size: 11px; }
 
 .input-group {
   flex: 1.5;

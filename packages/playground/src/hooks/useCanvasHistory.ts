@@ -11,6 +11,7 @@ interface CanvasEdit {
   kind: EditKind;
   before: ScenePoint;
   after: ScenePoint;
+  group?: symbol;
 }
 
 interface CanvasHistory {
@@ -32,15 +33,19 @@ export function useCanvasHistory() {
   }, []);
 
   useEffect(() => {
-    const onManipulation = ({ detail }: CustomEvent<{ object: GameObject; kind: EditKind; initial: ScenePoint }>) => {
-      const { object, kind, initial } = detail;
+    const onManipulation = ({ detail }: CustomEvent<{ object: GameObject; kind: EditKind; initial: ScenePoint; group?: symbol }>) => {
+      const { object, kind, initial, group } = detail;
       const scene = Engine.currentScene;
       if (!(scene?.objects ?? Engine.objects).has(object)) return;
-      const before = { x: initial.x, y: initial.y };
       const after = Input.getObjectManipulationValue(object, kind);
-      if (before.x === after.x && before.y === after.y) return;
+      if (initial.x === after.x && initial.y === after.y) return;
       const { undo, redo } = currentHistory.current;
-      updateHistory({ scene, undo: [...undo, { scene, object, kind, before, after }], redo: redo.filter(edit => edit.scene !== scene) });
+      const last = undo.at(-1);
+      const coalesced = group && last?.group === group && last.object === object && last.scene === scene && last.kind === kind;
+      const before = coalesced ? last.before : { x: initial.x, y: initial.y };
+      const entries = coalesced ? undo.slice(0, -1) : [...undo];
+      if (before.x !== after.x || before.y !== after.y) entries.push({ scene, object, kind, before, after, group });
+      updateHistory({ scene, undo: entries, redo: redo.filter(edit => edit.scene !== scene) });
     };
 
     const onPlacementHistory = (event: Event) => {

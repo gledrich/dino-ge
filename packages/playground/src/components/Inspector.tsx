@@ -93,6 +93,18 @@ const getInspectorSections = (object: InspectableObject) => Object.entries(SECTI
     return object.hasComponent(component);
   });
 
+function getModulePlacementKind(object: Dino.GameObject, path: string): Dino.ObjectManipulationPreview['kind'] | undefined {
+  if (path === 'position.x' || path === 'position.y') return 'drag';
+  if (path === 'rotation') return 'rotate';
+  if (object instanceof Dino.Line) {
+    if (path === 'p1.x' || path === 'p1.y') return 'p1';
+    if (path === 'p2.x' || path === 'p2.y') return 'p2';
+  }
+  if (object instanceof Dino.Sprite && (path === 'scale.x' || path === 'scale.y')) return 'resize';
+  if (object instanceof Dino.Circle && path === 'radius') return 'resize';
+  if ((object instanceof Dino.Rectangle || object instanceof Dino.Text) && (path === 'width' || path === 'height')) return 'resize';
+}
+
 function prepareCanvasPlacement(object: Dino.GameObject, placement: CanvasPlacement,
   sourceId: string, mappings = getSourceMapping()) {
   const mapping = mappings[sourceId];
@@ -130,7 +142,9 @@ function prepareCanvasPlacement(object: Dino.GameObject, placement: CanvasPlacem
     const value = valueAt(path);
     if ((!literal?.numeric && !(path === 'rotation' && !property)) ||
         typeof value !== 'number' || !Number.isFinite(value)) break;
-    const edit = getSurgicalEdit(sourceId, path, Number(value.toFixed(6)), valueAt, mappings);
+    const rounded = Number(value.toFixed(6));
+    if ((path === 'width' || path === 'height' || path === 'radius') && rounded <= 0) return 'Use dimensions greater than zero.';
+    const edit = getSurgicalEdit(sourceId, path, rounded, valueAt, mappings);
     if (!edit) break;
     edits.push(edit);
   }
@@ -176,14 +190,16 @@ const Inspector: React.FC<InspectorProps> = ({ visible }) => {
   const [, setTick] = useState(0);
   const [placementStatus, setPlacementStatus] = useState('');
   const activeObjects = Engine.currentScene?.objects ?? Engine.objects;
-  const pendingCount = Array.from(pendingCanvasPlacements.keys()).filter(object => activeObjects.has(object)).length;
-  const hasModulePlacements = Array.from(pendingCanvasPlacements.keys()).some(object =>
-    activeObjects.has(object) && getProjectObjectSource(object)?.scriptId === currentScriptId);
+  const activePending = Array.from(pendingCanvasPlacements.keys()).filter(object => activeObjects.has(object));
+  const pendingCount = activePending.length;
+  const canApplyAll = activePending.every(object => !!object.metadata.sourceId);
   const hasPendingCanvasChanges = pendingCanvasPlacements.size > 0;
   const baseline = selectedObject && placement ? getCanvasPlacementBaseline(selectedObject, placement) : undefined;
   const sourceId = selectedObject?.metadata.sourceId;
   const moduleSource = selectedObject ? getProjectObjectSource(selectedObject) : undefined;
   const canOpenModule = moduleSource?.scriptId === currentScriptId;
+  const canStageModuleTransform = canOpenModule && isPaused && !!selectedObject &&
+    [Dino.Rectangle, Dino.Circle, Dino.Text, Dino.Line, Dino.Sprite].some(Type => selectedObject.constructor === Type);
   const modulePlacements = canOpenModule ? Array.from(pendingCanvasPlacements).flatMap(([object, changes]) => {
     const source = getProjectObjectSource(object);
     return activeObjects.has(object) && source?.scriptId === currentScriptId && source.run === moduleSource.run &&
@@ -423,7 +439,7 @@ const Inspector: React.FC<InspectorProps> = ({ visible }) => {
                 {pendingCount > 1 && (
                   <>
                     <p className="inspector-section-description">{pendingCount} objects in this scene have pending changes.</p>
-                    {!hasModulePlacements && <button type="button" className="scene-control inspector-apply" onClick={() => applyPlacements(true)}>
+                    {canApplyAll && <button type="button" className="scene-control inspector-apply" onClick={() => applyPlacements(true)}>
                       <i className="fa-solid fa-code" aria-hidden="true" /> Apply all canvas changes
                     </button>}
                   </>
@@ -431,13 +447,14 @@ const Inspector: React.FC<InspectorProps> = ({ visible }) => {
                 {placement && (
                   <>
                     {canOpenModule ? <p className="inspector-section-description">Review changes in this object’s source module.</p>
+                      : !sourceId ? <p className="inspector-section-description">This placement affects the live scene.</p>
                       : pendingCount <= 1 && <p className="inspector-section-description">Apply these changes before saving the script.</p>}
-                    <button type="button" className={`scene-control${pendingCount <= 1 ? ' inspector-apply' : ''}`}
+                    {(canOpenModule || sourceId) && <button type="button" className={`scene-control${pendingCount <= 1 ? ' inspector-apply' : ''}`}
                       onClick={event => canOpenModule ? reviewModulePlacement(event.currentTarget) : applyPlacements(false)}>
                       <i className="fa-solid fa-code" aria-hidden="true" /> {canOpenModule
                         ? (modulePlacements.length > 1 ? `Review ${modulePlacements.length} placements in module` : 'Review placement in module')
                         : 'Apply placement to code'}
-                    </button>
+                    </button>}
                     <button type="button" className="scene-control" onClick={discardPlacement}>
                       <i className="fa-solid fa-rotate-left" aria-hidden="true" /> Discard canvas changes
                     </button>
@@ -493,6 +510,11 @@ const Inspector: React.FC<InspectorProps> = ({ visible }) => {
               </div>
             </div>
 
+            {selectedObject && !sourceId && <p className="inspector-section-description">
+              {canStageModuleTransform ? 'Fields marked with the code icon can be reviewed in the source module. All fields update the live scene.'
+                : canOpenModule && !isPaused ? 'Enter Edit scene to review supported transform edits in the source module.'
+                  : 'Inspector edits affect the live scene.'}
+            </p>}
             {!selectedObject ? (
               <div className="no-selection">Click an object to inspect.</div>
             ) : (
@@ -506,6 +528,8 @@ const Inspector: React.FC<InspectorProps> = ({ visible }) => {
                         key={def.propertyPath} 
                         def={def} 
                         selectedObject={selectedObject} 
+                        canSaveToCode={!!sourceId && !syntaxError}
+                        placementKind={canStageModuleTransform ? getModulePlacementKind(selectedObject, def.propertyPath) : undefined}
                         deferSave={baseline && isCanvasTransformProperty(def.propertyPath, baseline)}
                       />
                     ))}

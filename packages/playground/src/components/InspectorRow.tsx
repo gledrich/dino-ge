@@ -1,7 +1,7 @@
-import React, { useEffect, useId, useRef } from 'react';
+import React, { useEffect, useId, useLayoutEffect, useRef } from 'react';
 import * as Dino from 'dino-ge';
 import { getSurgicalEdit, type CanvasPlacementTransaction } from '../utils/ast-utils';
-import { isCanvasTransformProperty, type SceneTransformState } from '../utils/scene-objects';
+import { getCanvasPlacementBaseline, isCanvasTransformProperty, restoreSceneTransform, type SceneTransformState } from '../utils/scene-objects';
 
 export interface PropertyRowDef {
   label: string;
@@ -113,20 +113,32 @@ export const resolveComponentPath = (obj: InspectableObject, pathStr: string): {
 const InspectorRow: React.FC<{
   def: PropertyRowDef;
   selectedObject: InspectableObject;
+  canSaveToCode: boolean;
+  placementKind?: Dino.ObjectManipulationPreview['kind'];
   deferSave?: boolean;
-}> = ({ def, selectedObject, deferSave }) => {
+}> = ({ def, selectedObject, canSaveToCode, placementKind, deferSave }) => {
   const inputRef = useRef<HTMLInputElement>(null);
   const colourRef = useRef<HTMLInputElement>(null);
+  const editGroup = useRef<symbol>(undefined);
   const inputId = useId();
   const isRotation = def.propertyPath === 'rotation';
   const isColour = def.type === 'colour';
+  const isDimension = def.propertyPath === 'width' || def.propertyPath === 'height' || def.propertyPath === 'radius';
+  const isModuleDimension = placementKind === 'resize' && isDimension;
+  const minimum = isModuleDimension ? 0.000001 : def.min;
   const [isValid, setIsValid] = React.useState(true);
+  const invalid = (isColour || isModuleDimension) && !isValid;
   const [prevSelectedObject, setPrevSelectedObject] = React.useState(selectedObject);
   const [lastSyncedValue, setLastSyncedValue] = React.useState<any>(() => {
     const resolved = resolveComponentPath(selectedObject, def.propertyPath);
     return resolved && resolved.target ? resolved.target[resolved.prop] : undefined;
   });
   const [isModified, setIsModified] = React.useState(false);
+
+  useLayoutEffect(() => {
+    const input = inputRef.current;
+    if (placementKind && input && document.activeElement === input) input.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+  }, [placementKind, deferSave]);
 
   // Sync state during render if selectedObject changes
   if (selectedObject !== prevSelectedObject) {
@@ -184,7 +196,7 @@ const InspectorRow: React.FC<{
           } else {
             inputRef.current.value = val !== undefined ? String(val) : '';
           }
-          if (isColour) setIsValid(true);
+          if (isColour || isModuleDimension) setIsValid(true);
         }
 
         // Compare runtime value with baseline to determine modified state
@@ -201,7 +213,7 @@ const InspectorRow: React.FC<{
     };
     rafId = requestAnimationFrame(loop);
     return () => cancelAnimationFrame(rafId);
-  }, [selectedObject, def, isColour, isRotation, lastSyncedValue]);
+  }, [selectedObject, def, isColour, isModuleDimension, isRotation, lastSyncedValue]);
 
   const parseValue = (element: HTMLInputElement) => {
     if (def.type === 'checkbox') return element.checked;
@@ -217,6 +229,19 @@ const InspectorRow: React.FC<{
   const updateValue = (element: HTMLInputElement) => {
     const val = parseValue(element);
     if (isColour) setIsValid(val !== undefined);
+    if (isModuleDimension) setIsValid(!element.validity.rangeUnderflow);
+    if (placementKind && typeof val === 'number' && Dino.Engine.paused && Dino.Engine.debug) {
+      const initial = Dino.Input.getObjectManipulationValue(selectedObject, placementKind);
+      const next = { x: initial.x, y: initial.y };
+      if (def.propertyPath === 'radius') next.x = next.y = val * 2;
+      else if (def.propertyPath.endsWith('.y') || def.propertyPath === 'height') next.y = val;
+      else next.x = val;
+      restoreSceneTransform(selectedObject, getCanvasPlacementBaseline(selectedObject, new Map([[placementKind, next]])));
+      Dino.Engine.emit('objectManipulated', {
+        object: selectedObject, kind: placementKind, initial, group: editGroup.current ??= Symbol(),
+      });
+      return;
+    }
     const resolved = resolveComponentPath(selectedObject, def.propertyPath);
     if (resolved?.target && val !== undefined) {
       resolved.target[resolved.prop] = val;
@@ -276,28 +301,31 @@ const InspectorRow: React.FC<{
             updateValue(inputRef.current);
           }} />
       </div> : <label htmlFor={inputId}>{def.label}</label>}
-      <div className={`input-group${isColour ? ' colour-input-group' : ''}`}>
+      <div className={`input-group${isColour ? ' colour-input-group' : ''}${isModuleDimension && invalid ? ' input-group-invalid' : ''}`}>
         <input
           id={inputId}
           type={isColour ? 'text' : def.type}
-          min={def.min}
+          min={minimum}
           step="any"
           ref={inputRef}
           placeholder={def.emptyColourLabel}
-          aria-invalid={isColour && !isValid ? true : undefined}
-          aria-describedby={isColour && !isValid ? `${inputId}-error` : undefined}
-          title={isColour ? 'CSS colour, such as #54d6ad, rebeccapurple or rgba(0, 0, 0, 0.5)' : undefined}
+          aria-invalid={invalid || undefined}
+          aria-describedby={invalid ? `${inputId}-error` : undefined}
+          title={isColour ? 'CSS colour, such as #54d6ad, rebeccapurple or rgba(0, 0, 0, 0.5)'
+            : placementKind ? 'Stages this transform for module review' : undefined}
           onChange={event => updateValue(event.currentTarget)}
+          onBlur={() => { editGroup.current = undefined; }}
         />
-        {!deferSave && <button type="button"
+        {canSaveToCode && !deferSave && <button type="button"
           className="save-prop-icon"
           onClick={handleSync}
           disabled={isColour && !isValid}
           aria-label={`Save ${def.label} to code`}
           title="Save this property to code"
         ><i className="fa-solid fa-floppy-disk" aria-hidden="true" /></button>}
-        {isColour && !isValid && <span className="prop-validation" id={`${inputId}-error`} role="status">
-          Enter a CSS colour, such as #54d6ad or rgba(0, 0, 0, 0.5).
+        {placementKind && <i className="fa-solid fa-code prop-module-indicator" aria-hidden="true" />}
+        {invalid && <span className="prop-validation" id={`${inputId}-error`} role="status">
+          {isColour ? 'Enter a CSS colour, such as #54d6ad or rgba(0, 0, 0, 0.5).' : 'Enter a positive dimension.'}
         </span>}
       </div>
     </div>
