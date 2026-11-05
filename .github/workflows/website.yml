@@ -1,0 +1,39 @@
+name: Website
+permissions:
+  contents: read
+
+on:
+  pull_request:
+    paths:
+      - 'website/**'
+      - 'packages/dino-ge/**'
+      - 'packages/playground/**'
+      - 'packages/example/amber-ruins/**'
+      - 'package.json'
+      - 'package-lock.json'
+      - '.nvmrc'
+      - '.github/workflows/website.yml'
+  workflow_dispatch:
+
+jobs:
+  smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version-file: '.nvmrc'
+          cache: 'npm'
+      - run: npm ci
+      - run: npm run website:build
+      - run: npx --no-install playwright install --with-deps chromium webkit
+      - name: Check both static origins
+        shell: bash
+        run: |
+          node website/serve.mjs &
+          server_pid=$!
+          trap 'kill "$server_pid" 2>/dev/null || true' EXIT
+          curl --fail --silent --show-error --retry 10 --retry-connrefused --retry-delay 1 http://127.0.0.1:4173/ --output /dev/null
+          curl --fail --silent --show-error http://127.0.0.1:4174/broker.html --output /dev/null
+          node website/check-release.mjs

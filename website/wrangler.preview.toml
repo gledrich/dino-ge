@@ -1,0 +1,7 @@
+name = "dino-ge-preview"
+compatibility_date = "2026-11-05"
+
+[assets]
+directory = "./dist/preview"
+html_handling = "none"
+not_found_handling = "none"

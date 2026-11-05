@@ -1,0 +1,7 @@
+name = "dino-ge-site"
+compatibility_date = "2026-11-05"
+
+[assets]
+directory = "./dist/site"
+html_handling = "auto-trailing-slash"
+not_found_handling = "none"
