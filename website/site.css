@@ -1,0 +1,78 @@
+:root {
+  color-scheme: dark;
+  --ink: #151411;
+  --panel: #211f1a;
+  --line: #41392e;
+  --text: #faf2e4;
+  --muted: #c9bdab;
+  --amber: #ffc46f;
+  font: 16px/1.6 system-ui, sans-serif;
+}
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--ink); color: var(--text); }
+a { color: var(--amber); }
+a:focus-visible { outline: 2px solid var(--amber); outline-offset: 5px; }
+.wrap { width: min(1200px, calc(100% - 3rem)); margin-inline: auto; }
+.skip { position: absolute; top: 0; left: 1rem; padding: .5rem 1rem; background: var(--ink); transform: translateY(-120%); z-index: 1; }
+.skip:focus { transform: translateY(0); }
+.site-header { border-bottom: 1px solid var(--line); }
+.navigation, .nav-links, .actions, .footer { display: flex; align-items: center; gap: 1rem; flex-wrap: wrap; }
+.navigation, .footer { justify-content: space-between; }
+.navigation { min-height: 4.25rem; padding-block: .5rem; }
+.navigation a { text-decoration: none; color: var(--muted); }
+.navigation a:hover, .navigation a[aria-current] { color: var(--text); }
+.navigation .brand { color: var(--text); font-weight: 800; font-size: 1.15rem; }
+.brand span { color: var(--amber); margin-right: .3rem; }
+.hero { display: grid; grid-template-columns: 1fr 1.05fr; align-items: center; gap: clamp(1.5rem, 5vw, 5rem); padding-block: clamp(3rem, 8vw, 7rem); }
+.eyebrow, .index { color: var(--amber); font: 700 .76rem/1.5 ui-monospace, monospace; letter-spacing: .12em; text-transform: uppercase; }
+h1, h2, h3, p { margin-top: 0; }
+h1, h2 { line-height: 1.02; letter-spacing: -.045em; text-wrap: balance; }
+h1 { font-size: clamp(2.7rem, 6.3vw, 5.75rem); margin-bottom: 1.5rem; }
+h1 em { color: var(--amber); font-style: normal; }
+h2 { font-size: clamp(1.9rem, 3.5vw, 3rem); margin-bottom: 1.5rem; }
+h3 { line-height: 1.25; }
+.intro, .feature-grid p, .footer { color: var(--muted); }
+.intro { font-size: 1.15rem; max-width: 42ch; }
+.actions { margin-top: 1.75rem; }
+.button { display: inline-block; padding: .65rem 1rem; border: 1px solid var(--line); border-radius: .35rem; color: var(--text); text-decoration: none; font-weight: 700; }
+.button:hover { border-color: var(--amber); }
+.primary { background: var(--amber); border-color: var(--amber); color: var(--ink); }
+.primary:hover { background: #ffd89e; }
+.showcase { margin: 0; overflow: hidden; border: 1px solid var(--line); border-radius: .65rem; background: var(--panel); }
+.showcase img { display: block; width: 100%; height: auto; }
+.showcase figcaption { display: flex; justify-content: space-between; gap: .5rem; flex-wrap: wrap; padding: .75rem 1rem; color: var(--muted); }
+.showcase strong { color: var(--text); }
+.features { border-top: 1px solid var(--line); padding-block: 3rem; }
+.feature-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1rem; }
+.feature-grid article, pre, .demo { border: 1px solid var(--line); background: var(--panel); border-radius: .4rem; padding: 1.25rem; }
+.feature-grid h3 { margin: .7rem 0 .4rem; }
+.feature-grid p { margin: 0; }
+.footer { padding-block: 1.25rem; border-top: 1px solid var(--line); }
+.guide { max-width: 780px; padding-block: 3rem; }
+.guide h1 { font-size: clamp(2.5rem, 6vw, 4.5rem); }
+.guide h2 { font-size: 1.85rem; margin-top: 2.25rem; }
+pre { overflow: auto; }
+.demo { display: block; width: 100%; min-height: 230px; padding: 0; }
+@media (max-width: 780px) {
+  .hero, .feature-grid { grid-template-columns: 1fr; }
+}
+.demo { height: 230px; margin-block: 1rem; }
+.playground-page { min-height: 100dvh; display: flex; flex-direction: column; }
+.playground-main { flex: 1; min-height: 0; display: flex; }
+.playground-page .playground-main #root { flex: 1; min-width: 0; }
+.playground-links { display: flex; flex-wrap: wrap; gap: .4rem 1rem; padding-block: .4rem; font-size: .9rem; }
+.standalone-game { height: 100dvh; display: flex; flex-direction: column; }
+.standalone-game #amber-ruins-viewport { flex: 1; min-height: 0; overflow: hidden; }
+.standalone-game canvas { display: block; }
+.standalone-game .touch-arrows { display: flex; justify-content: center; gap: .3rem; padding: .4rem; background: #17282a; }
+.standalone-game .touch-arrows button { flex: 1; max-width: 5rem; min-height: 44px; touch-action: none; background: #203234; color: var(--amber); border: 1px solid #586863; border-radius: .25rem; font: 24px system-ui; }
+.standalone-game .touch-arrows button:active { background: var(--amber); color: var(--ink); }
+.relic-demo { display: grid; justify-items: center; gap: .5rem; padding: .75rem 0; }
+.relic-demo #relic-game { width: 280px; height: 176px; }
+.relic-demo p { margin: 0; }
+.relic-demo button { background: var(--panel); border: 1px solid var(--line); color: var(--text); padding: .4rem .75rem; border-radius: .3rem; font: inherit; }
+.relic-demo :focus-visible { outline: 2px solid var(--amber); outline-offset: 2px; }
+.relic-frame { display: block; width: 100%; min-height: 282px; border: 1px solid var(--line); border-radius: .4rem; }
+@media (max-width: 380px) {
+  .guide { width: calc(100% - 1.5rem); }
+}

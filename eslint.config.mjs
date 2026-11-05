@@ -84,6 +84,7 @@ export default [
       'coverage/',
       'packages/*/coverage/',
       'docs/api/',
+      'website/dist/',
       'playground/dist/'
     ]
   }

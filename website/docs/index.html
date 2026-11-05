@@ -1,0 +1,94 @@
+<!doctype html>
+<html lang="en-GB">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="Install Dino GE and draw your first 2D scene.">
+  <title>Quickstart | Dino GE</title>
+  <link rel="stylesheet" href="/site.css">
+  <script type="importmap">{"imports":{"dino-ge":"/built/index.js"}}</script>
+  <script type="module" src="/docs/first-scene.js"></script>
+</head>
+<body>
+  <a class="skip" href="#main">Skip to content</a>
+  <header class="site-header">
+    <nav class="wrap navigation" aria-label="Main">
+      <a class="brand" href="/"><span aria-hidden="true">◆</span> Dino GE</a>
+      <div class="nav-links"><a href="/docs/" aria-current="page">Docs</a><a href="/playground/">Playground</a></div>
+    </nav>
+  </header>
+  <main id="main" class="wrap guide">
+    <p class="eyebrow">Documentation / Quickstart</p>
+    <h1>Build your first scene.</h1>
+    <p class="intro">Draw an explorer, move it with the keyboard and collect a relic. You’ll learn how Dino GE represents game objects and where to put your game logic.</p>
+    <p>You’ll need basic JavaScript and a browser. Allow about 20 minutes, including time to try the exercises.</p>
+    <a class="button" href="/docs/api/index.html">Browse the API reference</a>
+
+    <h2>1. Install the engine</h2>
+    <p>In an existing JavaScript or TypeScript project with a browser bundler, install the beta package.</p>
+    <pre><code>npm install dino-ge@beta</code></pre>
+
+    <h2>2. Add a game object</h2>
+    <p>Add <code>&lt;div id="first-scene"&gt;&lt;/div&gt;</code> to your page. Give it a height, then add this to your module entry point. The engine runs <code>onLoad</code> when it is ready to create game objects.</p>
+    <pre><code>import { Circle, Engine, Vector2 } from "dino-ge";
+
+new Engine({
+  onLoad: () =&gt; {
+    new Circle({
+      position: new Vector2(96, 96),
+      radius: 28,
+      colour: "#ffc46f"
+    });
+  },
+  update() {}
+}, {
+  title: "Quickstart | Dino GE",
+  width: "100%",
+  height: "100%",
+  containerId: "first-scene"
+});</code></pre>
+    <div class="demo" id="first-scene" aria-label="First scene preview showing an amber circle"></div>
+    <p>A scene contains game objects. Components give those objects data such as position and appearance. Systems use that data to render the scene or simulate physics. The circle above already has a transform for position and a shape for rendering.</p>
+    <p><strong>Try it.</strong> Change the radius from <code>28</code> to <code>14</code> and the first coordinate from <code>96</code> to <code>42</code>. The circle should shrink and move left. The second coordinate increases downwards.</p>
+
+    <h2>3. Move the explorer</h2>
+    <p>Give the circle a <code>tag</code> of <code>"explorer"</code> so it’s easy to identify. Declare <code>let player</code> before creating the engine, and assign your circle to it in <code>onLoad</code>. Add <code>Input</code> to your imports and put the movement code in <code>fixedUpdate</code>.</p>
+    <pre><code>fixedUpdate() {
+  const right = Number(Input.isKeyDown("ArrowRight"));
+  const left = Number(Input.isKeyDown("ArrowLeft"));
+  player.transform.position.x += (right - left) * 2;
+}</code></pre>
+    <p><code>onLoad</code> sets up the game once. <code>fixedUpdate</code> runs on regular simulation steps, so this movement advances by the same amount on each step. <code>update</code> runs on each rendered frame and can handle visual changes.</p>
+    <p><strong>Try it.</strong> Add up and down movement using <code>position.y</code>. Press both horizontal keys together and check that the explorer stays still.</p>
+
+    <h2>4. Collect a relic</h2>
+    <p>Create a second circle in <code>onLoad</code> and keep a reference to it as <code>relic</code>. After moving the player, compare the distance between the circles to the sum of their radii. For an explorer with radius 14 and a relic with radius 10, they touch at 24 pixels.</p>
+    <pre><code>if (relic &amp;&amp; Vector2.distance(
+  player.transform.position, relic.transform.position
+) &lt;= 24) {
+  Engine.destroyObject(relic);
+  relic = undefined;
+}</code></pre>
+    <p>The distance check is enough for this pickup. Use a <code>PhysicsComponent</code> when you want the engine to simulate motion and resolve collisions.</p>
+    <p>Tab to the game or click it, then hold the right arrow to collect the relic. Reset the scene to try again.</p>
+    <iframe class="relic-frame" src="/docs/collect-a-relic.html" title="Playable collect-a-relic example" loading="lazy"></iframe>
+    <p><a href="/docs/collect-a-relic.js" download>Download the finished JavaScript</a> and <a href="/docs/collect-a-relic.html" download>its companion HTML</a>. To run the pair in your own bundled project, put them in the same folder, point the module script at <code>./collect-a-relic.js</code> and let the bundler resolve <code>dino-ge</code> instead of using the demo’s import map.</p>
+    <p><strong>Try it.</strong> Move the relic to a different starting position. Then add a second relic and keep score as each is collected.</p>
+
+    <h2>5. Read a complete game</h2>
+    <p><a href="/playground/">Open Amber Ruins in the Playground</a> and find its movement and pickup logic. Amber Ruins checks tile coordinates to decide whether you can enter a cell. When you collect a relic, it hides the sprite, plays a sound and updates the HUD. Follow one of those actions from the code to what you see on screen.</p>
+    <p>Use the <a href="/docs/api/index.html">API reference</a> when you want to add a sprite, import a Tiled map, or draw a HUD with <code>ScreenUI</code>.</p>
+
+    <h2>If you get stuck</h2>
+    <dl>
+      <dt><strong>The canvas is blank</strong></dt>
+      <dd>Check the browser console for a failed import. Confirm that the element ID matches <code>containerId</code> and that the element has a height.</dd>
+      <dt><strong>The explorer stays still</strong></dt>
+      <dd>Focus the playable example. In your own code, check that <code>fixedUpdate</code> belongs to the engine callbacks and that you use <code>ArrowRight</code>, with that capitalisation.</dd>
+      <dt><strong>The relic never disappears</strong></dt>
+      <dd>Check both objects’ <code>transform.position</code> values. Compare the distance to the sum of the radii, and clear your reference once you destroy the relic.</dd>
+    </dl>
+  </main>
+  <footer class="wrap footer"><span>Dino GE · MIT licensed</span><a href="https://github.com/gledrich/tsge">Source on GitHub ↗</a></footer>
+</body>
+</html>

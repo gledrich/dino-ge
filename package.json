@@ -19,6 +19,8 @@
     "example": "npm run start -w dino-ge-example",
     "playground": "npm run start -w dino-ge-playground",
     "playground:dev": "npm run dev -w dino-ge-playground",
+    "website:build": "node website/build.mjs",
+    "website:preview": "node website/serve.mjs",
     "test:e2e:docker": "docker build --build-arg NODE_VERSION=$(cat .nvmrc) -t tsge-e2e -f docker/e2e.Dockerfile . && docker run --rm -e CI=true -v $(pwd)/packages/playground/playwright-report:/app/packages/playground/playwright-report -v $(pwd)/packages/playground/e2e:/app/packages/playground/e2e tsge-e2e",
     "test:e2e": "npx playwright test -c packages/playground/playwright.config.ts",
     "test:example": "playwright test -c packages/example/playwright.config.ts"
