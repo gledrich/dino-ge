@@ -14,6 +14,8 @@ export interface RectProps {
   __sourceId?: string;
   /** Initial position of the top-left corner. */
   position: Vector2;
+  /** Initial rotation in radians. */
+  rotation?: number;
   /** Width of the rectangle. */
   width: number;
   /** Height of the rectangle. */
@@ -69,6 +71,7 @@ export default class Rectangle extends GameObject {
 
     this.metadata.tag = defaultedProps.tag;
     this.transform.position = defaultedProps.position;
+    this.transform.rotation = defaultedProps.rotation ?? 0;
     this.colour = defaultedProps.colour;
     this.metadata.zIndex = defaultedProps.zIndex;
 

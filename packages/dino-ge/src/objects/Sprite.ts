@@ -27,6 +27,8 @@ export interface SpriteProps {
   endCol?: number;
   /** Initial position in world space. */
   position?: Vector2;
+  /** Initial rotation in radians. */
+  rotation?: number;
   /** Rendering order. */
   zIndex?: number;
   /** Scale factor (number or Vector2). */
@@ -172,6 +174,7 @@ export default class Sprite extends GameObject {
     if (props.position) {
       this.transform.position.copy(props.position);
     }
+    this.transform.rotation = props.rotation ?? 0;
 
     this.addComponent(new VisibilityComponent(props.visible ?? true));
 

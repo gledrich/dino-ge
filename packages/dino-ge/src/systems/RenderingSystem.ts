@@ -134,7 +134,7 @@ export default class RenderingSystem extends System {
             this.ctx.moveTo(line.x1, line.y1);
             this.ctx.lineTo(line.x2, line.y2);
             this.ctx.stroke();
-          } else if (object === Engine.selectedObject && rotation !== 0) {
+          } else if (rotation !== 0) {
             this.ctx.save();
             this.ctx.translate(worldPosition.x, worldPosition.y);
             this.ctx.rotate(rotation);

@@ -17,6 +17,8 @@ export interface LineProperties {
   width?: number;
   /** Transform origin for local endpoints. Defaults to p1 for existing lines. */
   position?: Vector2;
+  /** Initial rotation in radians. */
+  rotation?: number;
   /** Start point of the line. */
   p1: Vector2;
   /** End point of the line. */
@@ -109,6 +111,7 @@ export default class Line extends GameObject {
     this.lineComponent = new LineComponent(defaultedProps.width, defaultedProps.p1, defaultedProps.p2);
     this.metadata.zIndex = defaultedProps.zIndex;
     this.transform.position = defaultedProps.position ?? defaultedProps.p1;
+    this.transform.rotation = defaultedProps.rotation ?? 0;
 
     const width = Math.abs(this.x2 - this.x1);
     const height = Math.abs(this.y2 - this.y1);

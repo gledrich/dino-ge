@@ -146,6 +146,7 @@ describe('RenderingSystem', () => {
     
     const obj1 = new MockGameObject('test-tag', 0, 50, 50);
     const obj2 = new MockGameObject('', 1, 50, 50); // No tag
+    obj2.transform.rotation = Math.PI / 4;
     
     Engine.selectedObject = obj1;
     Engine.debug = true;
@@ -169,6 +170,7 @@ describe('RenderingSystem', () => {
     system.update(entities, 0.016, true);
 
     expect(debugCtx.strokeRect).toHaveBeenCalledTimes(3);
+    expect(debugCtx.rotate).toHaveBeenCalledWith(Math.PI / 4);
     // Selected object (obj1) check is done via style change
     expect(debugCtx.fillText).toHaveBeenCalledWith('test-tag', 0, -5);
     expect(debugCtx.fillText).toHaveBeenCalledWith('obj', 0, -5); // obj2 default tag

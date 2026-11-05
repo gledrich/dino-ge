@@ -41,6 +41,8 @@ export interface TextProperties {
   verticalAlign?: VerticalAlign;
   /** Anchor position for the text. */
   position: Vector2;
+  /** Initial rotation in radians. */
+  rotation?: number;
   /** Optional width for background box. */
   width?: number;
   /** Optional height for background box. */
@@ -147,6 +149,7 @@ export default class Text extends GameObject {
     const text = defaultedProps.text;
     this.length = defaultedProps.text.length;
     this.transform.position = defaultedProps.position;
+    this.transform.rotation = defaultedProps.rotation ?? 0;
     const horizontalAlign: HorizontalAlign = defaultedProps.horizontalAlign as HorizontalAlign;
     const verticalAlign: VerticalAlign = defaultedProps.verticalAlign as VerticalAlign;
     const width = defaultedProps.width || this.fontSize * this.length;

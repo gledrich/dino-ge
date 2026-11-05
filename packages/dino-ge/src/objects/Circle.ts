@@ -14,6 +14,8 @@ export interface CircleProps {
   __sourceId?: string;
   /** Initial position of the circle. */
   position: Vector2;
+  /** Initial rotation in radians. */
+  rotation?: number;
   /** Radius of the circle. */
   radius: number;
   /** Fill colour. */
@@ -86,6 +88,7 @@ export default class Circle extends GameObject {
 
     this.metadata.tag = defaultedProps.tag;
     this.transform.position = defaultedProps.position;
+    this.transform.rotation = defaultedProps.rotation ?? 0;
     this.radius = defaultedProps.radius;
     this.colour = defaultedProps.colour;
     this.metadata.zIndex = defaultedProps.zIndex;
