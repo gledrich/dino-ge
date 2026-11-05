@@ -1,13 +1,12 @@
-import React, { useEffect, useState, useCallback, useRef } from 'react';
+import React, { useEffect, useState } from 'react';
 import * as Dino from 'dino-ge';
 import InspectorRow, { InspectableObject, PropertyRowDef, resolveComponentPath } from './InspectorRow';
 import { getLineOriginEdit, getSurgicalEdit, getSourceMapping, Edit } from '../utils/ast-utils';
 import { usePlayground } from '../context/PlaygroundContext';
-import { getCanvasPlacementBaseline, isCanvasTransformProperty, restoreSceneTransform, type CanvasPlacement, type ScenePoint, type SceneTransformState } from '../utils/scene-objects';
+import { getCanvasPlacementBaseline, isCanvasTransformProperty, restoreSceneTransform, type SceneTransformState } from '../utils/scene-objects';
 import '../styles/inspector.css';
 
 const { Engine } = Dino;
-type Manipulation = Dino.ObjectManipulationPreview['kind'];
 
 interface InspectorProps {
   visible: boolean;
@@ -82,12 +81,11 @@ const getInspectorSections = (object: InspectableObject) => Object.entries(SECTI
   });
 
 const Inspector: React.FC<InspectorProps> = ({ visible }) => {
-  const { isDebug, isPaused, canvasPlacement: placement, setCanvasPlacement: setPlacement } = usePlayground();
-  const [selectedObject, setSelectedObject] = useState<InspectableObject | null>(Engine.selectedObject as InspectableObject | null);
+  const { isDebug, isPaused, selectedObject, pendingCanvasPlacements } = usePlayground();
+  const placement = selectedObject ? pendingCanvasPlacements.get(selectedObject) : undefined;
   const [isApplying, setIsApplying] = useState(false);
   const [syntaxError, setSyntaxError] = useState<string | null>(null);
   const [, setTick] = useState(0);
-  const pendingPlacement = useRef(new WeakMap<Dino.GameObject, CanvasPlacement>());
   const [placementStatus, setPlacementStatus] = useState('');
   const baseline = selectedObject && placement ? getCanvasPlacementBaseline(selectedObject, placement) : undefined;
   const canEditPaletteObject = isPaused && !syntaxError && selectedObject?.metadata.sourceId?.startsWith('DinoPlace');
@@ -109,21 +107,10 @@ const Inspector: React.FC<InspectorProps> = ({ visible }) => {
   };
 
   useEffect(() => {
-    const onSelectedObjectChanged = (e: any) => {
-      setSelectedObject(e.detail as InspectableObject | null);
-      setPlacement(e.detail ? pendingPlacement.current.get(e.detail) : undefined);
-      setPlacementStatus('');
-    };
-
-    const onObjectManipulated = (event: CustomEvent<{ object: Dino.GameObject; kind: Manipulation; initial: ScenePoint }>) => {
-      const { object, kind, initial } = event.detail;
-      const changes = new Map(pendingPlacement.current.get(object));
-      if (!changes.has(kind)) changes.set(kind, { x: initial.x, y: initial.y });
-      pendingPlacement.current.set(object, changes);
-      if (Engine.selectedObject === object) {
-        setPlacement(changes);
-        setPlacementStatus('');
-      }
+    const clearStatus = () => setPlacementStatus('');
+    const onPlacementChanged = (event: Event) => {
+      const { object } = (event as CustomEvent<{ object: Dino.GameObject }>).detail;
+      if (Engine.selectedObject === object) clearStatus();
     };
 
     const onSyntaxError = (e: Event) => {
@@ -131,40 +118,26 @@ const Inspector: React.FC<InspectorProps> = ({ visible }) => {
       setSyntaxError(customEvent.detail);
     };
 
-    const onPlacementHistory = (event: Event) => {
-      const { object, state } = (event as CustomEvent<{ object: Dino.GameObject; state: SceneTransformState }>).detail;
-      const changes = new Map(pendingPlacement.current.get(object));
-      if (state.position) changes.delete('drag');
-      if (state.scale || state.size) changes.delete('resize');
-      if (state.rotation !== undefined) changes.delete('rotate');
-      if (state.p1) changes.delete('p1');
-      if (state.p2) changes.delete('p2');
-      if (changes.size) pendingPlacement.current.set(object, changes);
-      else pendingPlacement.current.delete(object);
-      if (Engine.selectedObject === object) {
-        setPlacement(changes.size ? changes : undefined);
-        setPlacementStatus('');
-      }
-    };
-
     const onEngineUpdate = () => {
       setTick(t => t + 1);
     };
 
-    Engine.on('selectedObjectChanged', onSelectedObjectChanged);
-    Engine.on('objectManipulated', onObjectManipulated);
+    Engine.on('selectedObjectChanged', clearStatus);
+    Engine.on('objectManipulated', onPlacementChanged);
     window.addEventListener('playground-syntax-error', onSyntaxError);
-    window.addEventListener('playground-placement-history', onPlacementHistory);
+    window.addEventListener('playground-placement-history', onPlacementChanged);
+    window.addEventListener('playground-before-run', clearStatus);
     window.addEventListener('playground-update-inspector', onEngineUpdate);
 
     return () => {
-      Engine.off('selectedObjectChanged', onSelectedObjectChanged);
-      Engine.off('objectManipulated', onObjectManipulated);
+      Engine.off('selectedObjectChanged', clearStatus);
+      Engine.off('objectManipulated', onPlacementChanged);
       window.removeEventListener('playground-syntax-error', onSyntaxError);
-      window.removeEventListener('playground-placement-history', onPlacementHistory);
+      window.removeEventListener('playground-placement-history', onPlacementChanged);
+      window.removeEventListener('playground-before-run', clearStatus);
       window.removeEventListener('playground-update-inspector', onEngineUpdate);
     };
-  }, [setPlacement]);
+  }, []);
 
   const finishPlacement = (object: Dino.GameObject, state: SceneTransformState, message: string) => {
     window.dispatchEvent(new CustomEvent('playground-placement-history', { detail: { object, state } }));
@@ -270,7 +243,7 @@ const Inspector: React.FC<InspectorProps> = ({ visible }) => {
     finishPlacement(selectedObject, after, 'Applied to code. Save the script to keep it.');
   };
 
-  const handleApplyToCode = useCallback(() => {
+  const handleApplyToCode = () => {
     if (!selectedObject) return;
     const sourceId = selectedObject.metadata.sourceId;
     if (!sourceId) {
@@ -306,7 +279,7 @@ const Inspector: React.FC<InspectorProps> = ({ visible }) => {
     }
     
     setTimeout(() => setIsApplying(false), 500);
-  }, [selectedObject]);
+  };
 
   if (!visible) return null;
 

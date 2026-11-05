@@ -44,7 +44,8 @@ const Viewport: React.FC = () => {
     setIsViewportReady, 
     isInspectorVisible, 
     setIsInspectorVisible,
-    canvasPlacement,
+    selectedObject,
+    pendingCanvasPlacements,
     isPaused, 
     setIsPaused,
     isDebug, 
@@ -494,7 +495,7 @@ const Viewport: React.FC = () => {
               Drag the round handle to rotate · Hold Shift to snap to 15°<br />
               Esc cancels the current edit
             </span>
-            {!isInspectorVisible && canvasPlacement && (
+            {!isInspectorVisible && selectedObject && pendingCanvasPlacements.has(selectedObject) && (
               <button type="button" className="scene-control scene-review-changes" onClick={() => {
                 setIsInspectorVisible(true);
                 requestAnimationFrame(() => document.getElementById('canvas-changes')?.focus());
