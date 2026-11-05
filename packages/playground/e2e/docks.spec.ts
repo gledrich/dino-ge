@@ -92,6 +92,10 @@ test('reorders, moves and restores tabs including moves into an empty dock', asy
   await bottom.getByRole('tab', { name: 'Console' }).click();
   await left.getByRole('button', { name: 'View source', exact: true }).click();
   await expect(bottom.getByRole('tab', { name: 'Editor' })).toHaveAttribute('aria-selected', 'true');
+  await expect.poll(() => page.evaluate(() => {
+    const { monaco } = window as typeof window & { monaco: Monaco };
+    return monaco.editor.getEditors()[0]?.hasTextFocus();
+  })).toBe(true);
   const beforeResize = (await right.boundingBox())!.width;
   await page.getByRole('separator', { name: 'Resize right dock' }).press('ArrowLeft');
   await expect.poll(async () => (await right.boundingBox())?.width ?? 0).toBeGreaterThan(beforeResize);
