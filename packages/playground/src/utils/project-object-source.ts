@@ -1,4 +1,6 @@
 import { Engine, type GameObject } from 'dino-ge';
+import { getLineInfo } from 'acorn';
+import { getSourceOffset, mapSourceOffset, type Edit } from './ast-utils';
 
 export interface ProjectObjectSource {
   scriptId: string;
@@ -6,10 +8,11 @@ export interface ProjectObjectSource {
   lineNumber: number;
   column: number;
   run: number;
+  urlVariant: boolean;
 }
 
 export const openProjectObjectSourceEvent = 'playground-open-project-object-source';
-export interface ProjectPlacementDraft { value: string; onSaved: () => void }
+export interface ProjectPlacementDraft { value: string; edits: Edit[]; onSaved: () => void }
 export type ProjectObjectSourceRequest = {
   source: ProjectObjectSource;
   trigger: HTMLButtonElement;
@@ -17,24 +20,47 @@ export type ProjectObjectSourceRequest = {
 };
 
 const objectSources = new WeakMap<GameObject, ProjectObjectSource>();
-let activeProject: { scriptId: string; run: number; editedModules: Set<string> } | undefined;
+type ModuleRevision = { original: string; latest: string; changes: Edit[][] };
+let activeProject: { scriptId: string; run: number; modules: Map<string, ModuleRevision | null> } | undefined;
 
 export function getProjectObjectSource(object: GameObject) {
   return objectSources.get(object);
 }
 
 export function markProjectModuleEdited(scriptId: string, path: string) {
-  if (activeProject?.scriptId === scriptId) activeProject.editedModules.add(path);
+  if (activeProject?.scriptId === scriptId) activeProject.modules.set(path, null);
 }
 
-export function isProjectObjectLocationCurrent(source: ProjectObjectSource) {
-  return activeProject?.scriptId === source.scriptId && activeProject.run === source.run &&
-    !activeProject.editedModules.has(source.path);
+export function recordProjectPlacementSave(source: ProjectObjectSource, before: string, draft: ProjectPlacementDraft): boolean {
+  if (activeProject?.scriptId !== source.scriptId) return false;
+  const previous = activeProject.modules.get(source.path);
+  if (activeProject.run !== source.run || source.urlVariant || previous === null || (previous && previous.latest !== before)) return false;
+  activeProject.modules.set(source.path, {
+    original: previous?.original ?? before,
+    latest: draft.value,
+    changes: [...(previous?.changes ?? []), draft.edits],
+  });
+  return true;
+}
+
+export function getProjectObjectLocation(source: ProjectObjectSource, value: string, preview?: ProjectPlacementDraft) {
+  if (activeProject?.scriptId !== source.scriptId || activeProject.run !== source.run) return;
+  const revision = activeProject.modules.get(source.path);
+  if (revision === null || (revision && (source.urlVariant || revision.latest !== value))) return;
+  if (!revision && !preview) return { lineNumber: source.lineNumber, column: source.column };
+  let offset = getSourceOffset(revision?.original ?? value, source.lineNumber, source.column);
+  for (const edits of [...(revision?.changes ?? []), ...(preview ? [preview.edits] : [])]) {
+    if (offset === undefined) return;
+    offset = mapSourceOffset(offset, edits);
+  }
+  if (offset === undefined) return;
+  const { line, column } = getLineInfo(preview?.value ?? value, offset);
+  return { lineNumber: line, column: column + 1 };
 }
 
 /** Capture the module that created the object, even if it registers later. */
 export function trackProjectObjectSources(scriptId: string, run: number) {
-  const session = { scriptId, run, editedModules: new Set<string>() };
+  const session = { scriptId, run, modules: new Map<string, ModuleRevision | null>() };
   activeProject = session;
   const [project, ...entry] = scriptId.split('/');
   const prefix = new URL(`/project-runs/${run}/${encodeURIComponent(project)}/`, location.href);
@@ -59,14 +85,18 @@ export function trackProjectObjectSources(scriptId: string, run: number) {
         continue;
       }
       let path: string;
+      let urlVariant: boolean;
       try {
-        path = decodeURIComponent(new URL(match[1]).pathname.slice(prefix.pathname.length));
+        const url = new URL(match[1]);
+        path = decodeURIComponent(url.pathname.slice(prefix.pathname.length));
+        const canonicalUrl = new URL(path.split('/').map(encodeURIComponent).join('/'), prefix);
+        urlVariant = url.href !== canonicalUrl.href;
       } catch {
         break;
       }
       if (path === entryPath) break;
       if (!/\.m?js$/.test(path) || path.split('/').some(part => part.startsWith('.') || part === 'node_modules')) break;
-      objectSources.set(object, { scriptId, run, path, lineNumber: Number(match[2]), column: Number(match[3]) });
+      objectSources.set(object, { scriptId, run, path, urlVariant, lineNumber: Number(match[2]), column: Number(match[3]) });
       break;
     }
   });

@@ -296,8 +296,7 @@ export const makeExternal = () => new Rectangle({ tag: 'External platform', posi
 test('reviews and saves canvas moves in the module that created the objects', async ({ page }) => {
   const id = 'module-placement/index';
   const original = `import { Rectangle, Vector2 } from 'dino-ge';
-export const makePlatform = () => new Rectangle({ tag: 'Platform', position: new Vector2(60, 60), width: 64, height: 20 });
-export const makeWall = () => new Rectangle({ tag: 'Wall', position: new Vector2(160, 60), width: 20, height: 64 });
+export const makePlatform = () => new Rectangle({ tag: 'Platform', position: new Vector2(90, 60), width: 64, height: 20 }); export const makeWall = () => new Rectangle({ tag: 'Wall', position: new Vector2(160, 60), width: 20, height: 64 });
 export const makeQuoted = () => new Rectangle({ tag: 'Quoted', position: new Vector2(260, 60), width: 20, height: 64, 'rotation': 0 });
 export const makeShadowed = (Vector2) => new Rectangle({ tag: 'Shadowed', position: new Vector2(360, 60), width: 20, height: 64 });`;
   let module = original;
@@ -341,9 +340,9 @@ new Engine({ onLoad() { makePlatform(); makeWall(); makeQuoted(); makeShadowed(V
   await platform.click();
   await platform.press('Shift+ArrowRight');
   const x = page.getByRole('spinbutton', { name: 'X', exact: true });
-  await expect(x).toHaveValue('70.00');
+  await expect(x).toHaveValue('100.00');
   await apply.click({ timeout: 3000 });
-  await expect(dialog.locator('.monaco-editor')).toContainText('new Vector2(70, 60)');
+  await expect(dialog.locator('.monaco-editor')).toContainText('new Vector2(100, 60)');
   expect(module).toBe(original);
   await dialog.getByRole('button', { name: 'Discard changes', exact: true }).click();
   await dialog.getByRole('button', { name: 'Close', exact: true }).click();
@@ -357,18 +356,48 @@ new Engine({ onLoad() { makePlatform(); makeWall(); makeQuoted(); makeShadowed(V
   await expect(dialog.getByRole('alert')).toHaveText('Could not save the module.');
   expect(module).toBe(original);
   await save.click();
-  await expect(dialog.getByRole('status')).toContainText('Saved');
+  await expect(dialog.getByRole('status')).toHaveText('Saved. You can keep editing the scene.');
   await dialog.getByRole('button', { name: 'Close', exact: true }).click();
   await expect(platform).not.toHaveAccessibleDescription('Pending canvas changes');
   await expect(wall).not.toHaveAccessibleDescription('Pending canvas changes');
-  expect(module.replace(/\r\n/g, '\n')).toBe(original.replace('Vector2(60, 60)', 'Vector2(70, 60)')
+  expect(module.replace(/\r\n/g, '\n')).toBe(original.replace('Vector2(90, 60)', 'Vector2(100, 60)')
     .replace('Vector2(160, 60)', 'Vector2(160, 70)'));
+
+  const liveCanvas = await page.locator('#canvas').elementHandle();
+  await page.getByRole('button', { name: 'View source', exact: true }).click();
+  await expect.poll(() => dialog.locator('.monaco-editor').evaluate(element => {
+    const { monaco } = window as typeof window & { monaco: Monaco };
+    const editor = monaco.editor.getEditors().find(item => item.getDomNode() === element);
+    const position = editor?.getPosition();
+    const line = position && editor?.getModel()?.getLineContent(position.lineNumber);
+    return position && line ? line.slice(position.column - 1) : '';
+  })).toMatch(/^(?:new )?(?:Rectangle)?\(\{ tag: 'Wall'/);
+  await dialog.getByRole('button', { name: 'Close', exact: true }).click();
+  await wall.press('Shift+ArrowDown');
+  await apply.click();
+  await expect(dialog.locator('.monaco-editor')).toContainText('new Vector2(160, 80)');
+  await save.click();
+  await expect(dialog.getByRole('status')).toContainText('Saved');
+  await dialog.getByRole('button', { name: 'Close', exact: true }).click();
+  expect(await liveCanvas?.evaluate(element => element === document.querySelector('#canvas'))).toBe(true);
+  await expect(wall).not.toHaveAccessibleDescription('Pending canvas changes');
+
+  module = '// External edit\n' + module;
+  await wall.press('Shift+ArrowDown');
+  await apply.click();
+  await expect(dialog.getByRole('alert')).toContainText('Reset the game to refresh the source locations');
+  await expect(save).toBeDisabled();
+  await dialog.getByRole('button', { name: 'Close', exact: true }).click();
+  await expect(wall).toHaveAccessibleDescription('Pending canvas changes');
+  await page.getByRole('button', { name: 'Discard canvas changes', exact: true }).click();
 
   await page.getByRole('button', { name: 'Reset game', exact: true }).click();
   await expect(platform).toBeVisible();
   await page.getByRole('button', { name: 'Edit scene', exact: true }).click();
   await platform.click();
-  await expect(x).toHaveValue('70.00');
+  await expect(x).toHaveValue('100.00');
+  await wall.click();
+  await expect(page.getByRole('spinbutton', { name: 'Y', exact: true })).toHaveValue('80.00');
 });
 
 test('keeps an imported image available after deleting its sprite and reloading', async ({ page }) => {

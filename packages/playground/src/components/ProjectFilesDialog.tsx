@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import Editor from '@monaco-editor/react';
 import type { editor } from 'monaco-editor';
 import { listProjectModules, readProjectModule, saveProjectModule } from '../utils/helpers';
-import { isProjectObjectLocationCurrent, markProjectModuleEdited, type ProjectObjectSource, type ProjectObjectSourceRequest, type ProjectPlacementDraft } from '../utils/project-object-source';
+import { getProjectObjectLocation, markProjectModuleEdited, recordProjectPlacementSave, type ProjectObjectSource, type ProjectObjectSourceRequest, type ProjectPlacementDraft } from '../utils/project-object-source';
 
 export default function ProjectFilesDialog({ scriptId, initialSource, prepareDraft, onClose }: {
   scriptId: string; initialSource?: ProjectObjectSource; prepareDraft?: ProjectObjectSourceRequest['prepareDraft']; onClose: () => void;
@@ -19,7 +19,9 @@ export default function ProjectFilesDialog({ scriptId, initialSource, prepareDra
   const [error, setError] = useState('');
   const ready = loaded?.path === path && !!path;
   const dirty = ready && draft !== loaded?.value;
-  const staleLocation = initialSource?.path === path && !isProjectObjectLocationCurrent(initialSource);
+  const sourceLocation = ready && initialSource?.path === path
+    ? getProjectObjectLocation(initialSource, loaded.value, placementDraft) : undefined;
+  const staleLocation = ready && initialSource?.path === path && !sourceLocation;
 
   useEffect(() => {
     const element = dialog.current;
@@ -66,12 +68,14 @@ export default function ProjectFilesDialog({ scriptId, initialSource, prepareDra
     try {
       const value = placementDraft?.value ?? draft;
       await saveProjectModule(scriptId, path, value);
+      const canContinue = initialSource && placementDraft && loaded
+        ? recordProjectPlacementSave(initialSource, loaded.value, placementDraft) : false;
       placementDraft?.onSaved();
       setPlacementDraft(undefined);
-      markProjectModuleEdited(scriptId, path);
+      if (!canContinue) markProjectModuleEdited(scriptId, path);
       setLoaded({ path, value });
       setDraft(value);
-      setStatus('Saved. Reset the game to run the updated module.');
+      setStatus(canContinue ? 'Saved. You can keep editing the scene.' : 'Saved. Reset the game to run the updated module.');
     } catch (error) {
       setError(error instanceof Error ? error.message : 'Could not save the module.');
     } finally {
@@ -119,8 +123,8 @@ export default function ProjectFilesDialog({ scriptId, initialSource, prepareDra
           <Editor height="100%" defaultLanguage="javascript" theme="vs-dark" value={draft} saveViewState={!initialSource}
             path={`file:///projects/${scriptId.split('/')[0]}/${path.split('/').map(encodeURIComponent).join('/')}`}
             onMount={(editor: editor.IStandaloneCodeEditor) => {
-              if (path !== initialSource?.path || !isProjectObjectLocationCurrent(initialSource)) return;
-              const position = editor.getModel()?.validatePosition(initialSource);
+              if (!sourceLocation) return;
+              const position = editor.getModel()?.validatePosition(sourceLocation);
               if (!position) return;
               editor.setPosition(position);
               editor.revealPositionInCenterIfOutsideViewport(position);

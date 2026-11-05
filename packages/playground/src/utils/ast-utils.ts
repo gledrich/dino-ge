@@ -425,6 +425,26 @@ export interface Edit {
   newText: string;
 }
 
+export function getSourceOffset(source: string, lineNumber: number, column: number): number | undefined {
+  let line = 1;
+  let start = 0;
+  for (const newline of source.matchAll(/\r\n|[\r\n\u2028\u2029]/g)) {
+    if (line === lineNumber) return column > 0 && start + column - 1 <= newline.index ? start + column - 1 : undefined;
+    start = newline.index + newline[0].length;
+    line++;
+  }
+  if (line === lineNumber && column > 0 && start + column - 1 <= source.length) return start + column - 1;
+}
+
+export function mapSourceOffset(offset: number, edits: readonly Edit[]): number | undefined {
+  let mapped = offset;
+  for (const { start, end, newText } of edits) {
+    if (offset >= end) mapped += newText.length - (end - start);
+    else if (offset >= start) return;
+  }
+  return mapped;
+}
+
 export function applyEditsToSource(source: string, edits: Edit[]): string | undefined {
   let boundary = source.length;
   for (const { start, end, newText } of [...edits].sort((a, b) => b.start - a.start || b.end - a.end)) {
@@ -441,11 +461,9 @@ export function readObjectSourceMappings(source: string): SourceMappings | undef
 }
 
 export function findObjectConstructor(mappings: SourceMappings, source: string, line: number, column: number) {
-  const isAfter = (offset: number) => {
-    const position = acorn.getLineInfo(source, offset);
-    return line > position.line || (line === position.line && column > position.column);
-  };
-  return Object.values(mappings).find(mapping => isAfter(mapping.start) && !isAfter(mapping.contentStart));
+  const offset = getSourceOffset(source, line, column);
+  if (offset === undefined) return;
+  return Object.values(mappings).find(mapping => mapping.start <= offset && offset < mapping.contentStart);
 }
 
 export interface CanvasPlacementTransaction {

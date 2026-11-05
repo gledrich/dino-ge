@@ -3,7 +3,7 @@ import * as Dino from 'dino-ge';
 import InspectorRow, { InspectableObject, PropertyRowDef, resolveComponentPath } from './InspectorRow';
 import { applyEditsToSource, findObjectConstructor, getLineOriginEdit, getStandaloneSceneObject, getSurgicalEdit, getSourceMapping, readObjectSourceMappings, type CanvasPlacementTransaction, type Edit } from '../utils/ast-utils';
 import { usePlayground } from '../context/PlaygroundContext';
-import { getProjectObjectSource, isProjectObjectLocationCurrent, openProjectObjectSourceEvent, type ProjectObjectSourceRequest } from '../utils/project-object-source';
+import { getProjectObjectLocation, getProjectObjectSource, openProjectObjectSourceEvent, type ProjectObjectSourceRequest } from '../utils/project-object-source';
 import { getCanvasPlacementBaseline, isCanvasTransformProperty, restoreSceneTransform, type CanvasPlacement, type SceneTransformState } from '../utils/scene-objects';
 import '../styles/inspector.css';
 
@@ -310,12 +310,13 @@ const Inspector: React.FC<InspectorProps> = ({ visible }) => {
     });
     window.dispatchEvent(new CustomEvent<ProjectObjectSourceRequest>(openProjectObjectSourceEvent, {
       detail: { source: moduleSource, trigger, prepareDraft: value => {
-        if (!isProjectObjectLocationCurrent(moduleSource)) return 'Reset the game before applying changes to this module.';
         const mappings = readObjectSourceMappings(value);
         if (!mappings) return 'Fix the syntax in this module before applying canvas placements.';
         const edits: Edit[] = [];
         const applied: { object: Dino.GameObject; state: SceneTransformState; placementMatches: () => boolean }[] = [];
         for (const { object, changes, source, placementMatches } of candidates) {
+          const location = getProjectObjectLocation(source, value);
+          if (!location) return 'Reset the game to refresh the source locations before applying changes to this module.';
           if (!placementMatches()) return 'The canvas placement changed. Review the latest placement from the Inspector.';
           const matches = Array.from(scene?.objects ?? Engine.objects).filter(member => {
             const other = getProjectObjectSource(member);
@@ -324,7 +325,7 @@ const Inspector: React.FC<InspectorProps> = ({ visible }) => {
           });
           const tag = object.metadata.tag;
           if (matches.length !== 1) return `${tag}: Use a constructor that creates one object in the scene.`;
-          const mapping = findObjectConstructor(mappings, value, source.lineNumber, source.column);
+          const mapping = findObjectConstructor(mappings, value, location.lineNumber, location.column);
           if (!mapping || mapping.hasDynamicProperties || Dino[mapping.type as keyof typeof Dino] !== object.constructor ||
               mapping.literalTag !== tag) {
             return `${tag}: Use a Dino GE constructor with a literal tag and options at the recorded location.`;
@@ -338,7 +339,7 @@ const Inspector: React.FC<InspectorProps> = ({ visible }) => {
         if (updated === undefined || updated === value || !readObjectSourceMappings(updated)) {
           return 'This placement could not be added to the module draft.';
         }
-        return { value: updated, onSaved: () => {
+        return { value: updated, edits, onSaved: () => {
           for (const { object, state, placementMatches } of applied) {
             if (!placementMatches()) continue;
             window.dispatchEvent(new CustomEvent('playground-placement-history', { detail: { object, state } }));
