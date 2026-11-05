@@ -33,17 +33,28 @@ test('keeps unsaved edits across tabs and panel collapse, and retains hidden con
 
 test('selects an object in Explorer and writes an Inspector change back to the script', async ({ page }) => {
   await page.route('**/files', route => route.fulfill({ json: ['script'] }));
-  await page.route('**/api/scripts/script', route => route.fulfill({ json: `
+  let source = `
 import { Engine, Rectangle, Vector2 } from 'dino-ge';
 new Engine({
-  onLoad: () => new Rectangle({
-    tag: 'beta-box', position: new Vector2(12, 24), width: 30, height: 30, colour: '#abc',
-  }),
+  onLoad() {
+    new Rectangle({ tag: 'reserved-box', position: new Vector2(72, 24), width: 30, height: 30 });
+    new Rectangle({ 'tag': 'beta-box', position: new Vector2(12, 24), width: 30, height: 30, colour: '#abc' });
+  },
   update: () => {},
 }, { containerId: 'playground-canvas-container' });
-` }));
+`;
+  await page.route('**/api/scripts/script', route => {
+    if (route.request().method() === 'PUT') {
+      source = route.request().postDataJSON().data;
+      return route.fulfill({ json: { success: true } });
+    }
+    return route.fulfill({ json: source });
+  });
   await page.goto('/');
-  await page.getByRole('button', { name: 'beta-box' }).press('Enter');
+  const original = page.getByRole('button', { name: 'beta-box', exact: true });
+  await expect(original).toBeVisible();
+  await page.getByRole('button', { name: 'Edit scene', exact: true }).click();
+  await original.press('Enter');
   const x = page.getByRole('spinbutton', { name: 'X', exact: true });
   await x.fill('120');
   await page.getByRole('button', { name: 'Save X to code', exact: true }).click();
@@ -51,12 +62,79 @@ new Engine({
     const { monaco } = window as typeof window & { monaco: Monaco };
     return monaco.editor.getModels().find(model => model.getLanguageId() === 'javascript')?.getValue();
   })).toContain('new Vector2(120, 24)');
-  await page.getByRole('textbox', { name: 'Tag', exact: true }).fill("beta's box");
-  await page.getByRole('button', { name: 'Save Tag to code', exact: true }).click();
+  const tag = page.getByRole('textbox', { name: 'Tag', exact: true });
+  const saveTag = page.getByRole('button', { name: 'Save Tag to code', exact: true });
+  await tag.fill('reserved-box');
+  await saveTag.click();
+  await expect(tag).toHaveAccessibleDescription('Could not save this tag to a unique constructor in the open script.');
+  await expect.poll(() => page.evaluate(() => {
+    const { monaco } = window as typeof window & { monaco: Monaco };
+    return monaco.editor.getEditors()[0].getValue();
+  })).toContain("tag: 'beta-box'");
+  await tag.fill("beta's box");
+  await saveTag.click();
   await expect.poll(() => page.evaluate(() => {
     const { monaco } = window as typeof window & { monaco: Monaco };
     return monaco.editor.getModels().find(model => model.getLanguageId() === 'javascript')?.getValue();
   })).toContain(`tag: "beta's box"`);
+  const renamed = page.getByRole('button', { name: "beta's box", exact: true });
+  await expect(renamed).toHaveAttribute('aria-pressed', 'true');
+  await page.getByRole('button', { name: 'View source', exact: true }).click();
+  await expect.poll(() => page.evaluate(() => {
+    const { monaco } = window as typeof window & { monaco: Monaco };
+    const editor = monaco.editor.getEditors()[0];
+    const position = editor.getPosition();
+    const model = editor.getModel();
+    if (!position || !model || !editor.hasTextFocus()) return '';
+    return model.getValue().slice(model.getOffsetAt(position), model.getOffsetAt(position) + 100);
+  })).toMatch(/^new Rectangle\(\{\s*tag: "beta's box"/);
+  await page.getByRole('button', { name: 'Undo code edit', exact: true }).click();
+  await expect(original).toHaveAttribute('aria-pressed', 'true');
+  await page.getByRole('button', { name: 'Redo code edit', exact: true }).click();
+  await expect(renamed).toHaveAttribute('aria-pressed', 'true');
+  await page.getByRole('button', { name: 'reserved-box', exact: true }).click();
+  await x.fill('7200');
+  await page.getByRole('button', { name: 'Save X to code', exact: true }).click();
+  const undo = page.getByRole('button', { name: 'Undo code edit', exact: true });
+  await undo.click();
+  await expect(renamed).toBeVisible();
+  await expect.poll(() => page.evaluate(() => {
+    const { monaco } = window as typeof window & { monaco: Monaco };
+    return monaco.editor.getEditors()[0].getValue();
+  })).toContain('new Vector2(72, 24)');
+  await undo.click();
+  await expect(original).toBeVisible();
+  await page.getByRole('button', { name: 'Redo code edit', exact: true }).click();
+  await renamed.click();
+  await x.fill('135');
+  await page.getByRole('button', { name: 'Save X to code', exact: true }).click();
+  await expect.poll(() => page.evaluate(() => {
+    const { monaco } = window as typeof window & { monaco: Monaco };
+    return monaco.editor.getEditors()[0].getValue();
+  })).toContain('new Vector2(135, 24)');
+
+  await page.evaluate(() => {
+    const { monaco } = window as typeof window & { monaco: Monaco };
+    const editor = monaco.editor.getEditors()[0];
+    editor.setValue(editor.getValue().replace(`tag: "beta's box"`, "tag: 'other-box'")
+      .replace("tag: 'reserved-box'", `tag: "beta's box"`));
+  });
+  await tag.fill('unsafe rename');
+  await saveTag.click();
+  await expect(tag).toHaveAccessibleDescription('Reset the game to refresh this object’s source after editing the script.');
+  await expect.poll(() => page.evaluate(() => {
+    const { monaco } = window as typeof window & { monaco: Monaco };
+    return monaco.editor.getEditors()[0].getValue();
+  })).not.toContain('unsafe rename');
+  await page.getByRole('button', { name: 'Reset game', exact: true }).click();
+  await expect(page.getByRole('button', { name: 'other-box', exact: true })).toBeVisible();
+  await renamed.click();
+  await tag.fill('fresh rename');
+  await saveTag.click();
+  await expect.poll(() => page.evaluate(() => {
+    const { monaco } = window as typeof window & { monaco: Monaco };
+    return monaco.editor.getEditors()[0].getValue();
+  })).toContain('tag: "fresh rename"');
 });
 
 test('previews and saves shape fill colours from CSS text and the colour picker', async ({ page }) => {

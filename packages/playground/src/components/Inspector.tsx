@@ -380,6 +380,7 @@ const Inspector: React.FC<InspectorProps> = ({ visible }) => {
 
     getInspectorSections(selectedObject).forEach(([, section]) => {
       section.rows.forEach(def => {
+        if (def.propertyPath === 'tag') return;
         const resolved = resolveComponentPath(selectedObject, def.propertyPath);
         if (resolved && resolved.target) {
           const val = resolved.target[resolved.prop];
@@ -414,7 +415,7 @@ const Inspector: React.FC<InspectorProps> = ({ visible }) => {
             <button 
               className={`apply-btn ${isApplying ? 'applying' : ''}`} 
               onClick={handleApplyToCode}
-              title="Apply all current values to code"
+              title="Apply current values to code. Save the tag separately."
             >
               <i className={`fa-solid ${isApplying ? 'fa-check' : 'fa-save'}`} />
               <span>Apply to Code</span>

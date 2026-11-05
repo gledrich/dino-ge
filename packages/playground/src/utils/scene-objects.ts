@@ -7,6 +7,9 @@ export const scenePointerDragEvent = 'playground-pointer-drag-scene-item';
 export const sceneKeyboardPlacementEvent = 'playground-position-scene-item';
 export const sceneObjectCodeEvent = 'playground-insert-scene-object-code';
 export const openEntryObjectSourceEvent = 'playground-open-entry-object-source';
+export const renameEntryObjectEvent = 'playground-rename-entry-object';
+export const sceneObjectTagHistoryEvent = 'playground-object-tag-history';
+export interface EntryObjectRename { object: Dino.GameObject; tag: string; previousTag: string; error?: string }
 export const sceneAssetDragType = 'application/x-dino-scene-asset';
 export const sceneAssetDragEvent = 'playground-drag-scene-asset';
 export const sceneSourceKey = '__dinoPlaygroundSceneSource';

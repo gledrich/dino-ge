@@ -1,7 +1,7 @@
 import React, { useEffect, useId, useLayoutEffect, useRef } from 'react';
 import * as Dino from 'dino-ge';
 import { getSurgicalEdit, type CanvasPlacementTransaction } from '../utils/ast-utils';
-import { getCanvasPlacementBaseline, isCanvasTransformProperty, restoreSceneTransform, type SceneTransformState } from '../utils/scene-objects';
+import { getCanvasPlacementBaseline, isCanvasTransformProperty, renameEntryObjectEvent, restoreSceneTransform, sceneObjectTagHistoryEvent, type EntryObjectRename, type SceneTransformState } from '../utils/scene-objects';
 
 export interface PropertyRowDef {
   label: string;
@@ -127,6 +127,7 @@ const InspectorRow: React.FC<{
   const isModuleDimension = placementKind === 'resize' && isDimension;
   const minimum = isModuleDimension ? 0.000001 : def.min;
   const [isValid, setIsValid] = React.useState(true);
+  const [syncError, setSyncError] = React.useState('');
   const invalid = (isColour || isModuleDimension) && !isValid;
   const [prevSelectedObject, setPrevSelectedObject] = React.useState(selectedObject);
   const [lastSyncedValue, setLastSyncedValue] = React.useState<any>(() => {
@@ -144,6 +145,7 @@ const InspectorRow: React.FC<{
   if (selectedObject !== prevSelectedObject) {
     setPrevSelectedObject(selectedObject);
     setIsValid(true);
+    setSyncError('');
     const resolved = resolveComponentPath(selectedObject, def.propertyPath);
     setLastSyncedValue(resolved && resolved.target ? resolved.target[resolved.prop] : undefined);
   }
@@ -160,13 +162,21 @@ const InspectorRow: React.FC<{
       const { object, state } = (event as CustomEvent<{ object: Dino.GameObject; state: SceneTransformState }>).detail;
       if (object === selectedObject && isCanvasTransformProperty(def.propertyPath, state)) handleUpdate();
     };
+    const onTagHistory = (event: Event) => {
+      if (def.propertyPath === 'tag' && (event as CustomEvent<Dino.GameObject>).detail === selectedObject) {
+        handleUpdate();
+        setSyncError('');
+      }
+    };
     window.addEventListener('playground-update-code', handleUpdate);
     window.addEventListener('playground-script-selected', handleUpdate);
     window.addEventListener('playground-placement-history', onPlacementHistory);
+    window.addEventListener(sceneObjectTagHistoryEvent, onTagHistory);
     return () => {
       window.removeEventListener('playground-update-code', handleUpdate);
       window.removeEventListener('playground-script-selected', handleUpdate);
       window.removeEventListener('playground-placement-history', onPlacementHistory);
+      window.removeEventListener(sceneObjectTagHistoryEvent, onTagHistory);
     };
   }, [selectedObject, def.propertyPath]);
 
@@ -228,6 +238,7 @@ const InspectorRow: React.FC<{
 
   const updateValue = (element: HTMLInputElement) => {
     const val = parseValue(element);
+    if (syncError) setSyncError('');
     if (isColour) setIsValid(val !== undefined);
     if (isModuleDimension) setIsValid(!element.validity.rangeUnderflow);
     if (placementKind && typeof val === 'number' && Dino.Engine.paused && Dino.Engine.debug) {
@@ -258,6 +269,15 @@ const InspectorRow: React.FC<{
 
     const val = parseValue(inputRef.current);
     if (val === undefined) return;
+    if (def.propertyPath === 'tag') {
+      if (typeof val !== 'string' || typeof lastSyncedValue !== 'string') return;
+      const request: EntryObjectRename = { object: selectedObject, tag: val, previousTag: lastSyncedValue };
+      const accepted = !window.dispatchEvent(new CustomEvent<EntryObjectRename>(renameEntryObjectEvent, {
+        cancelable: true, detail: request,
+      }));
+      if (!accepted) setSyncError(request.error ?? 'Could not save this tag to a unique constructor in the open script.');
+      return;
+    }
     window.dispatchEvent(new Event('playground-sync-source-mapping'));
     const edit = getSurgicalEdit(sourceId, def.propertyPath, val, (path) => {
       const res = resolveComponentPath(selectedObject, path);
@@ -280,7 +300,7 @@ const InspectorRow: React.FC<{
         }));
         if (!accepted) return;
       } else {
-        window.dispatchEvent(new CustomEvent('playground-apply-edit', { detail: edit }));
+        if (window.dispatchEvent(new CustomEvent('playground-apply-edit', { detail: edit, cancelable: true }))) return;
       }
       setLastSyncedValue(val);
       setIsModified(false);
@@ -301,7 +321,7 @@ const InspectorRow: React.FC<{
             updateValue(inputRef.current);
           }} />
       </div> : <label htmlFor={inputId}>{def.label}</label>}
-      <div className={`input-group${isColour ? ' colour-input-group' : ''}${isModuleDimension && invalid ? ' input-group-invalid' : ''}`}>
+      <div className={`input-group${isColour ? ' colour-input-group' : ''}${(isModuleDimension && invalid) || syncError ? ' input-group-invalid' : ''}`}>
         <input
           id={inputId}
           type={isColour ? 'text' : def.type}
@@ -310,7 +330,7 @@ const InspectorRow: React.FC<{
           ref={inputRef}
           placeholder={def.emptyColourLabel}
           aria-invalid={invalid || undefined}
-          aria-describedby={invalid ? `${inputId}-error` : undefined}
+          aria-describedby={invalid || syncError ? `${inputId}-error` : undefined}
           title={isColour ? 'CSS colour, such as #54d6ad, rebeccapurple or rgba(0, 0, 0, 0.5)'
             : placementKind ? 'Stages this transform for module review' : undefined}
           onChange={event => updateValue(event.currentTarget)}
@@ -327,6 +347,7 @@ const InspectorRow: React.FC<{
         {invalid && <span className="prop-validation" id={`${inputId}-error`} role="status">
           {isColour ? 'Enter a CSS colour, such as #54d6ad or rgba(0, 0, 0, 0.5).' : 'Enter a positive dimension.'}
         </span>}
+        {syncError && <span className="prop-validation" id={`${inputId}-error`} role="status">{syncError}</span>}
       </div>
     </div>
   );

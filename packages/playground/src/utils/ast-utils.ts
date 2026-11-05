@@ -45,6 +45,15 @@ export const resetSourceMapping = () => {
  */
 export const getSourceMapping = () => sourceMappingRegistry;
 
+export function getUniqueObjectSourceMapping(sourceId: string, mappings = sourceMappingRegistry) {
+  const group = sourceId.slice(0, sourceId.lastIndexOf('-') + 1);
+  if (Object.keys(mappings).some(id => id !== sourceId && id.startsWith(group) && /^\d+$/.test(id.slice(group.length)))) return;
+  return mappings[sourceId];
+}
+
+const isTagProperty = (prop: any) => prop.type === 'Property' && !prop.computed &&
+  (prop.key.name === 'tag' || prop.key.value === 'tag');
+
 /**
  * Recursively maps properties of an ObjectExpression.
  */
@@ -53,7 +62,7 @@ const mapProperties = (objExpr: any, imports: DinoImports, code: string, strict 
   if (!objExpr || objExpr.type !== 'ObjectExpression') return mapping;
 
   objExpr.properties.forEach((prop: any) => {
-    if (prop.key?.type === 'Identifier') {
+    if (prop.key?.type === 'Identifier' || isTagProperty(prop)) {
       const isNumeric = (node: any): boolean =>
         (node.type === 'Literal' && typeof node.value === 'number') ||
         (node.type === 'UnaryExpression' && ['-', '+'].includes(node.operator) &&
@@ -82,7 +91,7 @@ const mapProperties = (objExpr: any, imports: DinoImports, code: string, strict 
         propLoc.properties = mapProperties(prop.value, imports, code, strict);
       }
 
-      mapping[prop.key.name] = propLoc;
+      mapping[prop.key.name ?? prop.key.value] = propLoc;
     }
   });
 
@@ -298,8 +307,7 @@ export function rebaseModule(code: string, moduleUrl: URL): string {
  * Also builds the source mapping registry.
  */
 export const instrumentCode = (code: string, trackEditorSource = true, scriptId?: string,
-  mappings?: SourceMappings): InstrumentationResult => {
-  const strict = !!mappings;
+  mappings?: SourceMappings, strict = !!mappings): InstrumentationResult => {
   if (trackEditorSource && !mappings) {
     resetSourceMapping();
     mappings = sourceMappingRegistry;
@@ -341,7 +349,7 @@ export const instrumentCode = (code: string, trackEditorSource = true, scriptId?
     const constructorName = node.callee.name;
     const type = imported?.name ?? constructorName;
     // Keep tracking tagged constructor calls written with a bare identifier.
-    const hasTag = node.arguments[0].properties.some((p: any) => p.key?.type === 'Identifier' && p.key.name === 'tag');
+    const hasTag = node.arguments[0].properties.some(isTagProperty);
     if (knownClasses.includes(type) || hasTag) return { constructorName, type };
   };
 
@@ -361,7 +369,7 @@ export const instrumentCode = (code: string, trackEditorSource = true, scriptId?
         const props = args[0].properties;
         
         // Deterministic ID based on type, tag, and occurrence
-        const tagProp = props.find((p: any) => p.key?.name === 'tag');
+        const tagProp = props.findLast(isTagProperty);
         const tagValue = (tagProp && tagProp.value.type === 'Literal') ? String(tagProp.value.value) : 'no-tag';
         const { constructorName, type, namespace } = object;
         const idKey = `${constructorName}-${tagValue}`;
@@ -455,9 +463,9 @@ export function applyEditsToSource(source: string, edits: Edit[]): string | unde
   return source;
 }
 
-export function readObjectSourceMappings(source: string): SourceMappings | undefined {
+export function readObjectSourceMappings(source: string, strict = true): SourceMappings | undefined {
   const mappings: SourceMappings = {};
-  return instrumentCode(source, true, undefined, mappings).error ? undefined : mappings;
+  return instrumentCode(source, true, undefined, mappings, strict).error ? undefined : mappings;
 }
 
 export function findObjectConstructor(mappings: SourceMappings, source: string, line: number, column: number) {
@@ -473,11 +481,22 @@ export interface CanvasPlacementTransaction {
 
 /** Read source capabilities for one unambiguous standalone constructor. */
 export function getStandaloneSceneObject(sourceId: string) {
-  const mapping = getSourceMapping()[sourceId];
-  const group = sourceId.slice(0, sourceId.lastIndexOf('-') + 1);
-  if (!mapping?.standalone || Object.keys(getSourceMapping()).filter(id => id.startsWith(group) &&
-      /^\d+$/.test(id.slice(group.length))).length !== 1) return null;
+  const mapping = getUniqueObjectSourceMapping(sourceId);
+  if (!mapping?.standalone) return null;
   return { statement: mapping.standalone, mapping };
+}
+
+export function getSceneObjectRename(source: string, sourceId: string, tag: string) {
+  const mapping = getUniqueObjectSourceMapping(sourceId);
+  if (!mapping || mapping.hasDynamicProperties) return;
+  const edit = getSurgicalEdit(sourceId, 'tag', tag, () => undefined);
+  if (!edit) return;
+  const updated = applyEditsToSource(source, [edit]);
+  if (updated === undefined) return;
+  const mappings = readObjectSourceMappings(updated, false);
+  const replacement = mappings && Object.values(mappings).find(item => item.start === mapping.start && item.literalTag === tag);
+  if (!replacement || !getUniqueObjectSourceMapping(replacement.sourceId, mappings)) return;
+  return { edit, sourceId: replacement.sourceId, previousTag: mapping.literalTag };
 }
 
 function findStandaloneSceneObject(source: string, sourceId: string) {

@@ -6,8 +6,8 @@ import { usePlayground } from '../context/PlaygroundContext';
 import ProjectFilesDialog from './ProjectFilesDialog';
 import { openProjectObjectSourceEvent, type ProjectObjectSourceRequest } from '../utils/project-object-source';
 import { createScript, getCurrentScriptId, getScript, getFilesList, getSpriteImageFileError, readGameFolder, importGameFolder, importSpriteImage, type GameFolder } from '../utils/helpers';
-import { applyEditsToSource, Edit, instrumentCode, getSourceMapping, getSceneObjectCreation, getSceneObjectDeletion, getSceneObjectDuplication, getSpriteImageReplacement, type CanvasPlacementTransaction } from '../utils/ast-utils';
-import { createSceneObject, duplicateSceneObject, getSceneSource, insertSceneObjectCode, isReplaceableSprite, openEntryObjectSourceEvent, restoreSceneTransform, sceneAssetDragEvent, sceneAssetDragType, sceneObjectCodeEvent, sceneObjectDragType, sceneObjectKinds, scenePointerDragEvent, type CanvasTransformChange, type SceneImageAsset, type SceneObjectPlacement, type ScenePointerDrag, type ScenePointerDragItem } from '../utils/scene-objects';
+import { applyEditsToSource, Edit, instrumentCode, getSourceMapping, getSceneObjectCreation, getSceneObjectDeletion, getSceneObjectDuplication, getSceneObjectRename, getSpriteImageReplacement, getUniqueObjectSourceMapping, type CanvasPlacementTransaction } from '../utils/ast-utils';
+import { createSceneObject, duplicateSceneObject, getSceneSource, insertSceneObjectCode, isReplaceableSprite, openEntryObjectSourceEvent, renameEntryObjectEvent, restoreSceneTransform, sceneAssetDragEvent, sceneAssetDragType, sceneObjectCodeEvent, sceneObjectDragType, sceneObjectKinds, sceneObjectTagHistoryEvent, scenePointerDragEvent, type CanvasTransformChange, type EntryObjectRename, type SceneImageAsset, type SceneObjectPlacement, type ScenePointerDrag, type ScenePointerDragItem } from '../utils/scene-objects';
 import { useMonacoEditor } from '../hooks/useMonacoEditor';
 import '../styles/editor.css';
 
@@ -17,6 +17,8 @@ interface EditorProps {
   onSelectScript: (scriptId: string) => void;
 }
 
+type ObjectTagState = { sourceId: string; tag: string };
+
 type SceneHistoryEntry = {
   model: editor.ITextModel;
   run: HTMLElement;
@@ -25,8 +27,18 @@ type SceneHistoryEntry = {
   after: number;
 } & (
   | { transforms: CanvasTransformChange[] }
+  | { object: Dino.GameObject; tagChange: { before: ObjectTagState; after: ObjectTagState } }
   | { object: Dino.GameObject; spriteImage?: { before: HTMLImageElement; after: HTMLImageElement }; removed?: boolean }
 );
+
+function updateObjectTag(object: Dino.GameObject, { sourceId, tag }: ObjectTagState) {
+  object.metadata.sourceId = sourceId;
+  object.metadata.tag = tag;
+  window.dispatchEvent(new CustomEvent(sceneObjectTagHistoryEvent, { detail: object }));
+  window.dispatchEvent(new Event('playground-update-inspector'));
+}
+
+const normaliseEntryText = (source: string) => source.replace(/\r\n/g, '\n');
 
 const CodeEditor: React.FC<EditorProps> = ({ currentScriptId, onSave, onSelectScript }) => {
   const { setActiveTab, setIsEditorVisible } = usePlayground();
@@ -47,7 +59,14 @@ const CodeEditor: React.FC<EditorProps> = ({ currentScriptId, onSave, onSelectSc
   const folderPicker = useRef<HTMLInputElement>(null);
   const loadedScriptId = useRef('');
   const sceneHistory = useRef<SceneHistoryEntry[]>([]);
-  const { monacoEditorRef, formatCode, applyEdits, pushEditOperations } = useMonacoEditor();
+  const trustedEntryText = useRef<string>(undefined);
+  const trustedEntryRevisions = useRef(new Set<number>());
+  const loadedEntrySource = useRef<string>(undefined);
+  const runningEntrySource = useRef<{ scriptId: string; source: string }>(undefined);
+  const { monacoEditorRef, formatCode, pushEditOperations } = useMonacoEditor();
+
+  const isTrustedEntryModel = useCallback((model: editor.ITextModel) =>
+    trustedEntryRevisions.current.has(model.getAlternativeVersionId()) || normaliseEntryText(model.getValue()) === trustedEntryText.current, []);
 
   useEffect(() => {
     const openSource = (event: Event) => {
@@ -154,11 +173,19 @@ const CodeEditor: React.FC<EditorProps> = ({ currentScriptId, onSave, onSelectSc
     const formatted = await formatCode(value);
     if (formatted !== value && monacoEditorRef.current?.getModel() === model &&
         model.getValue() === value) {
+      const trusted = isTrustedEntryModel(model);
+      if (trusted) trustedEntryRevisions.current.add(model.getAlternativeVersionId());
+      model.pushStackElement();
       pushEditOperations(formatted);
+      model.pushStackElement();
+      if (trusted) {
+        trustedEntryRevisions.current.add(model.getAlternativeVersionId());
+        trustedEntryText.current = normaliseEntryText(model.getValue());
+      }
       setEditorValue(formatted);
     }
     setIsFormatting(false);
-  }, [formatCode, monacoEditorRef, pushEditOperations]);
+  }, [formatCode, isTrustedEntryModel, monacoEditorRef, pushEditOperations]);
 
   const editorCommands = useRef({ save: handleSave, format: handleFormat });
   useEffect(() => {
@@ -177,11 +204,19 @@ const CodeEditor: React.FC<EditorProps> = ({ currentScriptId, onSave, onSelectSc
     let cancelled = false;
     const loadScript = async () => {
       loadedScriptId.current = '';
+      loadedEntrySource.current = undefined;
+      trustedEntryText.current = undefined;
+      trustedEntryRevisions.current.clear();
       setIsSaving(true);
       const script = await getScript(currentScriptId);
       const formatted = await formatCode(script);
       if (cancelled) return;
       loadedScriptId.current = currentScriptId;
+      loadedEntrySource.current = normaliseEntryText(script);
+      const running = runningEntrySource.current;
+      if (running?.scriptId !== currentScriptId || running.source === loadedEntrySource.current) {
+        trustedEntryText.current = normaliseEntryText(formatted);
+      }
       setEditorValue(formatted);
       const result = instrumentCode(formatted);
       if (result.error) console.warn(result.error);
@@ -221,10 +256,8 @@ const CodeEditor: React.FC<EditorProps> = ({ currentScriptId, onSave, onSelectSc
       const codeEditor: editor.IStandaloneCodeEditor | undefined = monacoEditorRef.current;
       const model = codeEditor?.getModel();
       if (!sourceId || !run || !codeEditor || !model || instrumentCode(model.getValue()).error) return;
-      const mappings = getSourceMapping();
-      const mapping = mappings[sourceId];
-      const group = sourceId.slice(0, sourceId.lastIndexOf('-') + 1);
-      if (!mapping || Object.keys(mappings).some(id => id !== sourceId && id.startsWith(group) && /^\d+$/.test(id.slice(group.length)))) return;
+      const mapping = getUniqueObjectSourceMapping(sourceId);
+      if (!mapping) return;
       const revision = model.getVersionId();
       setActiveTab('editor');
       setIsEditorVisible(true);
@@ -296,6 +329,8 @@ const CodeEditor: React.FC<EditorProps> = ({ currentScriptId, onSave, onSelectSc
       if (updated === undefined) return;
       if (instrumentCode(updated, false).error) return;
       if (updated !== source) {
+        const trusted = isTrustedEntryModel(model);
+        if (trusted) trustedEntryRevisions.current.add(model.getAlternativeVersionId());
         model.pushStackElement();
         model.pushEditOperations([], edits.map(({ start, end, newText }) => {
           const from = model.getPositionAt(start);
@@ -307,6 +342,10 @@ const CodeEditor: React.FC<EditorProps> = ({ currentScriptId, onSave, onSelectSc
         }), () => null);
         model.pushStackElement();
         const applied = model.getValue();
+        if (trusted) {
+          trustedEntryRevisions.current.add(model.getAlternativeVersionId());
+          trustedEntryText.current = normaliseEntryText(applied);
+        }
         setEditorValue(applied);
         instrumentCode(applied);
       }
@@ -316,6 +355,36 @@ const CodeEditor: React.FC<EditorProps> = ({ currentScriptId, onSave, onSelectSc
     const recordSceneHistory = (entry: SceneHistoryEntry) => {
       sceneHistory.current = sceneHistory.current.filter(item => item.run === entry.run && item.model === entry.model);
       sceneHistory.current.push(entry);
+    };
+
+    const renameEntryObject = (event: Event) => {
+      const request = (event as CustomEvent<EntryObjectRename>).detail;
+      const { object, tag, previousTag } = request;
+      const model: editor.ITextModel | null = monacoEditorRef.current?.getModel();
+      const run = document.querySelector<HTMLElement>('script[data-playground-script]');
+      const scene = Dino.Engine.currentScene;
+      const objects = scene?.objects ?? Dino.Engine.objects;
+      const sourceId = object.metadata.sourceId;
+      if (!model || run?.dataset.playgroundScript !== currentScriptId || loadedScriptId.current !== currentScriptId ||
+          !objects.has(object) || !sourceId || Dino.Engine.selectedObject !== object || object.metadata.tag !== tag) return;
+      if (!isTrustedEntryModel(model)) {
+        request.error = 'Reset the game to refresh this object’s source after editing the script.';
+        return;
+      }
+      const others = Array.from(objects).filter(member => member !== object);
+      if (others.some(member => member.metadata.sourceId === sourceId)) return;
+      const source = model.getValue();
+      if (instrumentCode(source).error) return;
+      const rename = getSceneObjectRename(source, sourceId, tag);
+      if (!rename || others.some(member => member.metadata.sourceId === rename.sourceId)) return;
+      const before = model.getAlternativeVersionId();
+      if (!applySourceEdits([rename.edit])) return;
+      const next = { sourceId: rename.sourceId, tag };
+      const after = model.getAlternativeVersionId();
+      if (before !== after) recordSceneHistory({ model, run, scene, object, before, after,
+        tagChange: { before: { sourceId, tag: rename.previousTag ?? previousTag }, after: next } });
+      updateObjectTag(object, next);
+      event.preventDefault();
     };
 
     const applyPlacement = (event: Event) => {
@@ -468,93 +537,41 @@ const CodeEditor: React.FC<EditorProps> = ({ currentScriptId, onSave, onSelectSc
       event.preventDefault();
     };
 
-    const handleApplyEditEvent = async (e: Event) => {
-      const customEvent = e as CustomEvent<Edit>;
-      const { start, end, newText } = customEvent.detail;
-      const editor = monacoEditorRef.current;
-      if (editor) {
-        const model = editor.getModel();
-        if (model) {
-          const startPos = model.getPositionAt(start);
-          const endPos = model.getPositionAt(end);
-          const range = {
-            startLineNumber: startPos.lineNumber,
-            startColumn: startPos.column,
-            endLineNumber: endPos.lineNumber,
-            endColumn: endPos.column
-          };
-          
-          const newValueRaw = applyEdits([{ range, text: newText }]);
-          if (newValueRaw) {
-            const formatted = await formatCode(newValueRaw, { start, end: start + newText.length });
-            if (editor.getModel() !== model || model.getValue() !== newValueRaw) return;
-            if (formatted !== newValueRaw) {
-              pushEditOperations(formatted);
-              setEditorValue(formatted);
-            } else {
-              setEditorValue(newValueRaw);
-            }
-            instrumentCode(formatted);
-          }
-        }
-      }
+    const handleApplyEditEvent = (event: Event) => {
+      if (applySourceEdits([(event as CustomEvent<Edit>).detail])) event.preventDefault();
     };
 
-    const handleApplyMultiEditEvent = async (e: Event) => {
-      const customEvent = e as CustomEvent<Edit[]>;
-      const edits = customEvent.detail;
-      const editor = monacoEditorRef.current;
-      if (editor && edits.length > 0) {
-        const model = editor.getModel();
-        if (model) {
-          let minStart = Number.MAX_SAFE_INTEGER;
-          let maxEnd = 0;
-
-          const monacoEdits = edits.map(edit => {
-            const startPos = model.getPositionAt(edit.start);
-            const endPos = model.getPositionAt(edit.end);
-            
-            minStart = Math.min(minStart, edit.start);
-            maxEnd = Math.max(maxEnd, edit.end + edit.newText.length);
-
-            return {
-              range: {
-                startLineNumber: startPos.lineNumber,
-                startColumn: startPos.column,
-                endLineNumber: endPos.lineNumber,
-                endColumn: endPos.column
-              },
-              text: edit.newText
-            };
-          });
-
-          const newValueRaw = applyEdits(monacoEdits);
-          if (newValueRaw) {
-            const formatted = await formatCode(newValueRaw, { start: minStart, end: maxEnd });
-            if (editor.getModel() !== model || model.getValue() !== newValueRaw) return;
-            if (formatted !== newValueRaw) {
-              pushEditOperations(formatted);
-              setEditorValue(formatted);
-            } else {
-              setEditorValue(newValueRaw);
-            }
-            instrumentCode(formatted);
-          }
-        }
-      }
+    const handleApplyMultiEditEvent = (event: Event) => {
+      if (applySourceEdits((event as CustomEvent<Edit[]>).detail)) event.preventDefault();
     };
 
     window.addEventListener('playground-insert-text', handleInsertText);
     window.addEventListener('playground-update-code', handleUpdateCodeEvent);
     window.addEventListener('playground-get-value', handleGetValueEvent);
     window.addEventListener('playground-sync-source-mapping', syncSourceMapping);
+    window.addEventListener(renameEntryObjectEvent, renameEntryObject);
     window.addEventListener('playground-apply-placement', applyPlacement);
     window.addEventListener('playground-update-sprite-image', replaceSpriteImage);
     window.addEventListener('playground-add-scene-object', addSceneObject);
     window.addEventListener(sceneObjectCodeEvent, addSceneObject);
     window.addEventListener('playground-remove-scene-object', editSceneObject);
     window.addEventListener('playground-duplicate-scene-object', editSceneObject);
-    const clearSceneHistory = () => { sceneHistory.current = []; };
+    const clearSceneHistory = (event: Event) => {
+      sceneHistory.current = [];
+      const run = (event as CustomEvent<{ scriptId: string; source: string }>).detail;
+      const model: editor.ITextModel | null = monacoEditorRef.current?.getModel();
+      if (run?.scriptId !== currentScriptId) return;
+      const source = normaliseEntryText(run.source);
+      runningEntrySource.current = { scriptId: run.scriptId, source };
+      if (loadedScriptId.current !== currentScriptId) return;
+      if (model && normaliseEntryText(model.getValue()) === source) {
+        trustedEntryText.current = source;
+        trustedEntryRevisions.current.clear();
+      } else if (loadedEntrySource.current !== source) {
+        trustedEntryText.current = undefined;
+        trustedEntryRevisions.current.clear();
+      }
+    };
     window.addEventListener('playground-before-run', clearSceneHistory);
     const changeCodeHistory = (event: Event) => {
       const model: editor.ITextModel | null = monacoEditorRef.current?.getModel();
@@ -572,6 +589,7 @@ const CodeEditor: React.FC<EditorProps> = ({ currentScriptId, onSave, onSelectSc
       window.removeEventListener('playground-update-code', handleUpdateCodeEvent);
       window.removeEventListener('playground-get-value', handleGetValueEvent);
       window.removeEventListener('playground-sync-source-mapping', syncSourceMapping);
+      window.removeEventListener(renameEntryObjectEvent, renameEntryObject);
       window.removeEventListener('playground-apply-placement', applyPlacement);
       window.removeEventListener('playground-update-sprite-image', replaceSpriteImage);
       window.removeEventListener('playground-add-scene-object', addSceneObject);
@@ -583,14 +601,14 @@ const CodeEditor: React.FC<EditorProps> = ({ currentScriptId, onSave, onSelectSc
       window.removeEventListener('playground-apply-edit', handleApplyEditEvent);
       window.removeEventListener('playground-apply-multi-edit', handleApplyMultiEditEvent);
     };
-  }, [currentScriptId, editorValue, formatCode, applyEdits, pushEditOperations, monacoEditorRef, setActiveTab, setIsEditorVisible]);
+  }, [currentScriptId, editorValue, isTrustedEntryModel, monacoEditorRef, setActiveTab, setIsEditorVisible]);
 
-  const syncSceneHistory = (model: editor.ITextModel, event: editor.IModelContentChangedEvent) => {
+  const syncSceneHistory = (model: editor.ITextModel, event: editor.IModelContentChangedEvent, previousRevision: number) => {
     if (!event.isUndoing && !event.isRedoing) return;
     const revision = model.getAlternativeVersionId();
     const entry = sceneHistory.current.findLast(item => item.run.isConnected &&
       item.run.dataset.playgroundScript === loadedScriptId.current && item.model === model &&
-      revision === (event.isUndoing ? item.before : item.after));
+      previousRevision === (event.isUndoing ? item.after : item.before) && revision === (event.isUndoing ? item.before : item.after));
     if (!entry) return;
 
     const { scene } = entry;
@@ -610,6 +628,14 @@ const CodeEditor: React.FC<EditorProps> = ({ currentScriptId, onSave, onSelectSc
       const detail = changes.length > 1
         ? `${event.isUndoing ? 'Undid' : 'Restored'} canvas changes for ${changes.length} objects.`
         : `${event.isUndoing ? 'Undid' : 'Restored'} ${change} for ${object.metadata.tag}.`;
+      window.dispatchEvent(new CustomEvent('playground-scene-history', { detail }));
+      return;
+    }
+    if ('tagChange' in entry) {
+      if (!objects.has(entry.object)) return;
+      const state = event.isUndoing ? entry.tagChange.before : entry.tagChange.after;
+      updateObjectTag(entry.object, state);
+      const detail = `${event.isUndoing ? 'Undid' : 'Restored'} the tag change for ${state.tag}.`;
       window.dispatchEvent(new CustomEvent('playground-scene-history', { detail }));
       return;
     }
@@ -692,7 +718,12 @@ const CodeEditor: React.FC<EditorProps> = ({ currentScriptId, onSave, onSelectSc
   const handleEditorDidMount = async (editor: any, monaco: any) => {
     monacoEditorRef.current = editor;
     const model: editor.ITextModel = editor.getModel();
-    const historySubscription = model.onDidChangeContent(event => syncSceneHistory(model, event));
+    let revision = model.getAlternativeVersionId();
+    const historySubscription = model.onDidChangeContent(event => {
+      const previousRevision = revision;
+      revision = model.getAlternativeVersionId();
+      syncSceneHistory(model, event, previousRevision);
+    });
     editor.onDidDispose(() => historySubscription.dispose());
 
     editor.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyCode.KeyS, () => {

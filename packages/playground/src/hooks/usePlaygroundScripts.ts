@@ -43,7 +43,7 @@ export const usePlaygroundScripts = () => {
 
     stopTrackingSources.current?.();
     stopTrackingSources.current = undefined;
-    window.dispatchEvent(new Event('playground-before-run'));
+    window.dispatchEvent(new CustomEvent('playground-before-run', { detail: { scriptId: currentScriptId, source: scriptText } }));
     Engine.terminateCurrent();
     Engine.destroyAll();
     Engine.currentScene = null;
