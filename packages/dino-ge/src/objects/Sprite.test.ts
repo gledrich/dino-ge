@@ -128,10 +128,11 @@ describe('Sprite', () => {
 
   it('provides access to all SpriteComponent properties via getters and setters', () => {
     const sprite = new Sprite(mockProps);
-    const newImg = { width: 50, height: 50 } as HTMLImageElement;
+    const newImg = { width: 50, height: 50, complete: true } as HTMLImageElement;
     
     sprite.img = newImg;
     expect(sprite.img).toBe(newImg);
+    expect(sprite.bounds).toMatchObject({ width: 5, height: 50 });
     
     sprite.rows = 2;
     expect(sprite.rows).toBe(2);

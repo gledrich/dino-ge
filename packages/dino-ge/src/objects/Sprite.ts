@@ -54,9 +54,17 @@ export default class Sprite extends GameObject {
 
   /** The image element used by the sprite. */
   get img(): HTMLImageElement { return this._spriteComponent.img; }
-  set img(val: HTMLImageElement) { 
-    this._spriteComponent.img = val;
-    this._updateBounds();
+  set img(val: HTMLImageElement) {
+    const component = this._spriteComponent;
+    component.img = val;
+    const update = () => {
+      if (component.img !== val) return;
+      component.frameWidth = val.width / component.cols;
+      component.frameHeight = val.height / component.rows;
+      this._updateBounds();
+    };
+    update();
+    if (!val.complete) val.addEventListener('load', update, { once: true });
   }
 
   /** Number of rows in the spritesheet. */
