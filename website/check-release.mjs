@@ -360,6 +360,15 @@ try {
   assert.ok(gap >= 0 && gap <= 24, 'The toolbar should sit just above the open drawer. Gap: ' + gap);
   const previewBounds = await iframe.boundingBox();
   const canvasBounds = await canvas.boundingBox();
+  await toolbar.getByRole('button', { name: 'Minimise all panels' }).tap();
+  const restorePanels = toolbar.getByRole('button', { name: 'Restore panels' });
+  await restorePanels.waitFor();
+  assert.equal(await page.getByRole('heading', { name: 'DINO-GE', exact: true }).count(), 0,
+    'Expanding the mobile game should keep the canvas clear of the Playground logo.');
+  assert.equal(await page.getByRole('tablist', { name: 'Workspace tools' }).isVisible(), false);
+  assert.deepEqual(await iframe.boundingBox(), previewBounds);
+  assert.deepEqual(await canvas.boundingBox(), canvasBounds);
+  await restorePanels.tap();
   await page.getByRole('button', { name: 'Collapse bottom dock' }).click();
   await game.getByRole('button', { name: 'Move right' }).waitFor();
   const arrows = await game.locator('.touch-arrows').boundingBox();

@@ -1102,7 +1102,7 @@ const Viewport: React.FC<{
       {isEditingScene && manipulationReadout && (
         <div className="scene-manipulation-readout" role="group" aria-label="Current scene gesture">{manipulationReadout}</div>
       )}
-      <Logo visible={arePanelsMinimized && isViewportReady && !isEditingScene} />
+      <Logo visible={!mobile && arePanelsMinimized && isViewportReady && !isEditingScene} />
       {runtimeError && <div className="game-runtime-error">
         <div role="alert">
           <strong>{{ script: 'Game script failed to run', startup: 'Game setup failed', frame: 'Game stopped running' }[runtimeError.phase]}</strong>
