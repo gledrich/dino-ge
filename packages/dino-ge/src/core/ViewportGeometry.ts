@@ -49,6 +49,13 @@ export function projectOntoObjectAxes(geometry: ReturnType<typeof getViewportGeo
   return { x: dx * geometry.cos + dy * geometry.sin, y: -dx * geometry.sin + dy * geometry.cos };
 }
 
+export function getViewportLineEndpoints(line: NonNullable<ReturnType<typeof getViewportGeometry>['line']>) {
+  return [
+    { kind: 'p1', x: line.x1, y: line.y1 },
+    { kind: 'p2', x: line.x2, y: line.y2 },
+  ] as const;
+}
+
 /** The rotation handle follows the upper edge or the midpoint of a line. */
 export function getViewportRotationHandle(geometry: ReturnType<typeof getViewportGeometry>, zoom: number) {
   const { origin, width, height, cos, sin, line } = geometry;

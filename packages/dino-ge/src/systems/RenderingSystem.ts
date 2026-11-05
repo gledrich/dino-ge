@@ -5,8 +5,9 @@ import VisibilityComponent from '../components/VisibilityComponent.js';
 import Engine from '../core/Engine.js';
 import PhysicsComponent from '../components/PhysicsComponent.js';
 import Vector2 from '../math/Vector2.js';
+import Line from '../objects/Line.js';
 import { getEngineState } from '../core/EngineState.js';
-import { getViewportDrawOrder, getViewportGeometry, getViewportRotationHandle } from '../core/ViewportGeometry.js';
+import { getViewportDrawOrder, getViewportGeometry, getViewportLineEndpoints, getViewportRotationHandle } from '../core/ViewportGeometry.js';
 
 /**
  * A system that processes entities with RenderComponents.
@@ -145,24 +146,18 @@ export default class RenderingSystem extends System {
           }
           this.ctx.setLineDash([]);
 
-          // Draw resize handle if selected
-          if (!line && object === Engine.selectedObject && width !== 0 && height !== 0) {
+          if (object === Engine.selectedObject) {
+            const handles = line
+              ? (Engine.paused && object instanceof Line ? getViewportLineEndpoints(line) : [])
+              : (width !== 0 && height !== 0 ? [{ x: cornerX, y: cornerY }] : []);
             const handleSize = 8 / Engine.camera.zoom;
             this.ctx.fillStyle = '#FFD166';
-            this.ctx.fillRect(
-              cornerX - handleSize / 2,
-              cornerY - handleSize / 2,
-              handleSize,
-              handleSize
-            );
             this.ctx.strokeStyle = '#000000';
             this.ctx.lineWidth = 1 / Engine.camera.zoom;
-            this.ctx.strokeRect(
-              cornerX - handleSize / 2,
-              cornerY - handleSize / 2,
-              handleSize,
-              handleSize
-            );
+            for (const { x, y } of handles) {
+              this.ctx.fillRect(x - handleSize / 2, y - handleSize / 2, handleSize, handleSize);
+              this.ctx.strokeRect(x - handleSize / 2, y - handleSize / 2, handleSize, handleSize);
+            }
           }
 
           if (Engine.paused && object === Engine.selectedObject) {

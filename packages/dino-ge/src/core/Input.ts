@@ -4,13 +4,14 @@ import SpriteComponent from '../components/SpriteComponent.js';
 import ShapeComponent from '../components/ShapeComponent.js';
 import TextComponent from '../components/TextComponent.js';
 import VisibilityComponent from '../components/VisibilityComponent.js';
+import Line from '../objects/Line.js';
 import type GameObject from './GameObject.js';
-import { containsViewportPoint, getViewportDrawOrder, getViewportGeometry, getViewportRotationHandle, projectOntoObjectAxes, snapToGrid } from './ViewportGeometry.js';
+import { containsViewportPoint, getViewportDrawOrder, getViewportGeometry, getViewportLineEndpoints, getViewportRotationHandle, projectOntoObjectAxes, snapToGrid } from './ViewportGeometry.js';
 
 /** Detail of an objectManipulationPreview event. A null detail ends the preview. */
 export interface ObjectManipulationPreview {
   object: GameObject;
-  kind: 'drag' | 'resize' | 'rotate';
+  kind: 'drag' | 'resize' | 'rotate' | 'p1' | 'p2';
   value: Vector2;
 }
 
@@ -21,6 +22,7 @@ type ObjectGesture = {
 } & (
   | { kind: 'drag' | 'resize'; offset: Vector2; initialBounds?: Vector2 }
   | { kind: 'rotate'; pointerAngle: number; rotation: number }
+  | { kind: 'p1' | 'p2'; object: Line; offset: Vector2 }
 );
 
 /**
@@ -37,7 +39,7 @@ export default class Input {
   private static clearGesture() {
     const gesture = this.gesture;
     this.gesture = null;
-    if (gesture?.kind === 'rotate') {
+    if (gesture?.kind === 'rotate' || gesture?.kind === 'p1' || gesture?.kind === 'p2') {
       const canvas = document.getElementById('canvas');
       if (canvas?.style.cursor === 'grabbing') canvas.style.cursor = 'default';
     }
@@ -68,6 +70,10 @@ export default class Input {
 
   private static getGestureValue(object: GameObject, kind: ObjectGesture['kind']): Vector2 {
     if (kind === 'rotate') return new Vector2(object.transform.rotation, 0);
+    if (object instanceof Line) {
+      if (kind === 'p1') return new Vector2(object.x1, object.y1);
+      if (kind === 'p2') return new Vector2(object.x2, object.y2);
+    }
     if (kind === 'drag') {
       const position = object.transform.position;
       return new Vector2(position?.x, position?.y);
@@ -100,6 +106,14 @@ export default class Input {
     return !!handle && Math.hypot(x - handle.x, y - handle.y) <= handle.radius + 2 / zoom;
   }
 
+  private static getHoveredLineEndpoint(object: Line, x: number, y: number) {
+    if (!Engine.paused) return;
+    const { line } = getViewportGeometry(object);
+    const tolerance = 6 / Engine.camera.zoom;
+    return line && getViewportLineEndpoints(line).find(endpoint =>
+      Math.abs(x - endpoint.x) <= tolerance && Math.abs(y - endpoint.y) <= tolerance);
+  }
+
   /**
    * initialises input event listeners.
    */
@@ -115,6 +129,24 @@ export default class Input {
         this.clearGesture();
       }
       const gesture = this.gesture;
+
+      if (gesture?.kind === 'p1' || gesture?.kind === 'p2') {
+        const { object, kind, offset, initial } = gesture;
+        if (!Engine.paused) {
+          if (initial) object.setEndpoint(kind, initial.x, initial.y);
+          this.clearGesture();
+          return;
+        }
+        const geometry = getViewportGeometry(object);
+        const step = Engine.debugPositionGridSize;
+        const point = projectOntoObjectAxes(geometry,
+          snapToGrid(this.mouseX - offset.x, step), snapToGrid(this.mouseY - offset.y, step));
+        const current = this.getGestureValue(object, kind);
+        object.setEndpoint(kind, geometry.scaleX ? point.x / geometry.scaleX : current.x,
+          geometry.scaleY ? point.y / geometry.scaleY : current.y);
+        this.publishPreview(gesture);
+        return;
+      }
 
       if (gesture?.kind === 'rotate') {
         if (!Engine.paused) {
@@ -198,7 +230,8 @@ export default class Input {
       }
 
       const selected = Engine.selectedObject;
-      if (canvas && Engine.debug && selected && this.isOverRotationHandle(selected, this.mouseX, this.mouseY)) {
+      if (canvas && Engine.debug && selected && (this.isOverRotationHandle(selected, this.mouseX, this.mouseY) ||
+          (selected instanceof Line && this.getHoveredLineEndpoint(selected, this.mouseX, this.mouseY)))) {
         canvas.style.cursor = 'grab';
       } else if (canvas && Engine.debug && selected && this.getHoveredResizeHandle(selected, this.mouseX, this.mouseY)) {
         canvas.style.cursor = 'se-resize';
@@ -230,6 +263,19 @@ export default class Input {
           };
           target.style.cursor = 'grabbing';
           return;
+        }
+        if (selected instanceof Line) {
+          const endpoint = this.getHoveredLineEndpoint(selected, worldPos.x, worldPos.y);
+          if (endpoint) {
+            this.gesture = {
+              kind: endpoint.kind,
+              object: selected,
+              offset: new Vector2(worldPos.x - endpoint.x, worldPos.y - endpoint.y),
+              initial: this.getGestureValue(selected, endpoint.kind),
+            };
+            target.style.cursor = 'grabbing';
+            return;
+          }
         }
         const handle = selected && this.getHoveredResizeHandle(selected, worldPos.x, worldPos.y);
         if (selected && handle) {
@@ -310,7 +356,9 @@ export default class Input {
           object.transform.position.set(initial.x, initial.y);
         } else if (kind === 'rotate') {
           object.transform.rotation = initial.x;
-        } else {
+        } else if (kind === 'p1' || kind === 'p2') {
+          object.setEndpoint(kind, initial.x, initial.y);
+        } else if (kind === 'resize') {
           const { initialBounds } = gesture;
           if (object.getComponent(SpriteComponent)) object.transform.scale.set(initial.x, initial.y);
           if (initialBounds && object.bounds &&
