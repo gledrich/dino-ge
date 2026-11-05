@@ -31,6 +31,20 @@ async function verifyTouchMovement(page, game, container, embedded) {
   await game.waitForFunction(x => window.readExplorerX() > x, initialX, { timeout: 5_000 });
 }
 
+async function verifyLibraryCodeDrop(page, source, expected) {
+  const editor = page.locator('.monaco-editor').first();
+  await page.waitForFunction(() => !!window.monaco?.editor.getEditors()[0]?.getValue().length);
+  const before = await page.evaluate(() => window.monaco?.editor.getEditors()[0]?.getValue());
+  assert.equal(typeof before, 'string');
+  assert.ok(!before.includes(expected));
+  const run = await page.locator(previewFrame).getAttribute('src');
+  await source.and(page.locator('[draggable="true"]:enabled')).dragTo(editor);
+  await page.waitForFunction(text => window.monaco?.editor.getEditors()[0]?.getValue().includes(text), expected, { timeout: 5_000 });
+  assert.equal(await page.locator(previewFrame).getAttribute('src'), run);
+  await page.evaluate(() => window.monaco.editor.getEditors()[0].trigger('release-check', 'undo', null));
+  await page.waitForFunction(text => window.monaco?.editor.getEditors()[0]?.getValue() === text, before);
+}
+
 const desktop = await chromium.launch(chromiumOptions);
 try {
   const page = await desktop.newPage({ viewport: { width: 1280, height: 800 } });
@@ -44,6 +58,9 @@ try {
   await page.locator('.monaco-editor').first().waitFor();
   const game = page.frameLocator(previewFrame);
   await game.locator('#playground-canvas-container canvas').waitFor({ timeout: 15_000 });
+  await verifyLibraryCodeDrop(page, page.getByRole('button', { name: 'Insert rectangle code', exact: true }), 'New rectangle');
+  await page.getByRole('button', { name: 'Assets', exact: true }).click();
+  await verifyLibraryCodeDrop(page, page.getByRole('button', { name: 'Insert ruins-atlas sprite code', exact: true }), 'ruins-atlas sprite');
   const code = page.locator('.monaco-editor').first();
   await code.locator('.view-lines').click();
   // Monaco uses different document-start shortcuts on macOS and Linux.

@@ -25,6 +25,18 @@ function AssetTile({ asset, isEditing, canReplace, mobileDock, placementSource, 
   const [unavailable, setUnavailable] = useState(false);
   const image = asset.image ?? thumbnail;
   const sceneAsset = image ? { tag: asset.tag, image, projectPath: asset.projectPath } : undefined;
+  const canDragCode = !!browserPreviewUrl && !mobileDock && !!sceneAsset;
+  const startDrag = (event: React.DragEvent<HTMLButtonElement>) => {
+    if (!sceneAsset || placementSource.isActive()) {
+      event.preventDefault();
+      return;
+    }
+    event.dataTransfer.setData(sceneAssetDragType, asset.tag);
+    event.dataTransfer.setData(getSceneAssetPreviewType(asset.tag), '');
+    event.dataTransfer.effectAllowed = 'copy';
+    window.dispatchEvent(new CustomEvent<SceneImageAsset>(sceneAssetDragEvent, { detail: sceneAsset }));
+  };
+  const endDrag = () => window.dispatchEvent(new CustomEvent(sceneAssetDragEvent, { detail: null }));
   return (
     <div className="asset-tile">
       <button type="button" className="scene-control asset-item" title={asset.url}
@@ -34,18 +46,7 @@ function AssetTile({ asset, isEditing, canReplace, mobileDock, placementSource, 
           if (placementSource.consumeClick(event)) return;
           if (sceneAsset) window.dispatchEvent(new CustomEvent<SceneImageAsset>('playground-place-asset', { detail: sceneAsset }));
         }}
-        onDragStart={event => {
-          if (placementSource.isActive()) {
-            event.preventDefault();
-            return;
-          }
-          if (!sceneAsset) return;
-          event.dataTransfer.setData(sceneAssetDragType, asset.tag);
-          event.dataTransfer.setData(getSceneAssetPreviewType(asset.tag), '');
-          event.dataTransfer.effectAllowed = 'copy';
-          window.dispatchEvent(new CustomEvent<SceneImageAsset>(sceneAssetDragEvent, { detail: sceneAsset }));
-        }}
-        onDragEnd={() => window.dispatchEvent(new CustomEvent(sceneAssetDragEvent, { detail: null }))}
+        onDragStart={startDrag} onDragEnd={endDrag}
       >
         <div className="asset-preview">
           {!unavailable && <img src={asset.url} alt="" draggable={false} loading="lazy"
@@ -67,8 +68,10 @@ function AssetTile({ asset, isEditing, canReplace, mobileDock, placementSource, 
         {mobileDock && isEditing && image && <i className="fa-solid fa-grip-vertical" data-scene-drag-handle aria-hidden="true" />}
       </button>
       <div className="asset-actions">
-        <button type="button" className="scene-control" disabled={!image}
-          aria-label={`Insert ${asset.tag} sprite code`} title={`Insert sprite code for ${asset.tag}`}
+        <button type="button" className="scene-control" disabled={!image} draggable={canDragCode}
+          aria-label={`Insert ${asset.tag} sprite code`}
+          title={`Insert sprite code for ${asset.tag}${canDragCode ? ' or drag it to the editor' : ''}`}
+          onDragStart={canDragCode ? startDrag : undefined} onDragEnd={canDragCode ? endDrag : undefined}
           onClick={() => { if (sceneAsset) onInsert(sceneAsset); }}>
           Insert
         </button>

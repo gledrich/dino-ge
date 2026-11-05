@@ -97,7 +97,7 @@ const Sidebar: React.FC<{ mobileDock?: boolean }> = ({ mobileDock = false }) => 
             <section className="library-section" aria-labelledby="library-objects" aria-describedby="library-placement-hint">
               <h3 id="library-objects">Game objects</h3>
               <p id="library-placement-hint" className="library-hint">
-                {browserPreviewUrl ? 'Choose an object to insert its code into the open script.'
+                {browserPreviewUrl ? mobileDock ? 'Tap an object to insert its snippet.' : 'Drag an object to the editor or click to insert its snippet.'
                   : mobileDock ? 'Drag a grip to the canvas or tap an object to place it. Choose Code to insert its snippet.'
                   : 'Drag to the canvas or the editor. Click an object to place it, or choose Code to insert it.'}
               </p>
@@ -108,9 +108,10 @@ const Sidebar: React.FC<{ mobileDock?: boolean }> = ({ mobileDock = false }) => 
                 role={feedback.error ? 'alert' : 'status'}>{feedback.message}</p>}
               {shapeItems.map(({ icon, kind }) => (
                 <div className="library-row" key={kind}>
-                  <button type="button" className="scene-control snippet-btn" draggable={!browserPreviewUrl}
+                  <button type="button" className="scene-control snippet-btn" draggable={!browserPreviewUrl || !mobileDock}
                     aria-label={browserPreviewUrl ? `Insert ${kind.toLowerCase()} code` : `Add ${kind.toLowerCase()}`}
-                    title={browserPreviewUrl ? `Insert ${kind.toLowerCase()} code` : `Place ${kind.toLowerCase()} on the canvas${mobileDock ? '' : ' or drag to the editor for code'}`}
+                    title={browserPreviewUrl ? `Insert ${kind.toLowerCase()} code${mobileDock ? '' : ' or drag it to the editor'}`
+                      : `Place ${kind.toLowerCase()} on the canvas${mobileDock ? '' : ' or drag to the editor for code'}`}
                     {...placementSource.forItem(browserPreviewUrl ? undefined : { kind })}
                     onDragStart={event => {
                       if (placementSource.isActive()) {
@@ -132,7 +133,7 @@ const Sidebar: React.FC<{ mobileDock?: boolean }> = ({ mobileDock = false }) => 
                   >
                     <i className={`fa-solid ${icon}`} aria-hidden="true" />
                     <span>{kind}</span>
-                    <i className={`fa-solid ${browserPreviewUrl ? 'fa-code' : 'fa-grip-vertical'} library-affordance`} aria-hidden="true"
+                    <i className={`fa-solid ${browserPreviewUrl && mobileDock ? 'fa-code' : 'fa-grip-vertical'} library-affordance`} aria-hidden="true"
                       data-scene-drag-handle={!browserPreviewUrl && mobileDock || undefined} />
                   </button>
                   {!browserPreviewUrl && <button type="button" className="scene-control library-code" aria-label={`Insert ${kind.toLowerCase()} code`}
