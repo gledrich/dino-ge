@@ -103,3 +103,11 @@ sparks.burst(new Vector2(120, 80), {
   colour: '#ffcf64',
 });
 ```
+
+### Collision broad phase
+
+The default physics system uses a quadtree to find nearby world-space
+colliders before running shape-specific tests. Collisions retain their pair
+order, and later pairs see position changes made by earlier resolution and
+collision handlers. The Bouncy Physics example at `/bouncy.html` exercises
+the broad phase with a field of 216 static bumpers.

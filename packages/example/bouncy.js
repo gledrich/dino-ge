@@ -88,6 +88,22 @@ new Engine(
     rightPhys.isStatic = true;
     rightWall.addComponent(rightPhys);
 
+    // A sparse field of static bumpers exercises the collision broad phase.
+    for (let row = 0; row < 12; row++) {
+      for (let column = 0; column < 18; column++) {
+        const bumper = new Circle({
+          position: new Vector2(64 + column * 38, 130 + row * 33),
+          radius: 4,
+          colour: '#43aa8b',
+          tag: 'bumper',
+        });
+        const physics = new PhysicsComponent();
+        physics.isStatic = true;
+        physics.restitution = 0.9;
+        bumper.addComponent(physics);
+      }
+    }
+
     // 4. Instructions
     new Text({
       text: 'Bouncy Ball Example',

@@ -5,6 +5,7 @@ import Vector2 from '../math/Vector2.js';
 import BoundsComponent from '../components/BoundsComponent.js';
 import Physics from '../physics/Physics.js';
 import Engine from '../core/Engine.js';
+import Circle from '../objects/Circle.js';
 import { type EngineState } from '../core/EngineState.js';
 
 class MockGameObject extends GameObject {}
@@ -163,6 +164,85 @@ describe('PhysicsSystem', () => {
     
     expect(checkCollisionSpy).not.toHaveBeenCalled();
     checkCollisionSpy.mockRestore();
+  });
+
+  function body(x: number, y = 0): GameObject {
+    const object = new MockGameObject();
+    object.transform.position.set(x, y);
+    object.addComponent(new BoundsComponent(10, 10));
+    const physics = new PhysicsComponent();
+    physics.isSensor = true;
+    object.addComponent(physics);
+    return object;
+  }
+
+  it('avoids narrow-phase work for separated bodies', () => {
+    const objects = Array.from({ length: 400 }, (_, index) => body(index % 20 * 25, Math.floor(index / 20) * 25));
+    const check = jest.spyOn(Physics, 'checkCollision');
+    try {
+      new PhysicsSystem().fixedUpdate(new Set(objects), 0);
+      expect(check).not.toHaveBeenCalled();
+    } finally {
+      check.mockRestore();
+    }
+  });
+
+  it('includes tangent scaled circles at a quadtree split', () => {
+    const left = new Circle({ position: new Vector2(-20, -10), radius: 5 });
+    const right = new Circle({ position: new Vector2(0, -10), radius: 5 });
+    for (const circle of [left, right]) {
+      circle.transform.scale.set(2, 2);
+      const physics = new PhysicsComponent();
+      physics.isSensor = true;
+      circle.addComponent(physics);
+    }
+    const onCollision = jest.fn();
+    left.on('collision', onCollision);
+    const distant = Array.from({ length: 12 }, (_, index) =>
+      body(index % 2 === 0 ? -100 : 90, index * 30 - 170));
+
+    new PhysicsSystem().fixedUpdate(new Set([left, right, ...distant]), 0);
+    expect(onCollision).toHaveBeenCalledTimes(1);
+    expect(onCollision.mock.lastCall?.[0].detail.other).toBe(right);
+  });
+
+  it('retains a fractional circle contact accepted by the narrow phase', () => {
+    const first = new Circle({ position: new Vector2(-10, 0), radius: 1.1 });
+    const second = new Circle({ position: new Vector2(-7.8, 1), radius: 0.1 });
+    first.addComponent(new PhysicsComponent());
+    second.addComponent(new PhysicsComponent());
+    const contact = jest.fn();
+    first.on('collision', contact);
+
+    new PhysicsSystem().fixedUpdate(new Set([first, second]), 0);
+    expect(contact).toHaveBeenCalledTimes(1);
+  });
+
+  it('finds a later collision after an earlier callback moves a third body', () => {
+    const first = body(0);
+    const second = body(5);
+    const third = body(100);
+    const seen: GameObject[] = [];
+    first.on('collision', event => {
+      seen.push(event.detail.other);
+      if (event.detail.other === second) third.transform.position.x = 3;
+    });
+
+    new PhysicsSystem().fixedUpdate(new Set([first, second, third]), 0);
+    expect(seen).toEqual([second, third]);
+  });
+
+  it('skips a body removed by an earlier collision callback', () => {
+    const first = body(0);
+    const second = body(5);
+    const removed = body(3);
+    const objects = new Set([first, second, removed]);
+    const onRemovedCollision = jest.fn();
+    first.on('collision', () => objects.delete(removed));
+    removed.on('collision', onRemovedCollision);
+
+    new PhysicsSystem().fixedUpdate(objects, 0);
+    expect(onRemovedCollision).not.toHaveBeenCalled();
   });
 
   it('does not move static objects', () => {
