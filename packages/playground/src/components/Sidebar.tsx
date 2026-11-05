@@ -1,6 +1,7 @@
 import React, { useRef, useState } from 'react';
 import AssetPanel from './AssetPanel';
 import { usePlayground } from '../context/PlaygroundContext';
+import { browserPreviewUrl } from '../utils/helpers';
 import { insertSceneObjectCode, sceneObjectDragType, type SceneObjectKind } from '../utils/scene-objects';
 import { useScenePlacementSource } from '../hooks/useScenePlacementSource';
 import '../styles/sidebar.css';
@@ -54,7 +55,7 @@ const Sidebar: React.FC<{ mobileDock?: boolean }> = ({ mobileDock = false }) => 
   const [activeTab, setActiveTab] = useState<TabType>('library');
   const [feedback, setFeedback] = useState<{ scriptId: string; message: string; error: boolean }>();
   const assetsTab = useRef<HTMLButtonElement>(null);
-  const placementSource = useScenePlacementSource(activeTab === 'library');
+  const placementSource = useScenePlacementSource(!browserPreviewUrl && activeTab === 'library');
 
   const insertSnippet = (code: string) => {
     window.dispatchEvent(new CustomEvent('playground-insert-text', { detail: code }));
@@ -96,20 +97,21 @@ const Sidebar: React.FC<{ mobileDock?: boolean }> = ({ mobileDock = false }) => 
             <section className="library-section" aria-labelledby="library-objects" aria-describedby="library-placement-hint">
               <h3 id="library-objects">Game objects</h3>
               <p id="library-placement-hint" className="library-hint">
-                {mobileDock ? 'Drag a grip to the canvas or tap an object to place it. Choose Code to insert its snippet.'
+                {browserPreviewUrl ? 'Choose an object to insert its code into the open script.'
+                  : mobileDock ? 'Drag a grip to the canvas or tap an object to place it. Choose Code to insert its snippet.'
                   : 'Drag to the canvas or the editor. Click an object to place it, or choose Code to insert it.'}
               </p>
-              <p className="library-hint library-shortcuts">
+              {!browserPreviewUrl && <p className="library-hint library-shortcuts">
                 <kbd>Shift+Enter</kbd> to position with arrow keys.
-              </p>
+              </p>}
               {feedback?.scriptId === currentScriptId && <p className={`library-feedback${feedback.error ? ' library-feedback-error' : ''}`}
                 role={feedback.error ? 'alert' : 'status'}>{feedback.message}</p>}
               {shapeItems.map(({ icon, kind }) => (
                 <div className="library-row" key={kind}>
-                  <button type="button" className="scene-control snippet-btn" draggable
-                    aria-label={`Add ${kind.toLowerCase()}`}
-                    title={`Place ${kind.toLowerCase()} on the canvas${mobileDock ? '' : ' or drag to the editor for code'}`}
-                    {...placementSource.forItem({ kind })}
+                  <button type="button" className="scene-control snippet-btn" draggable={!browserPreviewUrl}
+                    aria-label={browserPreviewUrl ? `Insert ${kind.toLowerCase()} code` : `Add ${kind.toLowerCase()}`}
+                    title={browserPreviewUrl ? `Insert ${kind.toLowerCase()} code` : `Place ${kind.toLowerCase()} on the canvas${mobileDock ? '' : ' or drag to the editor for code'}`}
+                    {...placementSource.forItem(browserPreviewUrl ? undefined : { kind })}
                     onDragStart={event => {
                       if (placementSource.isActive()) {
                         event.preventDefault();
@@ -120,24 +122,28 @@ const Sidebar: React.FC<{ mobileDock?: boolean }> = ({ mobileDock = false }) => 
                       event.dataTransfer.effectAllowed = 'copy';
                     }}
                     onClick={event => {
+                      if (browserPreviewUrl) {
+                        insertShapeCode(kind);
+                        return;
+                      }
                       if (placementSource.consumeClick(event)) return;
                       window.dispatchEvent(new CustomEvent('playground-place-object', { detail: kind }));
                     }}
                   >
                     <i className={`fa-solid ${icon}`} aria-hidden="true" />
                     <span>{kind}</span>
-                    <i className="fa-solid fa-grip-vertical library-affordance" aria-hidden="true"
-                      data-scene-drag-handle={mobileDock || undefined} />
+                    <i className={`fa-solid ${browserPreviewUrl ? 'fa-code' : 'fa-grip-vertical'} library-affordance`} aria-hidden="true"
+                      data-scene-drag-handle={!browserPreviewUrl && mobileDock || undefined} />
                   </button>
-                  <button type="button" className="scene-control library-code" aria-label={`Insert ${kind.toLowerCase()} code`}
+                  {!browserPreviewUrl && <button type="button" className="scene-control library-code" aria-label={`Insert ${kind.toLowerCase()} code`}
                     title={`Insert ${kind.toLowerCase()} code`} onClick={() => insertShapeCode(kind)}>
                     <i className="fa-solid fa-code" aria-hidden="true" />
                     <span>Code</span>
-                  </button>
+                  </button>}
                 </div>
               ))}
               <button type="button" className="scene-control snippet-btn" aria-label="Choose sprite image"
-                title="Choose an image in Assets to place or insert as code" onClick={() => {
+                title={browserPreviewUrl ? "Choose an image in Assets to insert as code" : "Choose an image in Assets to place or insert as code"} onClick={() => {
                   setActiveTab('assets');
                   assetsTab.current?.focus();
                 }}>

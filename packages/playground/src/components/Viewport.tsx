@@ -5,7 +5,7 @@ import type { GameRunError } from '../hooks/usePlaygroundScripts';
 import Toolbar from './Toolbar';
 import Logo from './Logo';
 import { frameSceneObjectEvent, getAssetSource, getDefaultSceneObjectTag, getSceneArrowMovement, getSceneAssetPreviewType, getSceneSelectionBounds, getSceneSource, getSceneSpritePlacement, getSceneSpriteScale, isReplaceableSprite, isSceneFrameShortcut, nudgeSceneSelection, sceneAssetDragEvent, sceneAssetDragType, sceneKeyboardPlacementEvent, sceneObjectDefaults, sceneObjectDragType, sceneObjectKinds, scenePointerDragEvent, type SceneImageAsset, type SceneKeyboardPlacementRequest, type SceneObjectKind, type SceneObjectPlacement, type ScenePointerDrag, type ScenePoint } from '../utils/scene-objects';
-import { getSpriteImageFileError, importSpriteImage } from '../utils/helpers';
+import { browserPreviewUrl, getSpriteImageFileError, importSpriteImage } from '../utils/helpers';
 
 const shapePreviewDimensions: Record<SceneObjectKind, { width: number; height: number }> = {
   Rectangle: sceneObjectDefaults.Rectangle,
@@ -169,7 +169,7 @@ const Viewport: React.FC<{
 
   const viewportContainerRef = useRef<HTMLDivElement>(null);
   const sceneControlsRef = useRef<HTMLDivElement>(null);
-  const isEditingScene = isPaused && isDebug;
+  const isEditingScene = !browserPreviewUrl && isPaused && isDebug;
   const savedCamera = useRef<{ canvas: HTMLCanvasElement; scene: typeof Engine.currentScene;
     x: number; y: number; zoom: number } | null>(null);
   const pan = useRef<CameraPan | null>(null);
@@ -1107,6 +1107,9 @@ const Viewport: React.FC<{
         <button type="button" className="scene-control" onClick={onOpenConsole}>
           <i className="fa-solid fa-terminal" aria-hidden="true" /> Open Console
         </button>
+        {browserPreviewUrl && <a className="scene-control" href="/playground/amber-ruins.html" target="_top">
+          Play Amber Ruins directly
+        </a>}
       </div>}
       <Toolbar 
         isPaused={isPaused}
@@ -1115,7 +1118,7 @@ const Viewport: React.FC<{
         arePanelsMinimized={arePanelsMinimized}
         onTogglePause={isEditingScene ? toggleSceneEditing : togglePause}
         onToggleDebug={toggleDebug}
-        onToggleSceneEditing={toggleSceneEditing}
+        onToggleSceneEditing={browserPreviewUrl ? undefined : toggleSceneEditing}
         onTogglePanels={togglePanels}
         onRefresh={() => window.dispatchEvent(new CustomEvent('playground-refresh'))}
       />

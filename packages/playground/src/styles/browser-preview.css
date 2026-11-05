@@ -1,0 +1,7 @@
+@media (pointer: coarse) {
+  .viewport-panel:has(.browser-game-preview) .toolbar {
+    bottom: 54px;
+    padding: 2px 8px;
+    gap: 8px;
+  }
+}

@@ -5,13 +5,16 @@ import Sidebar from './components/Sidebar';
 import Editor from './components/Editor';
 import Inspector from './components/Inspector';
 import SceneExplorer from './components/SceneExplorer';
+import { BrowserInspector, BrowserSceneExplorer } from './components/BrowserSceneTools';
 import Console from './components/Console';
 import Viewport from './components/Viewport';
 import CanvasChangesDialog from './components/CanvasChangesDialog';
 import { usePlayground, type MobileDockTab } from './context/PlaygroundContext';
 import { usePlaygroundScripts } from './hooks/usePlaygroundScripts';
 import { captureConsole } from './utils/LogManager';
+import { browserPreviewUrl } from './utils/helpers';
 import './App.css';
+import './styles/browser-preview.css';
 
 const mobileDockQuery = '(max-width: 720px), (max-height: 500px) and (pointer: coarse)';
 const desktopTabs = ['editor', 'console'] as const;
@@ -355,10 +358,12 @@ function App() {
         </Panel>
       </Group>
       {createPortal(<>
-        <div className="explorer-scene"><SceneExplorer onReveal={revealExplorer} /></div>
+        <div className="explorer-scene">{browserPreviewUrl ? <BrowserSceneExplorer /> : <SceneExplorer onReveal={revealExplorer} />}</div>
         <div className="explorer-library">{(mobile || isExplorerVisible) && <Sidebar mobileDock={mobile} />}</div>
       </>, explorerHost)}
-      {createPortal(<Inspector visible={mobile || isInspectorVisible} />, inspectorHost)}
+      {createPortal(browserPreviewUrl
+        ? <BrowserInspector visible={mobile || isInspectorVisible} />
+        : <Inspector visible={mobile || isInspectorVisible} />, inspectorHost)}
       {pendingRunChange && (
         <CanvasChangesDialog action={pendingRunChange.kind} onCancel={cancelRunChange} onConfirm={confirmRunChange} />
       )}

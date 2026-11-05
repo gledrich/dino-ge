@@ -1,9 +1,10 @@
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
-import { cp } from 'node:fs/promises';
-import { basename } from 'node:path';
+import { cp, readdir, writeFile } from 'node:fs/promises';
+import { basename, dirname, join, relative, resolve, sep } from 'node:path';
 
 const api = `http://127.0.0.1:${process.env.PORT ?? '3000'}`;
+let outputDirectory: string;
 
 export default defineConfig({
   plugins: [
@@ -11,12 +12,21 @@ export default defineConfig({
     {
       name: 'bundle-amber-ruins',
       apply: 'build',
+      configResolved(config) {
+        outputDirectory = resolve(config.root, config.build.outDir);
+      },
       async closeBundle() {
+        const template = join(outputDirectory, 'templates', 'amber-ruins');
         await cp(new URL('../example/amber-ruins/', import.meta.url),
-          new URL('./dist/templates/amber-ruins/', import.meta.url), {
+          template, {
             recursive: true,
             filter: source => !['README.md', 'generate-audio.py', 'explorer.png'].includes(basename(source)),
           });
+        const files = (await readdir(template, { recursive: true, withFileTypes: true }))
+          .filter(file => file.isFile())
+          .map(file => relative(template, join(file.parentPath, file.name)).split(sep).join('/'))
+          .sort();
+        await writeFile(join(dirname(template), 'amber-ruins.workspace.json'), JSON.stringify({ entry: 'game.js', files }));
       },
     },
     {

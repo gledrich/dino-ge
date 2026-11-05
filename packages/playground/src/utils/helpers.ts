@@ -1,4 +1,7 @@
+import { browserWorkspace } from './browser-workspace';
+
 let currentScriptId = 'script';
+export const browserPreviewUrl = import.meta.env.VITE_DINO_PREVIEW_URL as string | undefined;
 const scriptEndpoint = (id: string) => `/api/scripts/${encodeURIComponent(id)}`;
 const moduleRevisionHeader = 'X-Dino-Module-Revision';
 
@@ -16,15 +19,21 @@ async function projectModuleRequest<T>(id: string, path?: string, options?: Requ
 }
 
 export const listProjectModules = async (id: string, signal: AbortSignal) =>
-  (await projectModuleRequest<string[]>(id, undefined, { signal })).value;
+  browserPreviewUrl ? browserWorkspace.listModules(id) : (await projectModuleRequest<string[]>(id, undefined, { signal })).value;
 
 export async function readProjectModule(id: string, path: string, signal: AbortSignal) {
+  if (browserPreviewUrl) return browserWorkspace.readModule(id, path);
   const { value, revision } = await projectModuleRequest<string>(id, path, { signal, cache: 'no-store' });
   if (!revision) throw new Error('Could not read the module revision.');
   return { value, revision };
 }
 
 export async function saveProjectModule(id: string, path: string, data: string, expectedRevision: string) {
+  if (browserPreviewUrl) {
+    const revision = await browserWorkspace.saveModule(id, path, data, expectedRevision);
+    if (!revision) throw new ProjectModuleConflict('This module changed since you opened it.');
+    return revision;
+  }
   const { revision } = await projectModuleRequest(id, path, {
     method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ data, revision: expectedRevision }),
   });
@@ -43,9 +52,17 @@ export type GameFolder = { name: string; files: { path: string; file: File }[] }
 export const spriteImageTypes = ['image/png', 'image/jpeg', 'image/gif', 'image/webp'];
 export const maxSpriteImageBytes = 5 * 1024 * 1024;
 
-export interface StoredSpriteImage { name: string; url: string }
+export interface StoredSpriteImage { name: string; url: string; projectPath?: string; release?: () => void }
 
 export async function listSpriteImages(id: string, signal: AbortSignal): Promise<StoredSpriteImage[]> {
+  if (browserPreviewUrl) {
+    const files = await browserWorkspace.listSprites(id);
+    signal.throwIfAborted();
+    return files.map(({ path, name, file }) => {
+      const url = URL.createObjectURL(file);
+      return { name, url, projectPath: path, release: () => URL.revokeObjectURL(url) };
+    });
+  }
   const response = await fetch(`${scriptEndpoint(id)}/assets`, { signal });
   if (response.status === 404) return [];
   if (!response.ok) throw new Error('Could not load workspace images.');
@@ -80,13 +97,19 @@ export async function importSpriteImage(file: File, id: string, isCurrent: () =>
     image.src = previewUrl;
     await image.decode();
     if (!isCurrent()) return;
+    const tag = file.name.replace(/\.[^.]*$/, '').trim() || 'Imported';
+    if (browserPreviewUrl) {
+      const projectPath = await browserWorkspace.importSprite(id, file);
+      window.dispatchEvent(new CustomEvent('playground-workspace-images-changed', { detail: id }));
+      return isCurrent() ? { tag, image, projectPath } : undefined;
+    }
     const url = await storeSpriteImage(file, id);
     window.dispatchEvent(new CustomEvent('playground-workspace-images-changed', { detail: id }));
     if (!isCurrent()) return;
     image.src = url;
     await image.decode();
     if (!isCurrent()) return;
-    return { tag: file.name.replace(/\.[^.]*$/, '').trim() || 'Imported', image };
+    return { tag, image };
   } catch (error) {
     if (error instanceof DOMException) throw new Error('The image could not be opened.');
     throw error;
@@ -114,6 +137,9 @@ export function readGameFolder(selection: FileList): GameFolder {
 }
 
 export async function importGameFolder(folder: GameFolder, entry: string): Promise<string> {
+  if (browserPreviewUrl) {
+    return browserWorkspace.importProject(folder.name, entry, new Map(folder.files.map(({ path, file }) => [path, file])));
+  }
   const files = await Promise.all(folder.files.map(({ path, file }) => new Promise<{ path: string; content: string }>((resolve, reject) => {
     const reader = new FileReader();
     reader.onload = () => resolve({ path, content: String(reader.result).split(',')[1] });
@@ -135,6 +161,7 @@ export async function importGameFolder(folder: GameFolder, entry: string): Promi
 
 export async function createScript(id: string): Promise<void> {
   if (!id || id.includes('/') || id.includes('\\')) throw new Error('Enter a script name without directories.');
+  if (browserPreviewUrl) return browserWorkspace.writeScript(id, '', 'create');
   const response = await fetch(scriptEndpoint(id), {
     method: 'PUT',
     headers: { 'Content-Type': 'application/json' },
@@ -146,8 +173,7 @@ export async function createScript(id: string): Promise<void> {
   }
 }
 
-const createInitialFile = async (id: string) => {
-  const defaultContent = `import { Engine, Scene, Sprite, Vector2, Text } from 'dino-ge';
+const defaultContent = `import { Engine, Scene, Sprite, Vector2, Text } from 'dino-ge';
 
 new Engine({
   onLoad: () => {
@@ -164,6 +190,8 @@ new Engine({
   backgroundColour: '#264653' 
 });
 `;
+
+const createInitialFile = async (id: string) => {
   
   await fetch(scriptEndpoint(id), {
     method: 'PUT',
@@ -179,6 +207,7 @@ new Engine({
 };
 
 export const getFilesList = async (): Promise<string[]> => {
+  if (browserPreviewUrl) return browserWorkspace.list();
   const res = await fetch('/files');
   if (res.ok) {
     return await res.json();
@@ -187,6 +216,19 @@ export const getFilesList = async (): Promise<string[]> => {
 };
 
 export const getScript = async (id: string = currentScriptId): Promise<string> => {
+  if (browserPreviewUrl) {
+    const script = await browserWorkspace.readScript(id);
+    if (script !== undefined) return script;
+    if (id.includes('/')) throw new Error('The project was not found.');
+    try {
+      await browserWorkspace.writeScript(id, defaultContent, 'create');
+    } catch (error) {
+      const existing = await browserWorkspace.readScript(id);
+      if (existing !== undefined) return existing;
+      throw error;
+    }
+    return defaultContent;
+  }
   const res = await fetch(scriptEndpoint(id));
 
   if (res.status === 404 && !id.includes('/')) {
@@ -200,6 +242,7 @@ export const getScript = async (id: string = currentScriptId): Promise<string> =
 };
 
 export const updateScript = async (data: string, upsert = true, id: string = currentScriptId) => {
+  if (browserPreviewUrl) return browserWorkspace.writeScript(id, data, upsert ? 'append' : 'replace');
   const res = await fetch(scriptEndpoint(id), {
     method: 'PUT',
     body: JSON.stringify({

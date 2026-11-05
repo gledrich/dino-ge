@@ -7,7 +7,7 @@ interface ToolbarProps {
   arePanelsMinimized: boolean;
   onTogglePause: () => void;
   onToggleDebug: () => void;
-  onToggleSceneEditing: () => void;
+  onToggleSceneEditing?: () => void;
   onTogglePanels: () => void;
   onRefresh: () => void;
 }
@@ -34,7 +34,7 @@ const Toolbar: React.FC<ToolbarProps> = ({
           {isPaused ? <path d="m8 5 11 7-11 7z" /> : <path d="M9 5v14m6-14v14" />}
         </svg>
       </button>
-      <button type="button"
+      {onToggleSceneEditing && <button type="button"
         className="scene-edit-button"
         onClick={onToggleSceneEditing}
         aria-label="Edit scene"
@@ -45,7 +45,7 @@ const Toolbar: React.FC<ToolbarProps> = ({
           <path d="M10 11 17 4a2.8 2.8 0 0 1 4 4l-7 7-4-4Z" />
           <path d="M10 11c-3 0-4 2-4 4s-1 4-3 5c5 1 11-1 11-5" />
         </svg>
-      </button>
+      </button>}
       <button type="button"
         onClick={onRefresh}
         aria-label="Reset game"

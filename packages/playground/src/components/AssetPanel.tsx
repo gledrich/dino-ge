@@ -3,13 +3,14 @@ import { Engine, Loader } from 'dino-ge';
 import { usePlayground } from '../context/PlaygroundContext';
 import { useScenePlacementSource } from '../hooks/useScenePlacementSource';
 import { getSceneAssetPreviewType, insertSceneObjectCode, isReplaceableSprite, sceneAssetDragEvent, sceneAssetDragType, type SceneImageAsset } from '../utils/scene-objects';
-import { listSpriteImages, spriteImageTypes, type StoredSpriteImage } from '../utils/helpers';
+import { browserPreviewUrl, getCurrentScriptId, getSpriteImageFileError, importSpriteImage, listSpriteImages, spriteImageTypes, type StoredSpriteImage } from '../utils/helpers';
 import '../styles/asset-panel.css';
 
 interface AssetEntry {
   tag: string;
   url: string;
   image?: HTMLImageElement;
+  projectPath?: string;
 }
 
 function AssetTile({ asset, isEditing, canReplace, mobileDock, placementSource, onInsert }: {
@@ -23,25 +24,26 @@ function AssetTile({ asset, isEditing, canReplace, mobileDock, placementSource, 
   const [thumbnail, setThumbnail] = useState<HTMLImageElement>();
   const [unavailable, setUnavailable] = useState(false);
   const image = asset.image ?? thumbnail;
+  const sceneAsset = image ? { tag: asset.tag, image, projectPath: asset.projectPath } : undefined;
   return (
     <div className="asset-tile">
       <button type="button" className="scene-control asset-item" title={asset.url}
         aria-label={`Add ${asset.tag} as sprite`} disabled={!isEditing || !image} draggable={isEditing && !!image}
-        {...placementSource.forItem(isEditing && image ? { asset: { tag: asset.tag, image } } : undefined)}
+        {...placementSource.forItem(isEditing && sceneAsset ? { asset: sceneAsset } : undefined)}
         onClick={event => {
           if (placementSource.consumeClick(event)) return;
-          if (image) window.dispatchEvent(new CustomEvent<SceneImageAsset>('playground-place-asset', { detail: { tag: asset.tag, image } }));
+          if (sceneAsset) window.dispatchEvent(new CustomEvent<SceneImageAsset>('playground-place-asset', { detail: sceneAsset }));
         }}
         onDragStart={event => {
           if (placementSource.isActive()) {
             event.preventDefault();
             return;
           }
-          if (!image) return;
+          if (!sceneAsset) return;
           event.dataTransfer.setData(sceneAssetDragType, asset.tag);
           event.dataTransfer.setData(getSceneAssetPreviewType(asset.tag), '');
           event.dataTransfer.effectAllowed = 'copy';
-          window.dispatchEvent(new CustomEvent<SceneImageAsset>(sceneAssetDragEvent, { detail: { tag: asset.tag, image } }));
+          window.dispatchEvent(new CustomEvent<SceneImageAsset>(sceneAssetDragEvent, { detail: sceneAsset }));
         }}
         onDragEnd={() => window.dispatchEvent(new CustomEvent(sceneAssetDragEvent, { detail: null }))}
       >
@@ -67,15 +69,15 @@ function AssetTile({ asset, isEditing, canReplace, mobileDock, placementSource, 
       <div className="asset-actions">
         <button type="button" className="scene-control" disabled={!image}
           aria-label={`Insert ${asset.tag} sprite code`} title={`Insert sprite code for ${asset.tag}`}
-          onClick={() => { if (image) onInsert({ tag: asset.tag, image }); }}>
+          onClick={() => { if (sceneAsset) onInsert(sceneAsset); }}>
           Insert
         </button>
         {canReplace && (
           <button type="button" className="scene-control" disabled={!image}
             aria-label={`Replace selected sprite with ${asset.tag}`} title="Replace the selected sprite’s image"
             onClick={() => {
-              if (image) window.dispatchEvent(new CustomEvent<SceneImageAsset>('playground-replace-sprite-image', {
-                detail: { tag: asset.tag, image },
+              if (sceneAsset) window.dispatchEvent(new CustomEvent<SceneImageAsset>('playground-replace-sprite-image', {
+                detail: sceneAsset,
               }));
             }}>
             <i className="fa-solid fa-right-left" aria-hidden="true" />
@@ -91,9 +93,10 @@ const AssetPanel: React.FC<{ mobileDock?: boolean }> = ({ mobileDock = false }) 
   const [selected, setSelected] = useState(Engine.selectedObject);
   const [catalogue, setCatalogue] = useState<{ scriptId: string; images: StoredSpriteImage[]; error?: string }>();
   const [feedback, setFeedback] = useState<{ message: string; error?: boolean }>();
+  const [importingImage, setImportingImage] = useState(false);
   const filePicker = useRef<HTMLInputElement>(null);
   const { currentScriptId, isPaused, isDebug } = usePlayground();
-  const isEditing = isPaused && isDebug;
+  const isEditing = !browserPreviewUrl && isPaused && isDebug;
   const placementSource = useScenePlacementSource(isEditing);
   const canReplace = isEditing && isReplaceableSprite(selected);
 
@@ -117,14 +120,25 @@ const AssetPanel: React.FC<{ mobileDock?: boolean }> = ({ mobileDock = false }) 
 
   useEffect(() => {
     let pending: AbortController | undefined;
+    let displayed: StoredSpriteImage[] = [];
+    const release = (images: StoredSpriteImage[]) => images.forEach(image => image.release?.());
     const refresh = () => {
       pending?.abort();
       const request = new AbortController();
       pending = request;
       void listSpriteImages(currentScriptId, request.signal).then(images => {
-        if (!request.signal.aborted) setCatalogue({ scriptId: currentScriptId, images });
+        if (request.signal.aborted) {
+          release(images);
+          return;
+        }
+        release(displayed);
+        displayed = images;
+        setCatalogue({ scriptId: currentScriptId, images });
       }).catch(() => {
-        if (!request.signal.aborted) setCatalogue({ scriptId: currentScriptId, images: [], error: 'Could not load workspace images.' });
+        if (request.signal.aborted) return;
+        release(displayed);
+        displayed = [];
+        setCatalogue({ scriptId: currentScriptId, images: [], error: 'Could not load workspace images.' });
       });
     };
     const onStored = (event: Event) => {
@@ -134,6 +148,7 @@ const AssetPanel: React.FC<{ mobileDock?: boolean }> = ({ mobileDock = false }) 
     window.addEventListener('playground-workspace-images-changed', onStored);
     return () => {
       pending?.abort();
+      release(displayed);
       window.removeEventListener('playground-workspace-images-changed', onStored);
     };
   }, [currentScriptId]);
@@ -149,8 +164,34 @@ const AssetPanel: React.FC<{ mobileDock?: boolean }> = ({ mobileDock = false }) 
     for (let i = 2; tags.has(tag); i++) tag = `${image.name} ${i}`;
     sources.add(url);
     tags.add(tag);
-    assets.push({ tag, url });
+    assets.push({ tag, url, projectPath: image.projectPath });
   }
+
+  const importImage = async (files: File[]) => {
+    if (!browserPreviewUrl) {
+      window.dispatchEvent(new CustomEvent('playground-import-image', { detail: files }));
+      return;
+    }
+    const fileError = getSpriteImageFileError(files);
+    if (fileError) {
+      setFeedback({ message: fileError, error: true });
+      return;
+    }
+    setImportingImage(true);
+    setFeedback(undefined);
+    const isCurrent = () => getCurrentScriptId() === currentScriptId;
+    try {
+      if (await importSpriteImage(files[0], currentScriptId, isCurrent)) {
+        setFeedback({ message: 'Image imported. Use Insert to add sprite code.' });
+      }
+    } catch (error) {
+      if (isCurrent()) {
+        setFeedback({ message: error instanceof Error ? error.message : 'Could not import the image.', error: true });
+      }
+    } finally {
+      setImportingImage(false);
+    }
+  };
 
   const insertSpriteCode = (asset: SceneImageAsset) => {
     const reject = (message: string) => setFeedback({ message, error: true });
@@ -161,19 +202,21 @@ const AssetPanel: React.FC<{ mobileDock?: boolean }> = ({ mobileDock = false }) 
 
   return (
     <div className="asset-panel">
-      <button type="button" className="scene-control" onClick={() => filePicker.current?.click()}>
-        <i className="fa-solid fa-upload" aria-hidden="true" /> Import image
+      <button type="button" className="scene-control" disabled={importingImage} onClick={() => filePicker.current?.click()}>
+        <i className="fa-solid fa-upload" aria-hidden="true" /> {importingImage ? 'Importing…' : 'Import image'}
       </button>
       <input type="file" ref={filePicker} hidden accept={spriteImageTypes.join(',')} aria-label="Choose sprite image"
         onChange={event => {
           const files = Array.from(event.currentTarget.files ?? []);
           event.currentTarget.value = '';
-          if (files.length) window.dispatchEvent(new CustomEvent('playground-import-image', { detail: files }));
+          if (files.length) void importImage(files);
         }} />
-      <p className="asset-help">{mobileDock ? 'Import an image to use it as a sprite.' : 'Drop an image file onto the canvas or editor.'}</p>
+      <p className="asset-help">{mobileDock ? 'Import an image to use it as a sprite.'
+        : browserPreviewUrl ? 'Drop an image file onto the editor.' : 'Drop an image file onto the canvas or editor.'}</p>
       {assets.length > 0 && (
         <p className="asset-help">
-          {!isEditing ? 'Enter Edit scene to drag images. Use Insert to add sprite code.'
+          {browserPreviewUrl ? 'Use Insert to add sprite code.'
+            : !isEditing ? 'Enter Edit scene to drag images. Use Insert to add sprite code.'
             : mobileDock ? 'Drag a grip to the canvas or tap an image to place it. Use Insert to add sprite code.'
               : 'Drag to the canvas to place, or to the editor for code. Click to place. Shift+Enter positions with keys.'}
         </p>

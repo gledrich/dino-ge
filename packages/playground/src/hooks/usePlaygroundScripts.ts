@@ -1,9 +1,11 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import * as Dino from 'dino-ge';
-import { getScript, setCurrentScriptId as rememberScriptId, updateScript } from '../utils/helpers';
+import { browserPreviewUrl, getScript, setCurrentScriptId as rememberScriptId, updateScript } from '../utils/helpers';
 import { instrumentCode, rebaseModule } from '../utils/ast-utils';
 import { trackProjectObjectSources } from '../utils/project-object-source';
 import runtimeModulePath from '../utils/game-module-runtime.js?url&no-inline';
+import { browserWorkspace } from '../utils/browser-workspace';
+import { startBrowserPreview } from '../utils/browser-preview';
 import { usePlayground } from '../context/PlaygroundContext';
 
 const { Engine, Loader } = Dino;
@@ -13,6 +15,8 @@ export type GameRunError = Dino.EngineRuntimeError | { phase: 'script'; error: u
 
 export const usePlaygroundScripts = () => {
   const runId = useRef(0);
+  const browserPreview = useRef<ReturnType<typeof startBrowserPreview>>(undefined);
+  const previewControls = useRef({ paused: false, debug: false });
   const retireScript = useRef<() => void>(undefined);
   const cancelPendingScript = useRef<() => void>(undefined);
   const stopTrackingSources = useRef<() => void>(undefined);
@@ -36,21 +40,48 @@ export const usePlaygroundScripts = () => {
   useEffect(() => () => {
     ++runId.current;
     retireScript.current?.();
+    browserPreview.current?.dispose();
     stopTrackingSources.current?.();
     stopTrackingSources.current = undefined;
   }, []);
   useLayoutEffect(() => {
     keepSceneOnSave.current = (isPaused && isDebug) || pendingCanvasPlacements.size > 0;
+    previewControls.current = { paused: isPaused, debug: isDebug };
+    browserPreview.current?.setControls(previewControls.current);
   }, [isPaused, isDebug, pendingCanvasPlacements]);
 
   const updatePlayground = useCallback(async (fromSave = false) => {
     if (!isViewportReady) return;
     const run = ++runId.current;
-    const scriptText = await getScript(currentScriptId);
+    let scriptText: string;
+    try {
+      scriptText = await getScript(currentScriptId);
+    } catch (error) {
+      if (run === runId.current) setRuntimeError({ phase: 'script', error });
+      return;
+    }
     if (run !== runId.current || (fromSave && keepSceneOnSave.current)) return;
     const result = instrumentCode(scriptText, false, currentScriptId);
     window.dispatchEvent(new CustomEvent('playground-syntax-error', { detail: result.error ?? null }));
     if (result.error) return;
+
+    if (browserPreviewUrl) {
+      try {
+        const snapshot = await browserWorkspace.snapshot(currentScriptId);
+        if (run !== runId.current) return;
+        const container = document.getElementById('playground-canvas-container');
+        if (!snapshot || !container) throw new Error('Could not open the game preview.');
+        browserPreview.current?.dispose();
+        setRuntimeError(undefined);
+        window.dispatchEvent(new CustomEvent('playground-before-run', { detail: { scriptId: currentScriptId, source: scriptText } }));
+        browserPreview.current = startBrowserPreview(container, browserPreviewUrl, snapshot, previewControls.current, error => {
+          if (run === runId.current) setRuntimeError({ phase: 'script', error });
+        });
+      } catch (error) {
+        if (run === runId.current) setRuntimeError({ phase: 'script', error });
+      }
+      return;
+    }
 
     stopTrackingSources.current?.();
     stopTrackingSources.current = undefined;
@@ -123,7 +154,13 @@ export const usePlaygroundScripts = () => {
   const handleRefresh = useCallback(async (editorValue: string, fromSave = false) => {
     const activeRun = runId.current;
     const keepCurrentScene = fromSave && keepSceneOnSave.current;
-    await updateScript(editorValue, false, currentScriptId);
+    try {
+      await updateScript(editorValue, false, currentScriptId);
+    } catch (error) {
+      console.error('Could not save the game script', error);
+      if (activeRun === runId.current) setRuntimeError({ phase: 'script', error });
+      return;
+    }
     if (fromSave && (keepCurrentScene || keepSceneOnSave.current || activeRun !== runId.current)) return;
     await updatePlayground(fromSave);
     if (!fromSave || !keepSceneOnSave.current) setIsPaused(false);
@@ -131,7 +168,9 @@ export const usePlaygroundScripts = () => {
   const handleSave = useCallback((editorValue: string) => handleRefresh(editorValue, true), [handleRefresh]);
 
   useEffect(() => {
-    updatePlayground();
+    let current = true;
+    queueMicrotask(() => { if (current) void updatePlayground(); });
+    return () => { current = false; };
   }, [updatePlayground]);
 
   useEffect(() => {

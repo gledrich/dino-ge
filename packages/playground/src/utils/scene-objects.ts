@@ -26,7 +26,7 @@ export function getSceneSpriteScale(image: HTMLImageElement): number {
   return Math.min(1, 128 / Math.max(image.naturalWidth, image.naturalHeight));
 }
 
-export interface SceneImageAsset { tag: string; image: HTMLImageElement }
+export interface SceneImageAsset { tag: string; image: HTMLImageElement; projectPath?: string }
 
 export function isReplaceableSprite(object: Dino.GameObject | null): object is Dino.Sprite {
   return object instanceof Dino.Sprite && object.rows === 1 && object.cols === 1 &&
@@ -269,9 +269,20 @@ export function getAssetSource(src: string, scriptId: string): string | undefine
   return JSON.stringify(`${workspacePath}${url.search}${url.hash}`);
 }
 
-export function getSceneSpritePlacement({ tag, image }: SceneImageAsset, { x, y }: ScenePoint,
+function projectAssetSource(path: string, scriptId: string): string {
+  const directory = scriptId.split('/').slice(1, -1);
+  const target = path.split('/');
+  while (directory.length && target.length && directory[0] === target[0]) {
+    directory.shift();
+    target.shift();
+  }
+  const prefix = directory.length ? '../'.repeat(directory.length) : './';
+  return `new URL(${JSON.stringify(prefix + target.map(encodeURIComponent).join('/'))}, import.meta.url).href`;
+}
+
+export function getSceneSpritePlacement({ tag, image, projectPath }: SceneImageAsset, { x, y }: ScenePoint,
   scriptId: string, scene?: SceneSource): SceneObjectPlacement | undefined {
-  const source = getAssetSource(image.src, scriptId);
+  const source = projectPath ? projectAssetSource(projectPath, scriptId) : getAssetSource(image.src, scriptId);
   if (!source) return;
   return { kind: 'Sprite', tag: `${tag} sprite`, x, y, scene, asset: { image, source, scale: getSceneSpriteScale(image) } };
 }

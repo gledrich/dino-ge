@@ -6,7 +6,8 @@ import { usePlayground } from '../context/PlaygroundContext';
 import { restoreInspectorProperty, type InspectorPropertyEdit } from './InspectorRow';
 import ProjectFilesDialog from './ProjectFilesDialog';
 import { openProjectObjectSourceEvent, type ProjectObjectSourceRequest } from '../utils/project-object-source';
-import { createScript, getCurrentScriptId, getScript, getFilesList, getSpriteImageFileError, readGameFolder, importGameFolder, importSpriteImage, type GameFolder } from '../utils/helpers';
+import { downloadBrowserProject, restoreBrowserProject } from '../utils/browser-project-archive';
+import { browserPreviewUrl, createScript, getCurrentScriptId, getScript, getFilesList, getSpriteImageFileError, readGameFolder, importGameFolder, importSpriteImage, type GameFolder } from '../utils/helpers';
 import { applyEditsToSource, Edit, instrumentCode, getSourceMapping, getSceneObjectCreation, getSceneObjectDeletion, getSceneObjectDuplication, getSceneObjectRename, getSpriteImageReplacement, getUniqueObjectSourceMapping, type CanvasPlacementTransaction } from '../utils/ast-utils';
 import { createSceneObject, duplicateSceneObject, getSceneSource, insertSceneObjectCode, isReplaceableSprite, openEntryObjectSourceEvent, renameEntryObjectEvent, restoreSceneTransform, sceneAssetDragEvent, sceneAssetDragType, sceneObjectCodeEvent, sceneObjectDragType, sceneObjectKinds, sceneObjectTagHistoryEvent, scenePointerDragEvent, type CanvasTransformChange, type EntryObjectRename, type SceneImageAsset, type SceneObjectPlacement, type ScenePointerDrag, type ScenePointerDragItem } from '../utils/scene-objects';
 import { useMonacoEditor } from '../hooks/useMonacoEditor';
@@ -58,7 +59,9 @@ const CodeEditor: React.FC<EditorProps> = ({ currentScriptId, onSave, onSelectSc
   const editorDropTarget = useRef<HTMLDivElement>(null);
   const draggedAsset = useRef<SceneImageAsset | null>(null);
   const imageImportRun = useRef<HTMLElement | null>(null);
+  const importingBrowserImage = useRef(false);
   const folderPicker = useRef<HTMLInputElement>(null);
+  const archivePicker = useRef<HTMLInputElement>(null);
   const loadedScriptId = useRef('');
   const sceneHistory = useRef<SceneHistoryEntry[]>([]);
   const trustedEntryText = useRef<string>(undefined);
@@ -94,6 +97,21 @@ const CodeEditor: React.FC<EditorProps> = ({ currentScriptId, onSave, onSelectSc
     const reject = (message: string) => setDropFeedback({ scriptId: currentScriptId, message, error: true });
     const fileError = getSpriteImageFileError(files);
     if (fileError) return reject(fileError);
+    if (browserPreviewUrl) {
+      if (loadedScriptId.current !== currentScriptId) return reject('Open a script before importing an image.');
+      if (importingBrowserImage.current) return reject('Wait for the current image to finish importing.');
+      const isCurrent = () => loadedScriptId.current === currentScriptId && getCurrentScriptId() === currentScriptId;
+      importingBrowserImage.current = true;
+      try {
+        const asset = await importSpriteImage(files[0], currentScriptId, isCurrent);
+        if (asset) dropObjectCode({ asset });
+      } catch (error) {
+        if (isCurrent()) reject(error instanceof Error ? error.message : 'The image could not be opened.');
+      } finally {
+        importingBrowserImage.current = false;
+      }
+      return;
+    }
     const run = document.querySelector<HTMLElement>('script[data-playground-script]');
     if (loadedScriptId.current !== currentScriptId || run?.dataset.playgroundScript !== currentScriptId) {
       return reject('Run the open Dino GE script before importing an image.');
@@ -157,9 +175,11 @@ const CodeEditor: React.FC<EditorProps> = ({ currentScriptId, onSave, onSelectSc
   const handleSave = useCallback(async (value: string) => {
     if (loadedScriptId.current !== currentScriptId) return;
     setIsSaving(true);
+    setImportError('');
     try {
       await onSave(value);
     } catch (error) {
+      setImportError(error instanceof Error ? error.message : 'Could not save the script.');
       console.error('Could not save the script', error);
     } finally {
       setIsSaving(false);
@@ -199,7 +219,9 @@ const CodeEditor: React.FC<EditorProps> = ({ currentScriptId, onSave, onSelectSc
       const list = await getFilesList();
       setScripts(list);
     };
-    refreshScripts();
+    refreshScripts().catch(error => {
+      setImportError(error instanceof Error ? error.message : 'Could not list projects.');
+    });
   }, [currentScriptId]);
 
   useEffect(() => {
@@ -227,6 +249,7 @@ const CodeEditor: React.FC<EditorProps> = ({ currentScriptId, onSave, onSelectSc
     loadScript().catch(error => {
       if (!cancelled) {
         setIsSaving(false);
+        setImportError(error instanceof Error ? error.message : 'Could not load the script.');
         console.error('Could not load script', error);
       }
     });
@@ -419,7 +442,8 @@ const CodeEditor: React.FC<EditorProps> = ({ currentScriptId, onSave, onSelectSc
       const model: editor.ITextModel | null = monacoEditorRef.current?.getModel();
       const run = document.querySelector<HTMLElement>('script[data-playground-script]');
       const liveRun = run?.dataset.playgroundScript === currentScriptId ? run : null;
-      if (!model || loadedScriptId.current !== currentScriptId || (!liveRun && !allowStandalone)) return;
+      const allowBrowserSprite = !!browserPreviewUrl && codeOnly && placement.kind === 'Sprite';
+      if (!model || loadedScriptId.current !== currentScriptId || (!liveRun && !allowStandalone && !allowBrowserSprite)) return;
       if (codeOnly && liveRun && Dino.Engine.currentScene) {
         placement.scene = getSceneSource(Dino.Engine.currentScene);
         if (!placement.scene) {
@@ -733,6 +757,30 @@ const CodeEditor: React.FC<EditorProps> = ({ currentScriptId, onSave, onSelectSc
     }
   };
 
+  const importArchive = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    event.target.value = '';
+    if (!file || importing) return;
+    setImporting(true);
+    setImportError('');
+    try {
+      selectNewScript(await restoreBrowserProject(file));
+    } catch (error) {
+      setImportError(error instanceof Error ? error.message : 'Could not restore the project.');
+    } finally {
+      setImporting(false);
+    }
+  };
+
+  const exportArchive = async () => {
+    setImportError('');
+    try {
+      await downloadBrowserProject(currentScriptId);
+    } catch (error) {
+      setImportError(error instanceof Error ? error.message : 'Could not export the project.');
+    }
+  };
+
   const handleEditorDidMount = async (editor: any, monaco: any) => {
     monacoEditorRef.current = editor;
     const model: editor.ITextModel = editor.getModel();
@@ -753,7 +801,7 @@ const CodeEditor: React.FC<EditorProps> = ({ currentScriptId, onSave, onSelectSc
     });
 
     try {
-      const response = await fetch('/api/types');
+      const response = await fetch(browserPreviewUrl ? '/types.json' : '/api/types');
       if (!response.ok) {
         throw new Error(`Could not load Dino GE declarations (HTTP ${response.status})`);
       }
@@ -809,6 +857,14 @@ const CodeEditor: React.FC<EditorProps> = ({ currentScriptId, onSave, onSelectSc
             onClick={() => folderPicker.current?.click()}>Import game folder</button>
           <input ref={folderPicker} type="file" multiple hidden {...{ webkitdirectory: '' }}
             aria-label="Choose game folder" onChange={selectFolder} />
+          {browserPreviewUrl && <>
+            <button type="button" className="import-game-button" disabled={importing}
+              onClick={() => archivePicker.current?.click()}>Restore backup</button>
+            <input ref={archivePicker} type="file" hidden accept=".json,application/json"
+              aria-label="Choose project backup" onChange={importArchive} />
+            <button type="button" className="import-game-button" disabled={isSaving || importing}
+              onClick={exportArchive}>Export saved project</button>
+          </>}
           <button type="button" className={`editor-icon-button format-btn ${isFormatting ? 'active' : ''}`}
             title="Format Code (Shift+Alt+F)"
             aria-label="Format code"
@@ -818,9 +874,10 @@ const CodeEditor: React.FC<EditorProps> = ({ currentScriptId, onSave, onSelectSc
             title="Save (Ctrl+S)"
             aria-label="Save script"
             onClick={() => handleSave(editorValue)}
-          ><i className="fa-solid fa-cloud" aria-hidden="true" /></button>
+          ><i className={browserPreviewUrl ? "fa-solid fa-floppy-disk" : "fa-solid fa-cloud"} aria-hidden="true" /></button>
         </div>
       </div>
+      {browserPreviewUrl && <p className="editor-drop-feedback">Saves stay in this browser. Export a backup to keep a copy.</p>}
       {folder && (
         <div className="import-game-options">
           <span>{folder.name}</span>
