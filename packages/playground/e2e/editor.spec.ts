@@ -287,6 +287,38 @@ new Engine({ onLoad() {}, update() {} }, { containerId: 'playground-canvas-conta
   await expect(copy).toBeVisible();
 });
 
+test('navigates the editing camera, places in world coordinates and restores the gameplay view', async ({ page }) => {
+  await page.route('**/files', route => route.fulfill({ json: ['script'] }));
+  await page.route('**/api/scripts/script', route => route.fulfill({ json: `
+import { Engine } from 'dino-ge';
+new Engine({ onLoad() {
+  Engine.camera.position.set(40, 30);
+  window.readCamera = () => ({ x: Engine.camera.position.x, y: Engine.camera.position.y, zoom: Engine.camera.zoom });
+} }, { containerId: 'playground-canvas-container' });` }));
+  await page.goto('/');
+  const readCamera = () => page.evaluate(() => (window as Window & {
+    readCamera?: () => { x: number; y: number; zoom: number };
+  }).readCamera?.());
+  await expect.poll(readCamera).toEqual({ x: 40, y: 30, zoom: 1 });
+  await page.getByRole('button', { name: 'Edit scene' }).click();
+  await page.getByRole('button', { name: 'Zoom in', exact: true }).click();
+  await expect.poll(readCamera).toMatchObject({ zoom: 1.25 });
+  await page.getByRole('button', { name: 'Reset view', exact: true }).click();
+  await expect.poll(readCamera).toEqual({ x: 40, y: 30, zoom: 1 });
+
+  const canvas = page.locator('#canvas');
+  const box = (await canvas.boundingBox())!;
+  await page.mouse.move(box.x + 210, box.y + 180);
+  await page.mouse.down({ button: 'middle' });
+  await page.mouse.move(box.x + 260, box.y + 210, { steps: 5 });
+  await page.mouse.up({ button: 'middle' });
+  await page.getByRole('button', { name: 'Add rectangle' }).dragTo(canvas, { targetPosition: { x: 180, y: 150 } });
+  await expect(page.getByRole('spinbutton', { name: 'X', exact: true })).toHaveValue('170.00');
+  await expect(page.getByRole('spinbutton', { name: 'Y', exact: true })).toHaveValue('150.00');
+  await page.getByRole('button', { name: 'Play', exact: true }).click();
+  await expect.poll(readCamera).toEqual({ x: 40, y: 30, zoom: 1 });
+});
+
 test('saves a palette drop to the active named scene and restores it there', async ({ page }) => {
   let source = `import { Engine, Scene as Level, Rectangle, Vector2 } from 'dino-ge';
 class Lobby extends Level {

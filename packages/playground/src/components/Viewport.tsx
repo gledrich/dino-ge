@@ -36,6 +36,10 @@ const Viewport: React.FC = () => {
 
   const viewportContainerRef = useRef<HTMLDivElement>(null);
   const isEditingScene = isPaused && isDebug;
+  const savedCamera = useRef<{ canvas: HTMLCanvasElement; scene: typeof Engine.currentScene;
+    x: number; y: number; zoom: number } | null>(null);
+  const pan = useRef<{ id: number; x: number; y: number } | null>(null);
+  const [isPanning, setIsPanning] = useState(false);
   const [placementStatus, setPlacementStatus] = useState('');
   const [dropGuide, setDropGuide] = useState<{
     x: number; y: number; left: number; top: number; kind?: SceneObjectKind;
@@ -116,12 +120,52 @@ const Viewport: React.FC = () => {
 
   const toggleSceneEditing = () => {
     const editing = !isEditingScene;
+    if (!editing) restoreCamera();
     setIsPaused(editing);
     setIsDebug(editing);
     if (editing) {
       setIsInspectorVisible(true);
       viewportContainerRef.current?.focus();
     }
+  };
+
+  const rememberCamera = (canvas: HTMLCanvasElement) => {
+    const scene = Engine.currentScene;
+    if (savedCamera.current?.canvas === canvas && savedCamera.current.scene === scene) return;
+    const { position, zoom } = Engine.camera;
+    savedCamera.current = { canvas, scene, x: position.x, y: position.y, zoom };
+  };
+
+  const restoreCamera = useCallback(() => {
+    const saved = savedCamera.current;
+    savedCamera.current = null;
+    pan.current = null;
+    setIsPanning(false);
+    if (saved?.canvas.isConnected && saved.scene === Engine.currentScene) {
+      Engine.camera.position.set(saved.x, saved.y);
+      Engine.camera.zoom = saved.zoom;
+    }
+  }, []);
+
+  useEffect(() => {
+    if (!isEditingScene) return;
+    window.addEventListener('playground-before-run', restoreCamera);
+    return () => {
+      window.removeEventListener('playground-before-run', restoreCamera);
+      restoreCamera();
+    };
+  }, [isEditingScene, restoreCamera]);
+
+  const zoomView = (factor: number) => {
+    const canvas = viewportContainerRef.current?.querySelector<HTMLCanvasElement>('canvas#canvas');
+    if (!canvas || !canvas.width || !canvas.height) return;
+    const { position, zoom } = Engine.camera;
+    const next = Math.max(0.1, Math.min(8, zoom * factor));
+    if (next === zoom) return;
+    rememberCamera(canvas);
+    position.set(position.x + canvas.width / 2 * (1 / zoom - 1 / next),
+      position.y + canvas.height / 2 * (1 / zoom - 1 / next));
+    Engine.camera.zoom = next;
   };
 
   const suppressGameActivation = (event: React.MouseEvent | React.KeyboardEvent) => {
@@ -172,10 +216,37 @@ const Viewport: React.FC = () => {
         </div>
       )}
       <div id="playground-canvas-container" ref={viewportContainerRef}
+        className={isPanning ? 'scene-panning' : undefined}
         role={isEditingScene ? 'region' : undefined}
         aria-label={isEditingScene ? 'Scene viewport' : undefined}
         aria-describedby={isEditingScene ? 'scene-keyboard-hint' : undefined}
         tabIndex={isEditingScene ? 0 : -1}
+        onPointerDownCapture={event => {
+          if (!isEditingScene || event.button !== 1 || !(event.target instanceof HTMLCanvasElement)) return;
+          event.preventDefault();
+          event.stopPropagation();
+          rememberCamera(event.target);
+          pan.current = { id: event.pointerId, x: event.clientX, y: event.clientY };
+          event.target.setPointerCapture(event.pointerId);
+          setIsPanning(true);
+        }}
+        onPointerMove={event => {
+          const drag = pan.current;
+          if (!drag || drag.id !== event.pointerId || !(event.target instanceof HTMLCanvasElement)) return;
+          const canvas = event.target;
+          const bounds = canvas.getBoundingClientRect();
+          const { position, zoom } = Engine.camera;
+          if (!bounds.width || !bounds.height) return;
+          position.set(position.x - (event.clientX - drag.x) * canvas.width / bounds.width / zoom,
+            position.y - (event.clientY - drag.y) * canvas.height / bounds.height / zoom);
+          drag.x = event.clientX;
+          drag.y = event.clientY;
+        }}
+        onLostPointerCapture={event => {
+          if (pan.current?.id !== event.pointerId) return;
+          pan.current = null;
+          setIsPanning(false);
+        }}
         onDragOver={event => {
           const types = event.dataTransfer.types;
           if ((!types.includes(sceneObjectDragType) && !(isEditingScene && types.includes(sceneAssetDragType))) ||
@@ -233,7 +304,12 @@ const Viewport: React.FC = () => {
                   {action === 'undo' ? 'Undo' : 'Redo'}</button>
               ))}
             </div>
-            <span id="scene-keyboard-hint" className="scene-edit-hint">Arrows move 1 unit · Shift + arrows move 10</span>
+            <div className="scene-object-options scene-history-actions" role="group" aria-label="Scene camera">
+              <button type="button" className="scene-control" onClick={() => zoomView(1 / 1.25)}>Zoom out</button>
+              <button type="button" className="scene-control" onClick={() => zoomView(1.25)}>Zoom in</button>
+              <button type="button" className="scene-control" onClick={restoreCamera}>Reset view</button>
+            </div>
+            <span id="scene-keyboard-hint" className="scene-edit-hint">Middle drag pans · Arrows move selection · Shift moves 10</span>
             {placementStatus && <span className="scene-edit-status" role="status">{placementStatus}</span>}
           </div>
       )}
