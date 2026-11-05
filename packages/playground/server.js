@@ -24,6 +24,7 @@ if (!(await fs.lstat(SCRIPTS_DIR)).isDirectory()) {
 
 const scriptsRoot = await fs.realpath(SCRIPTS_DIR);
 const noFollow = constants.O_NOFOLLOW ?? 0;
+const moduleRevisionHeader = 'X-Dino-Module-Revision';
 const projects = new ProjectStore(scriptsRoot);
 const bundledTemplate = path.join(DIST_DIR, 'templates/amber-ruins');
 const template = existsSync(bundledTemplate) ? bundledTemplate : path.join(__dirname, '../example/amber-ruins');
@@ -49,10 +50,10 @@ app.post('/api/projects', express.json({ limit: '24mb' }), async (req, res) => {
 });
 app.put('/api/scripts/:id/modules', express.json({ limit: '24mb' }), async (req, res) => {
   try {
-    const { data } = req.body ?? {};
+    const { data, revision } = req.body ?? {};
     if (typeof data !== 'string') return res.status(400).json({ error: 'Module contents must be text.' });
-    await projects.saveModule(req.params.id, req.query.path, data);
-    res.json({ success: true });
+    const savedRevision = await projects.saveModule(req.params.id, req.query.path, data, revision);
+    res.set(moduleRevisionHeader, savedRevision).json({ success: true });
   } catch (err) {
     res.status(scriptErrorStatus(err)).json({ error: err.message });
   }
@@ -143,8 +144,8 @@ app.post('/api/scripts/:id/assets', express.raw({ type: spriteImageTypes, limit:
 app.get('/api/scripts/:id/modules', async (req, res) => {
   try {
     if (req.query.path === undefined) return res.json(await projects.listModules(req.params.id));
-    const filePath = await projects.modulePath(req.params.id, req.query.path);
-    res.json(await fs.readFile(filePath, { encoding: 'utf8', flag: constants.O_RDONLY | noFollow }));
+    const { data, revision } = await projects.readModule(req.params.id, req.query.path);
+    res.set(moduleRevisionHeader, revision).json(data);
   } catch (err) {
     res.status(scriptErrorStatus(err)).json({ error: err.message });
   }

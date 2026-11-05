@@ -202,6 +202,19 @@ export const run = window.gameRuns;`);
     await page.reload();
     await page.locator('.script-selector').selectOption(id);
     await expect(page.getByText('Edited game: Nested level')).toBeVisible();
+
+    const counterUrl = `/api/scripts/${encodeURIComponent(id)}/modules?path=src%2Fcounter.js`;
+    const counter = await request.get(counterUrl);
+    const revision = counter.headers()['x-dino-module-revision'];
+    expect(revision).toMatch(/^[a-f0-9]{64}$/);
+    const revisions = ['export const run = 21;', 'export const run = 42;'];
+    const writes = await Promise.all(revisions.map(data => request.put(counterUrl, { data: { data, revision } })));
+    expect(writes.map(response => response.status()).sort()).toEqual([200, 409]);
+    const winner = writes.findIndex(response => response.ok());
+    const latest = await request.get(counterUrl);
+    expect(await latest.json()).toBe(revisions[winner]);
+    expect(latest.headers()['x-dino-module-revision']).toBe(writes[winner].headers()['x-dino-module-revision']);
+    expect(latest.headers()['x-dino-module-revision']).not.toBe(revision);
   } finally {
     await rm(folder, { recursive: true, force: true });
     await rm(stored, { recursive: true, force: true });

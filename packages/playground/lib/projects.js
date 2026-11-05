@@ -1,5 +1,5 @@
 import fs from 'node:fs/promises';
-import { realpathSync } from 'node:fs';
+import { constants, realpathSync } from 'node:fs';
 import path from 'node:path';
 import { createHash, randomUUID } from 'node:crypto';
 
@@ -8,6 +8,8 @@ const maxFiles = 512;
 const maxBytes = 16 * 1024 * 1024;
 const projectName = /^[a-z0-9][a-z0-9_-]{0,63}$/i;
 const maxImageBytes = 5 * 1024 * 1024;
+const moduleReadOptions = { flag: constants.O_RDONLY | (constants.O_NOFOLLOW ?? 0) };
+const moduleRevision = contents => createHash('sha256').update(contents).digest('hex');
 
 export const spriteImageTypes = ['image/png', 'image/jpeg', 'image/gif', 'image/webp'];
 
@@ -36,6 +38,8 @@ function relativePath(value) {
 }
 
 export class ProjectStore {
+  #moduleSaves = new Map();
+
   constructor(root) {
     this.root = realpathSync(root);
   }
@@ -121,16 +125,39 @@ export class ProjectStore {
     return filename;
   }
 
-  async saveModule(id, relative, data) {
-    if (Buffer.byteLength(data) > maxBytes) throw new ProjectError('A module can contain up to 16 MiB.', 413);
+  async readModule(id, relative) {
     const filename = await this.modulePath(id, relative);
-    const { mode } = await fs.stat(filename);
-    const temporary = path.join(path.dirname(filename), `.dino-module-${randomUUID()}.tmp`);
+    const contents = await fs.readFile(filename, moduleReadOptions);
+    return { data: contents.toString('utf8'), revision: moduleRevision(contents) };
+  }
+
+  async saveModule(id, relative, data, revision) {
+    if (Buffer.byteLength(data) > maxBytes) throw new ProjectError('A module can contain up to 16 MiB.', 413);
+    if (revision !== undefined && (typeof revision !== 'string' || !/^[a-f0-9]{64}$/.test(revision))) {
+      throw new ProjectError('Invalid module revision.');
+    }
+    const filename = await this.modulePath(id, relative);
+    const previous = this.#moduleSaves.get(filename);
+    const save = (previous?.catch(() => {}) ?? Promise.resolve()).then(async () => {
+      await this.modulePath(id, relative);
+      const { mode } = await fs.stat(filename);
+      const temporary = path.join(path.dirname(filename), `.dino-module-${randomUUID()}.tmp`);
+      try {
+        await fs.writeFile(temporary, data, { flag: 'wx', mode: mode & 0o777 });
+        if (revision !== undefined && moduleRevision(await fs.readFile(filename, moduleReadOptions)) !== revision) {
+          throw new ProjectError('This module changed since you opened it.', 409);
+        }
+        await fs.rename(temporary, filename);
+        return moduleRevision(data);
+      } finally {
+        await fs.rm(temporary, { force: true });
+      }
+    });
+    this.#moduleSaves.set(filename, save);
     try {
-      await fs.writeFile(temporary, data, { flag: 'wx', mode: mode & 0o777 });
-      await fs.rename(temporary, filename);
+      return await save;
     } finally {
-      await fs.rm(temporary, { force: true });
+      if (this.#moduleSaves.get(filename) === save) this.#moduleSaves.delete(filename);
     }
   }
 
