@@ -223,6 +223,83 @@ test('keeps unsaved edits across tabs and panel collapse, and retains hidden con
   await expect(page.getByRole('button', { name: 'Edit scene', exact: true })).toHaveAttribute('aria-pressed', 'false');
 });
 
+test('uses one resizable mobile dock and preserves the running game and editor draft', async ({ page, browserName }) => {
+  await page.setViewportSize({ width: 1280, height: 900 });
+  await page.route('**/files', route => route.fulfill({ json: ['script'] }));
+  await page.route('**/api/scripts/script', route => route.fulfill({ json: `
+import { Engine } from 'dino-ge';
+new Engine({ onLoad() {} }, { containerId: 'playground-canvas-container' });` }));
+  await page.goto('/');
+  const canvas = page.locator('#canvas');
+  await expect(canvas).toBeVisible();
+  const runningCanvas = await canvas.elementHandle();
+  const desktopWidth = (await canvas.boundingBox())!.width;
+  const readEditor = () => page.evaluate(() => {
+    const { monaco } = window as typeof window & { monaco: Monaco };
+    return monaco.editor.getEditors()[0]?.getValue();
+  });
+  await expect.poll(readEditor).toContain('new Engine');
+  await page.evaluate(() => {
+    const { monaco } = window as typeof window & { monaco: Monaco };
+    const editor = monaco.editor.getEditors()[0];
+    editor.setValue(`${editor.getValue()}\n// unsaved mobile draft`);
+  });
+
+  await page.setViewportSize({ width: 390, height: 844 });
+  const dock = page.getByRole('tablist', { name: 'Workspace tools' });
+  await expect(dock.getByRole('tab')).toHaveCount(4);
+  await expect(dock.getByRole('tab', { name: 'Editor' })).toHaveAttribute('aria-selected', 'true');
+  await expect.poll(async () => (await canvas.boundingBox())?.width ?? 0).toBeGreaterThan(380);
+  const separator = page.getByRole('separator', { name: 'Resize bottom dock' });
+  const before = (await canvas.boundingBox())!.height;
+  await separator.press('ArrowUp');
+  await expect.poll(async () => (await canvas.boundingBox())?.height ?? before).toBeLessThan(before);
+
+  await dock.getByRole('tab', { name: 'Explorer' }).click();
+  const addRectangle = page.getByRole('button', { name: 'Add rectangle' });
+  await expect(addRectangle).toBeVisible();
+  await expect(page.locator('.monaco-editor')).toBeHidden();
+  if (browserName === 'chromium') {
+    const grip = addRectangle.locator('[data-scene-drag-handle]');
+    await grip.scrollIntoViewIfNeeded();
+    const handle = (await grip.boundingBox())!;
+    const surface = (await canvas.boundingBox())!;
+    const start = { x: handle.x + handle.width / 2, y: handle.y + handle.height / 2 };
+    const touch = await page.context().newCDPSession(page);
+    await touch.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [start] });
+    await touch.send('Input.dispatchTouchEvent', { type: 'touchMove', touchPoints: [{ ...start, y: surface.y + 90 }] });
+    await expect(page.locator('.scene-drop-preview')).toContainText('Rectangle');
+    await touch.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
+  } else {
+    await addRectangle.dragTo(canvas, { targetPosition: { x: 120, y: 90 } });
+  }
+  await expect(page.getByRole('button', { name: 'New rectangle', exact: true })).toHaveAttribute('aria-pressed', 'true');
+  await dock.getByRole('tab', { name: 'Inspector' }).click();
+  await expect(page.getByRole('spinbutton', { name: 'Y', exact: true })).toHaveValue('90.00');
+  await dock.getByRole('tab', { name: 'Inspector' }).press('End');
+  await expect(dock.getByRole('tab', { name: 'Console' })).toBeFocused();
+  await page.getByRole('button', { name: 'Collapse bottom dock' }).press('Enter');
+  await expect(dock).toBeHidden();
+  const expand = page.getByRole('button', { name: 'Expand bottom dock' });
+  await expect(expand).toBeFocused();
+  await expand.press('Enter');
+  await expect(dock.getByRole('tab', { name: 'Console' })).toBeFocused();
+  await page.getByRole('button', { name: 'Minimise all panels' }).click();
+  await expect(separator).toHaveAttribute('aria-disabled', 'true');
+  await expect(dock).toBeHidden();
+  await page.getByRole('button', { name: 'Restore panels' }).click();
+  await expect(dock.getByRole('tab', { name: 'Console' })).toHaveAttribute('aria-selected', 'true');
+  await dock.getByRole('tab', { name: 'Editor' }).click();
+  await expect.poll(readEditor).toContain('// unsaved mobile draft');
+
+  await page.setViewportSize({ width: 1280, height: 900 });
+  await expect(dock).toHaveCount(0);
+  await expect(canvas).toBeVisible();
+  await expect.poll(async () => (await canvas.boundingBox())?.width).toBeCloseTo(desktopWidth, 0);
+  await expect.poll(readEditor).toContain('// unsaved mobile draft');
+  expect(await runningCanvas?.evaluate(element => element === document.getElementById('canvas'))).toBe(true);
+});
+
 test('selects an object in Explorer and writes an Inspector change back to the script', async ({ page }) => {
   await page.route('**/files', route => route.fulfill({ json: ['script'] }));
   let source = `
@@ -1722,6 +1799,7 @@ new Engine({ onLoad() {} }, { containerId: 'playground-canvas-container' });` })
   const rectangle = page.getByRole('button', { name: 'Add rectangle', exact: true });
   for (const width of [768, 540, 390]) {
     await page.setViewportSize({ width, height: 844 });
+    if (width < 768) await page.getByRole('tab', { name: 'Explorer', exact: true }).click();
     await expect.poll(async () => (await rectangle.boundingBox())?.width ?? 0, {
       message: `Rectangle drag target at ${width} px`,
     }).toBeGreaterThanOrEqual(44);
@@ -1732,9 +1810,9 @@ new Engine({ onLoad() {} }, { containerId: 'playground-canvas-container' });` })
     }
   }
   const editor = page.locator('.monaco-editor');
-  await expect(editor).toContainText('new Engine');
   const insert = page.getByRole('button', { name: 'Insert rectangle code' });
   await insert.click();
+  await expect(editor).toBeVisible();
   await expect(editor).toContainText('new Rectangle');
 });
 

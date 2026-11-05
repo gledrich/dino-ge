@@ -7,7 +7,8 @@ function reportPointerDrag(detail: ScenePointerDrag | null) {
 
 export function useScenePlacementSource(enabled: boolean) {
   const pointerDrag = useRef<{
-    id: number; item: ScenePointerDragItem; button: HTMLButtonElement; startX: number; dragging: boolean;
+    id: number; item: ScenePointerDragItem; button: HTMLButtonElement;
+    start: ScenePoint; fromHandle: boolean; dragging: boolean;
   } | null>(null);
   const suppressClick = useRef(false);
 
@@ -54,14 +55,19 @@ export function useScenePlacementSource(enabled: boolean) {
       if (!enabled || !event.isPrimary || event.button !== 0 || pointerDrag.current) return;
       suppressClick.current = false;
       if (!item || (event.pointerType !== 'touch' && event.pointerType !== 'pen')) return;
-      const { pointerId, currentTarget, clientX } = event;
+      const { pointerId, currentTarget, clientX, clientY, target } = event;
       currentTarget.setPointerCapture(pointerId);
-      pointerDrag.current = { id: pointerId, item, button: currentTarget, startX: clientX, dragging: false };
+      pointerDrag.current = {
+        id: pointerId, item, button: currentTarget, start: { x: clientX, y: clientY },
+        fromHandle: target instanceof Element && !!target.closest('[data-scene-drag-handle]'), dragging: false,
+      };
     },
     onPointerMove(event: PointerEvent<HTMLButtonElement>) {
       const drag = pointerDrag.current;
       if (!drag || drag.id !== event.pointerId) return;
-      if (!drag.dragging && Math.abs(event.clientX - drag.startX) < 8) return;
+      const dx = event.clientX - drag.start.x;
+      const distance = drag.fromHandle ? Math.hypot(dx, event.clientY - drag.start.y) : Math.abs(dx);
+      if (!drag.dragging && distance < 8) return;
       drag.dragging = true;
       suppressClick.current = true;
       reportPointerDrag({ ...drag.item, phase: 'preview', point: { x: event.clientX, y: event.clientY } });

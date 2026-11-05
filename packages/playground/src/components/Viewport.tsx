@@ -137,7 +137,12 @@ function getEdgePanDelta({ bounds, scaleX, scaleY }: CanvasProjection, x: number
   if (dx || dy) return { x: dx, y: dy };
 }
 
-const Viewport: React.FC<{ runtimeError?: GameRunError; onOpenConsole: () => void }> = ({ runtimeError, onOpenConsole }) => {
+const Viewport: React.FC<{
+  runtimeError?: GameRunError;
+  inspectorVisible: boolean;
+  onOpenConsole: () => void;
+  onOpenInspector: () => void;
+}> = ({ runtimeError, inspectorVisible, onOpenConsole, onOpenInspector }) => {
   const { 
     currentScriptId,
     isViewportReady, 
@@ -1044,11 +1049,8 @@ const Viewport: React.FC<{ runtimeError?: GameRunError; onOpenConsole: () => voi
               </details>}
             </div>
             {!keyboardPlacement && historyBlockedReason && <span className="scene-edit-hint">{historyBlockedReason}</span>}
-            {!isInspectorVisible && selectedObject && pendingCanvasPlacements.has(selectedObject) && (
-              <button type="button" className="scene-control scene-review-changes" onClick={() => {
-                setIsInspectorVisible(true);
-                requestAnimationFrame(() => document.getElementById('canvas-changes')?.focus());
-              }}>
+            {!inspectorVisible && selectedObject && pendingCanvasPlacements.has(selectedObject) && (
+              <button type="button" className="scene-control scene-review-changes" onClick={onOpenInspector}>
                 <i className="fa-solid fa-pen-to-square" aria-hidden="true" /> Review canvas changes
               </button>
             )}

@@ -49,7 +49,7 @@ floor.addComponent(floorPhys);` }
 
 type TabType = 'library' | 'assets';
 
-const Sidebar: React.FC = () => {
+const Sidebar: React.FC<{ mobileDock?: boolean }> = ({ mobileDock = false }) => {
   const { currentScriptId } = usePlayground();
   const [activeTab, setActiveTab] = useState<TabType>('library');
   const [feedback, setFeedback] = useState<{ scriptId: string; message: string; error: boolean }>();
@@ -92,7 +92,8 @@ const Sidebar: React.FC = () => {
             <section className="library-section" aria-labelledby="library-objects" aria-describedby="library-placement-hint">
               <h3 id="library-objects">Game objects</h3>
               <p id="library-placement-hint" className="library-hint">
-                Drag to the canvas or the editor. Click an object to place it, or choose Code to insert it.
+                {mobileDock ? 'Drag a grip to the canvas or tap an object to place it. Choose Code to insert its snippet.'
+                  : 'Drag to the canvas or the editor. Click an object to place it, or choose Code to insert it.'}
               </p>
               <p className="library-hint library-shortcuts">
                 <kbd>Shift+Enter</kbd> to position with arrow keys.
@@ -103,7 +104,7 @@ const Sidebar: React.FC = () => {
                 <div className="library-row" key={kind}>
                   <button type="button" className="scene-control snippet-btn" draggable
                     aria-label={`Add ${kind.toLowerCase()}`}
-                    title={`Place ${kind.toLowerCase()} on the canvas or drag to the editor for code`}
+                    title={`Place ${kind.toLowerCase()} on the canvas${mobileDock ? '' : ' or drag to the editor for code'}`}
                     {...placementSource.forItem({ kind })}
                     onDragStart={event => {
                       if (placementSource.isActive()) {
@@ -121,7 +122,8 @@ const Sidebar: React.FC = () => {
                   >
                     <i className={`fa-solid ${icon}`} aria-hidden="true" />
                     <span>{kind}</span>
-                    <i className="fa-solid fa-grip-vertical library-affordance" aria-hidden="true" />
+                    <i className="fa-solid fa-grip-vertical library-affordance" aria-hidden="true"
+                      data-scene-drag-handle={mobileDock || undefined} />
                   </button>
                   <button type="button" className="scene-control library-code" aria-label={`Insert ${kind.toLowerCase()} code`}
                     title={`Insert ${kind.toLowerCase()} code`} onClick={() => insertShapeCode(kind)}>
@@ -154,7 +156,7 @@ const Sidebar: React.FC = () => {
             </section>
           </div>
         ) : (activeTab === 'assets' && (
-          <AssetPanel />
+          <AssetPanel mobileDock={mobileDock} />
         ))}
       </div>
     </div>

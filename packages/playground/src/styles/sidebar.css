@@ -147,6 +147,10 @@
 
 .library-code i { font-size: 11px; }
 
+@media (pointer: coarse) {
+  .mobile-workspace .library-row .scene-control { min-height: 44px; }
+}
+
 .scene-control.snippet-btn {
   justify-content: flex-start;
   text-align: left;

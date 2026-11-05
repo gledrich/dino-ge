@@ -1,4 +1,5 @@
-import { useEffect } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { Panel, Group, Separator, usePanelRef } from 'react-resizable-panels';
 import Sidebar from './components/Sidebar';
 import Editor from './components/Editor';
@@ -7,10 +8,27 @@ import SceneExplorer from './components/SceneExplorer';
 import Console from './components/Console';
 import Viewport from './components/Viewport';
 import CanvasChangesDialog from './components/CanvasChangesDialog';
-import { usePlayground } from './context/PlaygroundContext';
+import { usePlayground, type MobileDockTab } from './context/PlaygroundContext';
 import { usePlaygroundScripts } from './hooks/usePlaygroundScripts';
 import { captureConsole } from './utils/LogManager';
 import './App.css';
+
+const mobileDockQuery = '(max-width: 720px), (max-height: 500px) and (pointer: coarse)';
+const desktopTabs = ['editor', 'console'] as const;
+const mobileTabs = ['explorer', 'editor', 'inspector', 'console'] as const;
+
+function useDockContent() {
+  const [host] = useState(() => {
+    const element = document.createElement('div');
+    element.className = 'panel-content';
+    return element;
+  });
+  // Moving the portal host preserves the tool's state across layouts.
+  const attach = useCallback((slot: HTMLDivElement | null) => {
+    slot?.appendChild(host);
+  }, [host]);
+  return [host, attach] as const;
+}
 
 function App() {
   const {
@@ -23,8 +41,58 @@ function App() {
     setIsEditorVisible,
     activeTab,
     setActiveTab,
+    mobileDockTab,
+    setMobileDockTab,
+    isMobileDockOpen,
+    setIsMobileDockOpen,
     arePanelsMinimized,
+    setArePanelsMinimized,
   } = usePlayground();
+  const [mobile, setMobile] = useState(() => window.matchMedia(mobileDockQuery).matches);
+  const mobileRef = useRef(mobile);
+  useLayoutEffect(() => { mobileRef.current = mobile; }, [mobile]);
+  useEffect(() => {
+    const media = window.matchMedia(mobileDockQuery);
+    const sync = () => setMobile(media.matches);
+    media.addEventListener('change', sync);
+    sync();
+    return () => media.removeEventListener('change', sync);
+  }, []);
+
+  const [explorerHost, attachExplorer] = useDockContent();
+  const [inspectorHost, attachInspector] = useDockContent();
+  const dockVisible = mobile ? isMobileDockOpen && !arePanelsMinimized : isEditorVisible;
+  const tabs: readonly MobileDockTab[] = mobile ? mobileTabs : desktopTabs;
+  const selectedTab = mobile ? mobileDockTab : activeTab;
+  const selectTab = (tab: MobileDockTab) => {
+    if (mobile) setMobileDockTab(tab);
+    else if (tab === 'editor' || tab === 'console') setActiveTab(tab);
+  };
+  const setDockVisible = (visible: boolean) => {
+    if (mobile) {
+      setIsMobileDockOpen(visible);
+      if (visible) setArePanelsMinimized(false);
+    } else setIsEditorVisible(visible);
+  };
+  const toggleDockFromButton = (visible: boolean) => {
+    setDockVisible(visible);
+    if (mobile) requestAnimationFrame(() => {
+      const target = visible ? `playground-tab-${selectedTab}` : 'playground-expand-bottom-dock';
+      document.getElementById(target)?.focus();
+    });
+  };
+  const openMobileTool = useCallback((tab: MobileDockTab) => {
+    if (!mobile) return;
+    setMobileDockTab(tab);
+    setIsMobileDockOpen(true);
+    setArePanelsMinimized(false);
+  }, [mobile, setArePanelsMinimized, setIsMobileDockOpen, setMobileDockTab]);
+  const revealExplorer = useCallback(() => openMobileTool('explorer'), [openMobileTool]);
+  const openInspector = () => {
+    setIsInspectorVisible(true);
+    openMobileTool('inspector');
+    requestAnimationFrame(() => document.getElementById('canvas-changes')?.focus());
+  };
 
   const { handleSave, selectScript, pendingRunChange, cancelRunChange, confirmRunChange, runtimeError } = usePlaygroundScripts();
   useEffect(captureConsole, []);
@@ -42,10 +110,10 @@ function App() {
       else if (!visible && !panel.isCollapsed()) panel.collapse();
     };
 
-    syncPanel(explorerPanelRef, isExplorerVisible);
-    syncPanel(editorPanelRef, isEditorVisible);
-    syncPanel(inspectorPanelRef, isInspectorVisible);
-  }, [isExplorerVisible, isEditorVisible, isInspectorVisible, explorerPanelRef, editorPanelRef, inspectorPanelRef]);
+    syncPanel(explorerPanelRef, !mobile && isExplorerVisible);
+    syncPanel(editorPanelRef, dockVisible);
+    syncPanel(inspectorPanelRef, !mobile && isInspectorVisible);
+  }, [mobile, isExplorerVisible, dockVisible, isInspectorVisible, explorerPanelRef, editorPanelRef, inspectorPanelRef]);
 
   // Sync all panels when arePanelsMinimized changes
   useEffect(() => {
@@ -57,14 +125,15 @@ function App() {
       setIsExplorerVisible(true);
       setIsEditorVisible(true);
       setIsInspectorVisible(true);
+      setIsMobileDockOpen(true);
     }
-  }, [arePanelsMinimized, setIsExplorerVisible, setIsEditorVisible, setIsInspectorVisible]);
+  }, [arePanelsMinimized, setIsExplorerVisible, setIsEditorVisible, setIsInspectorVisible, setIsMobileDockOpen]);
 
   return (
-    <div className="playground-root">
+    <div className={`playground-root${mobile ? ' mobile-workspace' : ''}`}>
       <Group orientation="horizontal" className="main-layout">
         {/* Left Panel: Sidebar & Scene Explorer */}
-        <Panel 
+        <Panel id="explorer-dock"
           defaultSize={20} 
           minSize={20} 
           collapsible={true} 
@@ -72,13 +141,14 @@ function App() {
           panelRef={explorerPanelRef}
           onResize={(size: any) => {
             requestAnimationFrame(() => {
-              const collapsed = size.asPercentage === 0;
+              if (mobile || mobileRef.current) return;
+              const collapsed = explorerPanelRef.current?.isCollapsed() ?? size.asPercentage === 0;
               if (collapsed && isExplorerVisible) setIsExplorerVisible(false);
               if (!collapsed && !isExplorerVisible) setIsExplorerVisible(true);
             });
           }}
         >
-          <div className="panel-container" hidden={!isExplorerVisible}>
+          <div className="panel-container" hidden={mobile || !isExplorerVisible}>
             <div
               className="panel-header"
               onClick={() => setIsExplorerVisible(false)}
@@ -86,18 +156,11 @@ function App() {
             >
               Explorer
             </div>
-            <div className="panel-content" style={{ display: 'flex', flexDirection: 'column' }}>
-              <div style={{ flex: 1, overflow: 'auto' }}>
-                <SceneExplorer />
-              </div>
-              <div style={{ height: '50%', borderTop: '1px solid var(--border-color)' }}>
-                {isExplorerVisible && <Sidebar />}
-              </div>
-            </div>
+            <div className="panel-content" ref={mobile ? undefined : attachExplorer} />
           </div>
         </Panel>
         
-        {!isExplorerVisible && (
+        {!mobile && !isExplorerVisible && (
           <div 
             style={{ 
               width: '15px', 
@@ -115,27 +178,31 @@ function App() {
           </div>
         )}
 
-        <Separator 
+        <Separator
           className="resize-handle-horizontal" 
           onDoubleClick={() => setIsExplorerVisible(!isExplorerVisible)}
         />
 
         {/* Centre Panel: Viewport & Editor/Console */}
-        <Panel defaultSize={60}>
+        <Panel key="workspace" id="workspace-main" defaultSize={60}>
           <Group orientation="vertical">
             {/* Top: Viewport */}
-            <Panel defaultSize={60} minSize={50}>
-              <Viewport runtimeError={runtimeError} onOpenConsole={() => {
+            <Panel defaultSize={60} minSize={mobile ? '30%' : 50}>
+              <Viewport runtimeError={runtimeError} onOpenInspector={openInspector}
+                inspectorVisible={mobile ? dockVisible && selectedTab === 'inspector' : isInspectorVisible}
+                onOpenConsole={() => {
                 setIsEditorVisible(true);
                 setActiveTab('console');
+                openMobileTool('console');
                 requestAnimationFrame(() => document.getElementById('playground-tab-console')?.focus());
               }} />
             </Panel>
             
-            {!isEditorVisible && (
+            {!dockVisible && (
               <button
                 type="button"
-                aria-label="Expand editor"
+                id={mobile ? 'playground-expand-bottom-dock' : undefined}
+                aria-label={mobile ? 'Expand bottom dock' : 'Expand editor'}
                 className="editor-panel-toggle"
                 style={{ 
                   width: '100%', 
@@ -146,7 +213,7 @@ function App() {
                   cursor: 'pointer',
                   opacity: 0.6
                 }}
-                onClick={() => setIsEditorVisible(true)}
+                onClick={() => toggleDockFromButton(true)}
                 data-testid="editor-expand-button"
               >
                 <span aria-hidden="true">▴</span>
@@ -154,75 +221,78 @@ function App() {
             )}
 
             <Separator 
-              className="resize-handle-vertical" 
-              onDoubleClick={() => setIsEditorVisible(!isEditorVisible)}
+              className={`resize-handle-vertical${mobile ? ' mobile-dock-resize' : ''}`}
+              aria-label={mobile ? 'Resize bottom dock' : undefined}
+              disabled={mobile && arePanelsMinimized}
+              onDoubleClick={() => {
+                if (!mobile || !arePanelsMinimized) setDockVisible(!dockVisible);
+              }}
             />
 
             {/* Bottom: Editor & Console Tabs */}
             <Panel 
               defaultSize={40} 
-              minSize={40} 
+              minSize={mobile ? '24%' : 40}
               collapsible={true} 
               collapsedSize={0} 
               panelRef={editorPanelRef}
               onResize={(size: any) => {
                 requestAnimationFrame(() => {
-                  const collapsed = size.asPercentage === 0;
-                  if (collapsed && isEditorVisible) setIsEditorVisible(false);
-                  if (!collapsed && !isEditorVisible) setIsEditorVisible(true);
+                  if (mobile !== mobileRef.current || (mobile && arePanelsMinimized)) return;
+                  const visible = !(editorPanelRef.current?.isCollapsed() ?? size.asPercentage === 0);
+                  if (visible !== dockVisible) setDockVisible(visible);
                 });
               }}
             >
-                <div className="panel-container" hidden={!isEditorVisible}>
-                  <div className="panel-header" style={{ display: 'flex', gap: '10px' }}>
-                    <div className="playground-tabs" aria-label="Bottom panel" role="tablist"
+                <div className="panel-container" hidden={!dockVisible}>
+                  <div className="panel-header dock-header">
+                    <div className="playground-tabs" aria-label={mobile ? 'Workspace tools' : 'Bottom panel'} role="tablist"
                       onKeyDown={event => {
                         if (!['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) return;
                         event.preventDefault();
                         event.stopPropagation();
-                        const next = event.key === 'Home' ? 'editor' : event.key === 'End' ? 'console'
-                          : activeTab === 'editor' ? 'console' : 'editor';
-                        setActiveTab(next);
+                        const offset = event.key === 'ArrowLeft' ? -1 : 1;
+                        const next = event.key === 'Home' ? tabs[0] : event.key === 'End' ? tabs[tabs.length - 1]
+                          : tabs[(tabs.indexOf(selectedTab) + offset + tabs.length) % tabs.length];
+                        selectTab(next);
                         document.getElementById(`playground-tab-${next}`)?.focus();
                       }}>
-                    <button type="button" id="playground-tab-editor" role="tab"
-                      aria-selected={activeTab === 'editor'} aria-controls="playground-panel-editor"
-                      tabIndex={activeTab === 'editor' ? 0 : -1}
-                      onClick={() => setActiveTab('editor')}
-                    >
-                      Editor
-                    </button>
-                    <button type="button" id="playground-tab-console" role="tab"
-                      aria-selected={activeTab === 'console'} aria-controls="playground-panel-console"
-                      tabIndex={activeTab === 'console' ? 0 : -1}
-                      onClick={() => setActiveTab('console')}
-                    >
-                      Console
-                    </button>
+                      {tabs.map(tab => (
+                        <button key={tab} type="button" id={`playground-tab-${tab}`} role="tab"
+                          aria-selected={selectedTab === tab} aria-controls={`playground-panel-${tab}`}
+                          tabIndex={selectedTab === tab ? 0 : -1}
+                          onClick={() => selectTab(tab)}>
+                          {tab[0].toUpperCase() + tab.slice(1)}
+                        </button>
+                      ))}
                     </div>
-                    <span style={{ flex: 1 }} />
+                    {!mobile && <span style={{ flex: 1 }} />}
                     <button
                       type="button"
-                      aria-label="Collapse editor"
+                      aria-label={mobile ? 'Collapse bottom dock' : 'Collapse editor'}
                       className="editor-panel-toggle"
                       style={{ cursor: 'pointer', opacity: 0.6 }}
-                      onClick={() => setIsEditorVisible(false)}
+                      onClick={() => toggleDockFromButton(false)}
                     >
                       <span aria-hidden="true">▾</span>
                     </button>
                   </div>
                   <div className="panel-content">
+                    {mobile && <div className="editor-tab-panel" id="playground-panel-explorer" role="tabpanel"
+                      aria-labelledby="playground-tab-explorer" hidden={selectedTab !== 'explorer'} ref={attachExplorer} />}
                     <div className="editor-tab-panel" id="playground-panel-editor" role="tabpanel"
-                      aria-labelledby="playground-tab-editor" hidden={activeTab !== 'editor'}>
+                      key="editor" aria-labelledby="playground-tab-editor" hidden={selectedTab !== 'editor'}>
                       <Editor 
                         currentScriptId={currentScriptId} 
                         onSave={handleSave}
                         onSelectScript={selectScript}
                       />
                     </div>
+                    {mobile && <div className="editor-tab-panel" id="playground-panel-inspector" role="tabpanel"
+                      aria-labelledby="playground-tab-inspector" hidden={selectedTab !== 'inspector'} ref={attachInspector} />}
                     <div className="editor-tab-panel" id="playground-panel-console" role="tabpanel"
-                      aria-labelledby="playground-tab-console" hidden={activeTab !== 'console'}>
-                      {activeTab === 'console' && <Console />}
+                      key="console" aria-labelledby="playground-tab-console" hidden={selectedTab !== 'console'}>
+                      {selectedTab === 'console' && <Console />}
                     </div>
                   </div>
                 </div>
@@ -231,13 +301,13 @@ function App() {
         </Panel>
 
         {/* Right Panel: Inspector */}
-        <Separator 
+        <Separator
           className="resize-handle-horizontal" 
           onDoubleClick={() => setIsInspectorVisible(!isInspectorVisible)}
           data-testid="inspector-separator"
         />
         
-        {!isInspectorVisible && (
+        {!mobile && !isInspectorVisible && (
           <div 
             style={{ 
               width: '15px', 
@@ -255,7 +325,7 @@ function App() {
           </div>
         )}
 
-        <Panel 
+        <Panel id="inspector-dock"
           defaultSize={20} 
           minSize={20} 
           collapsible={true} 
@@ -264,13 +334,14 @@ function App() {
           onResize={(size: any) => {
             // Defer state update to avoid update-during-render crashes
             requestAnimationFrame(() => {
-              const isCurrentlyCollapsed = size.asPercentage === 0;
+              if (mobile || mobileRef.current) return;
+              const isCurrentlyCollapsed = inspectorPanelRef.current?.isCollapsed() ?? size.asPercentage === 0;
               if (isCurrentlyCollapsed && isInspectorVisible) setIsInspectorVisible(false);
               if (!isCurrentlyCollapsed && !isInspectorVisible) setIsInspectorVisible(true);
             });
           }}
         >
-          <div className="panel-container" data-testid="inspector-panel" hidden={!isInspectorVisible}>
+          <div className="panel-container" data-testid="inspector-panel" hidden={mobile || !isInspectorVisible}>
             <div
               className="panel-header"
               onClick={() => setIsInspectorVisible(false)}
@@ -278,12 +349,15 @@ function App() {
             >
               Inspector
             </div>
-            <div className="panel-content">
-              <Inspector visible={isInspectorVisible} />
-            </div>
+            <div className="panel-content" ref={mobile ? undefined : attachInspector} />
           </div>
         </Panel>
       </Group>
+      {createPortal(<>
+        <div className="explorer-scene"><SceneExplorer onReveal={revealExplorer} /></div>
+        <div className="explorer-library">{(mobile || isExplorerVisible) && <Sidebar mobileDock={mobile} />}</div>
+      </>, explorerHost)}
+      {createPortal(<Inspector visible={mobile || isInspectorVisible} />, inspectorHost)}
       {pendingRunChange && (
         <CanvasChangesDialog action={pendingRunChange.kind} onCancel={cancelRunChange} onConfirm={confirmRunChange} />
       )}

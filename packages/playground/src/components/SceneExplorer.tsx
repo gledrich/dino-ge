@@ -98,7 +98,7 @@ const getIconForObject = (obj: Dino.GameObject): string => {
   return 'fa-cube';
 };
 
-const SceneExplorer: React.FC = () => {
+const SceneExplorer: React.FC<{ onReveal?: () => void }> = ({ onReveal }) => {
   const { isPaused, isDebug, isExplorerVisible, setIsExplorerVisible, selectedObject, pendingCanvasPlacements } = usePlayground();
   const [members, setMembers] = useState(() => new Set(Engine.currentScene?.objects ?? Engine.objects));
   const [collapsedBranches, setCollapsedBranches] = useState<ReadonlySet<Dino.GameObject>>(() => new Set());
@@ -176,11 +176,12 @@ const SceneExplorer: React.FC = () => {
       const name = getSceneObjectName(object).toLowerCase();
       setQuery(previous => name.includes(previous.trim().toLowerCase()) ? previous : '');
       setIsExplorerVisible(true);
+      onReveal?.();
       setRevealTarget(object);
     };
     window.addEventListener(revealSceneObjectEvent, reveal);
     return () => window.removeEventListener(revealSceneObjectEvent, reveal);
-  }, [setIsExplorerVisible]);
+  }, [onReveal, setIsExplorerVisible]);
 
   useEffect(() => {
     if (!isExplorerVisible || !revealTarget) return;

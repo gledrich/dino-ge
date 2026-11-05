@@ -12,10 +12,11 @@ interface AssetEntry {
   image?: HTMLImageElement;
 }
 
-function AssetTile({ asset, isEditing, canReplace, placementSource, onInsert }: {
+function AssetTile({ asset, isEditing, canReplace, mobileDock, placementSource, onInsert }: {
   asset: AssetEntry;
   isEditing: boolean;
   canReplace: boolean;
+  mobileDock: boolean;
   placementSource: ReturnType<typeof useScenePlacementSource>;
   onInsert: (asset: SceneImageAsset) => void;
 }) {
@@ -61,6 +62,7 @@ function AssetTile({ asset, isEditing, canReplace, placementSource, onInsert }: 
             {image ? `${image.naturalWidth} × ${image.naturalHeight} px` : unavailable ? 'Image unavailable' : 'Loading image…'}
           </span>
         </div>
+        {mobileDock && isEditing && image && <i className="fa-solid fa-grip-vertical" data-scene-drag-handle aria-hidden="true" />}
       </button>
       <div className="asset-actions">
         <button type="button" className="scene-control" disabled={!image}
@@ -84,7 +86,7 @@ function AssetTile({ asset, isEditing, canReplace, placementSource, onInsert }: 
   );
 }
 
-const AssetPanel: React.FC = () => {
+const AssetPanel: React.FC<{ mobileDock?: boolean }> = ({ mobileDock = false }) => {
   const [loadedImages, setLoadedImages] = useState<SceneImageAsset[]>([]);
   const [selected, setSelected] = useState(Engine.selectedObject);
   const [catalogue, setCatalogue] = useState<{ scriptId: string; images: StoredSpriteImage[]; error?: string }>();
@@ -168,11 +170,12 @@ const AssetPanel: React.FC = () => {
           event.currentTarget.value = '';
           if (files.length) window.dispatchEvent(new CustomEvent('playground-import-image', { detail: files }));
         }} />
-      <p className="asset-help">Drop an image file onto the canvas or editor.</p>
+      <p className="asset-help">{mobileDock ? 'Import an image to use it as a sprite.' : 'Drop an image file onto the canvas or editor.'}</p>
       {assets.length > 0 && (
         <p className="asset-help">
-          {isEditing ? 'Drag to the canvas to place, or to the editor for code. Click to place. Shift+Enter positions with keys.'
-            : 'Enter Edit scene to drag images. Use Insert to add sprite code.'}
+          {!isEditing ? 'Enter Edit scene to drag images. Use Insert to add sprite code.'
+            : mobileDock ? 'Drag a grip to the canvas or tap an image to place it. Use Insert to add sprite code.'
+              : 'Drag to the canvas to place, or to the editor for code. Click to place. Shift+Enter positions with keys.'}
         </p>
       )}
       {feedback && <p className={`library-feedback${feedback.error ? ' library-feedback-error' : ''}`}
@@ -180,7 +183,7 @@ const AssetPanel: React.FC = () => {
       {workspace?.error && <p className="asset-help" role="status">{workspace.error}</p>}
       {canReplace && <p className="asset-help">Use the swap button to change the selected sprite’s image.</p>}
       <div className="asset-list">
-        {assets.map(asset => <AssetTile key={`${asset.tag}:${asset.url}`} asset={asset} isEditing={isEditing}
+        {assets.map(asset => <AssetTile key={`${asset.tag}:${asset.url}`} asset={asset} isEditing={isEditing} mobileDock={mobileDock}
           canReplace={canReplace} placementSource={placementSource} onInsert={insertSpriteCode} />)}
         {!assets.length && !workspace?.error && (
           <div className="no-assets">{workspace ? 'Imported images and images loaded by the game appear here.' : 'Loading workspace images…'}</div>

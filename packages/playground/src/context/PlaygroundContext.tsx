@@ -6,6 +6,9 @@ import { useCanvasHistory } from '../hooks/useCanvasHistory';
 
 const { Engine } = Dino;
 
+type EditorTab = 'editor' | 'console';
+export type MobileDockTab = EditorTab | 'explorer' | 'inspector';
+
 interface PlaygroundContextType {
   currentScriptId: string;
   setCurrentScriptId: (id: string) => void;
@@ -24,8 +27,12 @@ interface PlaygroundContextType {
   setIsExplorerVisible: (visible: boolean) => void;
   isEditorVisible: boolean;
   setIsEditorVisible: (visible: boolean) => void;
-  activeTab: 'editor' | 'console';
-  setActiveTab: (tab: 'editor' | 'console') => void;
+  activeTab: EditorTab;
+  setActiveTab: (tab: EditorTab) => void;
+  mobileDockTab: MobileDockTab;
+  setMobileDockTab: (tab: MobileDockTab) => void;
+  isMobileDockOpen: boolean;
+  setIsMobileDockOpen: (open: boolean) => void;
   isViewportReady: boolean;
   setIsViewportReady: (ready: boolean) => void;
   arePanelsMinimized: boolean;
@@ -46,7 +53,9 @@ export const PlaygroundProvider: React.FC<{ children: React.ReactNode }> = ({ ch
   const canvasHistory = useCanvasHistory();
   const [isExplorerVisible, setIsExplorerVisible] = useState(true);
   const [isEditorVisible, setIsEditorVisible] = useState(true);
-  const [activeTab, setActiveTab] = useState<'editor' | 'console'>('editor');
+  const [activeTab, setEditorTab] = useState<EditorTab>('editor');
+  const [mobileDockTab, setMobileDockTab] = useState<MobileDockTab>('editor');
+  const [isMobileDockOpen, setIsMobileDockOpen] = useState(true);
   const [isViewportReady, setIsViewportReady] = useState(false);
   const [arePanelsMinimized, setArePanelsMinimized] = useState(false);
 
@@ -96,6 +105,12 @@ export const PlaygroundProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     setCurrentScriptIdState(id);
   }, []);
 
+  const setActiveTab = useCallback((tab: EditorTab) => {
+    setEditorTab(tab);
+    setMobileDockTab(tab);
+    setIsMobileDockOpen(true);
+  }, []);
+
   const value = {
     currentScriptId,
     setCurrentScriptId,
@@ -113,6 +128,10 @@ export const PlaygroundProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     setIsEditorVisible,
     activeTab,
     setActiveTab,
+    mobileDockTab,
+    setMobileDockTab,
+    isMobileDockOpen,
+    setIsMobileDockOpen,
     isViewportReady,
     setIsViewportReady,
     arePanelsMinimized,
