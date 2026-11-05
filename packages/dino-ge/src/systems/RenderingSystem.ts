@@ -123,7 +123,7 @@ export default class RenderingSystem extends System {
         if (debug) {
           const physics = object.getComponent(PhysicsComponent);
           this.ctx.save();
-          this.ctx.strokeStyle = object === Engine.selectedObject ? '#00ff00' : 'red';
+          this.ctx.strokeStyle = object === Engine.selectedObject ? '#65d9b2' : 'red';
           this.ctx.lineWidth = (object === Engine.selectedObject ? 2 : 1) / Engine.camera.zoom;
           
           if (physics?.isSensor) {
@@ -161,9 +161,13 @@ export default class RenderingSystem extends System {
             );
           }
 
+          this.ctx.save();
           this.ctx.font = `${12 / Engine.camera.zoom}px monospace`;
-          this.ctx.fillStyle = this.ctx.strokeStyle;
+          this.ctx.fillStyle = '#f5f7fa';
+          this.ctx.shadowColor = '#000000';
+          this.ctx.shadowBlur = 3;
           this.ctx.fillText(object.metadata.tag || 'obj', worldPosition.x, worldPosition.y - (5 / Engine.camera.zoom));
+          this.ctx.restore();
 
           // Draw Physics Vectors
           if (physics && Engine.showPhysicsVectors) {
