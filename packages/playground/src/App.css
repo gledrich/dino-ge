@@ -71,6 +71,7 @@
 }
 
 .scene-object-options .scene-control { pointer-events: auto; }
+.scene-object-options .scene-icon-control { width: var(--scene-control-height); }
 .scene-grid-size {
   color-scheme: dark;
 }

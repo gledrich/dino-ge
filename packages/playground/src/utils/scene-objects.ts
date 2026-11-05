@@ -27,6 +27,27 @@ export function isReplaceableSprite(object: Dino.GameObject | null): object is D
 
 export interface ScenePoint { x: number; y: number }
 
+export function getSceneSelectionBounds(object: Dino.GameObject, members: ReadonlySet<Dino.GameObject>) {
+  const selection = Dino.getViewportBounds(Dino.getViewportGeometry(object));
+  if (selection.left !== selection.right || selection.top !== selection.bottom) return selection;
+
+  // For a group, use the extent of its scene members instead of its origin.
+  let bounds: typeof selection | undefined;
+  const descendants = [...object.transform.children];
+  for (const transform of descendants) {
+    const child = transform.gameObject;
+    if (!child || !members.has(child)) continue;
+    descendants.push(...transform.children);
+    if (!child.bounds) continue;
+    const next = Dino.getViewportBounds(Dino.getViewportGeometry(child));
+    bounds = bounds ? {
+      left: Math.min(bounds.left, next.left), right: Math.max(bounds.right, next.right),
+      top: Math.min(bounds.top, next.top), bottom: Math.max(bounds.bottom, next.bottom),
+    } : next;
+  }
+  return bounds ?? selection;
+}
+
 export type ScenePointerDragItem = { kind: SceneObjectKind } | { asset: SceneImageAsset };
 
 export type ScenePointerDrag = ScenePointerDragItem & {

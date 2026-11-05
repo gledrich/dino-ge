@@ -3,7 +3,7 @@ import { Engine, Input, SpriteComponent, snapToGrid, type ObjectManipulationPrev
 import { usePlayground } from '../context/PlaygroundContext';
 import Toolbar from './Toolbar';
 import Logo from './Logo';
-import { getAssetSource, getSceneArrowMovement, getSceneAssetPreviewType, getSceneSource, getSceneSpriteScale, isReplaceableSprite, nudgeSceneSelection, sceneAssetDragType, sceneKeyboardPlacementEvent, sceneObjectDefaults, sceneObjectDragType, sceneObjectKinds, scenePointerDragEvent, type SceneImageAsset, type SceneKeyboardPlacementRequest, type SceneObjectKind, type SceneObjectPlacement, type ScenePointerDrag, type ScenePoint } from '../utils/scene-objects';
+import { getAssetSource, getSceneArrowMovement, getSceneAssetPreviewType, getSceneSelectionBounds, getSceneSource, getSceneSpriteScale, isReplaceableSprite, nudgeSceneSelection, sceneAssetDragType, sceneKeyboardPlacementEvent, sceneObjectDefaults, sceneObjectDragType, sceneObjectKinds, scenePointerDragEvent, type SceneImageAsset, type SceneKeyboardPlacementRequest, type SceneObjectKind, type SceneObjectPlacement, type ScenePointerDrag, type ScenePoint } from '../utils/scene-objects';
 import { maxSpriteImageBytes, spriteImageTypes, storeSpriteImage } from '../utils/helpers';
 
 const shapePreviewDimensions: Partial<Record<SceneObjectKind, { width: number; height: number }>> = {
@@ -13,6 +13,7 @@ const shapePreviewDimensions: Partial<Record<SceneObjectKind, { width: number; h
   Text: sceneObjectDefaults.Text,
 };
 const sceneGridSizes = [8, 16, 32, 64];
+const clampSceneZoom = (zoom: number) => Math.max(0.1, Math.min(8, zoom));
 
 function TextDropPreview() {
   const { width, height, text, colour, backgroundColour, fontSize, font } = sceneObjectDefaults.Text;
@@ -85,6 +86,7 @@ const Viewport: React.FC = () => {
   } = usePlayground();
 
   const viewportContainerRef = useRef<HTMLDivElement>(null);
+  const sceneControlsRef = useRef<HTMLDivElement>(null);
   const isEditingScene = isPaused && isDebug;
   const savedCamera = useRef<{ canvas: HTMLCanvasElement; scene: typeof Engine.currentScene;
     x: number; y: number; zoom: number } | null>(null);
@@ -489,12 +491,41 @@ const Viewport: React.FC = () => {
     const canvas = viewportContainerRef.current?.querySelector<HTMLCanvasElement>('canvas#canvas');
     if (!canvas || !canvas.width || !canvas.height) return;
     const { position, zoom } = Engine.camera;
-    const next = Math.max(0.1, Math.min(8, zoom * factor));
+    const next = clampSceneZoom(zoom * factor);
     if (next === zoom) return;
     rememberCamera(canvas);
     position.set(position.x + canvas.width / 2 * (1 / zoom - 1 / next),
       position.y + canvas.height / 2 * (1 / zoom - 1 / next));
     Engine.camera.zoom = next;
+  };
+
+  const frameSelection = () => {
+    if (!selectedObject || keyboardPlacement || Input.isManipulatingObject) return;
+    const canvas = viewportContainerRef.current?.querySelector<HTMLCanvasElement>('canvas#canvas');
+    const view = canvas?.getBoundingClientRect();
+    if (!canvas?.width || !canvas.height || !view?.height) return;
+    const members = Engine.currentScene?.objects ?? Engine.objects;
+    if (!members.has(selectedObject)) return;
+    const bounds = getSceneSelectionBounds(selectedObject, members);
+    if (!Object.values(bounds).every(Number.isFinite)) return;
+
+    const { width, height } = canvas;
+    const controls = sceneControlsRef.current?.getBoundingClientRect();
+    const controlsBottom = controls ? (controls.bottom - view.top) * height / view.height : 0;
+    const paddingX = Math.min(48, width / 4);
+    // Leave room for object handles and the two floating toolbars.
+    const top = Math.min(height / 2, Math.max(48, controlsBottom + 28));
+    const bottom = height - Math.min(80, height / 4);
+    const selectionWidth = bounds.right - bounds.left;
+    const selectionHeight = bounds.bottom - bounds.top;
+    const zoom = selectionWidth || selectionHeight ? clampSceneZoom(Math.min(
+      (width - 2 * paddingX) / Math.max(1, selectionWidth),
+      (bottom - top) / Math.max(1, selectionHeight),
+    )) : Engine.camera.zoom;
+    rememberCamera(canvas);
+    Engine.camera.zoom = zoom;
+    Engine.camera.position.set(bounds.left + selectionWidth / 2 - width / (2 * zoom),
+      bounds.top + selectionHeight / 2 - (top + bottom) / (2 * zoom));
   };
 
   const suppressGameActivation = (event: React.MouseEvent | React.KeyboardEvent) => {
@@ -633,10 +664,12 @@ const Viewport: React.FC = () => {
             const key = event.key.toLowerCase();
             const isHistoryShortcut = !event.altKey && (event.ctrlKey || event.metaKey) &&
               (key === 'z' || (key === 'y' && event.ctrlKey && !event.metaKey && !event.shiftKey));
-            if (isHistoryShortcut || nudgeSceneSelection(event)) {
+            const isFrameShortcut = key === 'f' && !event.ctrlKey && !event.metaKey && !event.altKey && !event.shiftKey;
+            if (isHistoryShortcut || isFrameShortcut || nudgeSceneSelection(event)) {
               event.preventDefault();
               event.stopPropagation();
               if (isHistoryShortcut && !event.repeat) changeCodeHistory(event.shiftKey || key === 'y' ? 'redo' : 'undo');
+              if (isFrameShortcut && !event.repeat) frameSelection();
               return;
             }
           }
@@ -644,7 +677,7 @@ const Viewport: React.FC = () => {
         }}
       />
       {(isEditingScene || keyboardPlacement || placementStatus?.error || placementStatus?.pending) && (
-        <div className="scene-edit-controls" role={isEditingScene ? 'group' : undefined}
+        <div className="scene-edit-controls" ref={sceneControlsRef} role={isEditingScene ? 'group' : undefined}
           aria-label={isEditingScene ? 'Scene editing' : undefined}>
           {isEditingScene && <>
             <div className="scene-object-options">
@@ -667,9 +700,14 @@ const Viewport: React.FC = () => {
               </div>
             </div>
             <div className="scene-object-options" role="group" aria-label="Scene camera and grid">
-              <button type="button" className="scene-control" onClick={() => zoomView(1 / 1.25)}>Zoom out</button>
-              <button type="button" className="scene-control" onClick={() => zoomView(1.25)}>Zoom in</button>
+              <button type="button" className="scene-control scene-icon-control" aria-label="Zoom out" title="Zoom out"
+                onClick={() => zoomView(1 / 1.25)}><i className="fa-solid fa-magnifying-glass-minus" aria-hidden="true" /></button>
+              <button type="button" className="scene-control scene-icon-control" aria-label="Zoom in" title="Zoom in"
+                onClick={() => zoomView(1.25)}><i className="fa-solid fa-magnifying-glass-plus" aria-hidden="true" /></button>
               <button type="button" className="scene-control" onClick={restoreCamera}>Reset view</button>
+              <button type="button" className="scene-control" aria-label="Frame selection" title="Frame selected object or group (F)"
+                aria-keyshortcuts="F" disabled={!selectedObject || !!keyboardPlacement || !!manipulationReadout}
+                onClick={frameSelection}>Frame</button>
               <button type="button" className="scene-control"
                 aria-pressed={isGridSnapping} title={`Snap moves, resizes and drops to the ${sceneGridSize} px grid`}
                 onClick={() => setIsGridSnapping(enabled => !enabled)}>Snap to grid</button>
@@ -680,7 +718,7 @@ const Viewport: React.FC = () => {
             </div>
             {!keyboardPlacement && <span id="scene-keyboard-hint" className="scene-edit-hint">
               Middle drag pans · {isGridSnapping ? 'Arrows move 1 cell · Shift moves 10 cells' : 'Arrows move 1 px · Shift moves 10 px'}<br />
-              Round handle rotates · Square handle resizes<br />
+              F frames selection · Round handle rotates · Square handle resizes<br />
               Shift enables either option while dragging · Esc cancels<br />
               {historyBlockedReason || 'Ctrl/⌘+Z undoes · Add Shift to redo'}
             </span>}

@@ -1225,6 +1225,60 @@ new Engine({ onLoad() {
   await expect.poll(readCamera).toEqual({ x: 40, y: 30, zoom: 1 });
 });
 
+test('frames offscreen objects and groups without moving them or changing the gameplay camera', async ({ page }) => {
+  await page.route('**/files', route => route.fulfill({ json: ['script'] }));
+  await page.route('**/api/scripts/script', route => route.fulfill({ json: `
+import { Engine, Group, Line, Rectangle, Vector2 } from 'dino-ge';
+new Engine({ onLoad() {
+  Engine.camera.position.set(40, 30);
+  const group = new Group('Remote platforms');
+  group.transform.position.set(1200, 700);
+  group.transform.rotation = Math.PI / 2;
+  group.transform.scale.set(2, 1);
+  const first = new Rectangle({ tag: 'Tall platform', position: new Vector2(20, 0), width: 120, height: 40 });
+  const second = new Line({ tag: 'Rail', p1: new Vector2(20, -120), p2: new Vector2(80, -120), width: 8 });
+  group.transform.addChild(first.transform);
+  group.transform.addChild(second.transform);
+}, update() {} }, { containerId: 'playground-canvas-container' });` }));
+  await page.goto('/');
+  const group = page.getByRole('button', { name: 'Remote platforms', exact: true });
+  await expect(group).toBeVisible();
+  await page.getByRole('button', { name: 'Edit scene', exact: true }).click();
+  const frame = page.getByRole('button', { name: 'Frame selection', exact: true });
+  await expect(frame).toBeDisabled();
+  const canvas = page.locator('#canvas');
+  const readView = () => canvas.evaluate((element: HTMLCanvasElement) => {
+    const { Engine } = window as unknown as {
+      Engine: { camera: { position: { x: number; y: number }; zoom: number } };
+    };
+    const { position, zoom } = Engine.camera;
+    return { x: position.x, y: position.y, zoom, width: element.width, height: element.height };
+  });
+  const assertFramed = async (left: number, top: number, right: number, bottom: number) => {
+    const { x, y, zoom, width, height } = await readView();
+    expect((left - x) * zoom).toBeGreaterThanOrEqual(24);
+    expect((right - x) * zoom).toBeLessThanOrEqual(width - 24);
+    expect((top - y) * zoom).toBeGreaterThanOrEqual(24);
+    expect((bottom - y) * zoom).toBeLessThanOrEqual(height - 24);
+  };
+
+  await group.click();
+  await frame.click();
+  await assertFramed(1160, 732, 1328, 980);
+  await expect(group).toHaveAttribute('aria-pressed', 'true');
+  await page.getByRole('button', { name: 'Reset view', exact: true }).click();
+  expect(await readView()).toMatchObject({ x: 40, y: 30, zoom: 1 });
+
+  const platform = page.getByRole('button', { name: 'Tall platform', exact: true });
+  await platform.click();
+  await page.getByRole('region', { name: 'Scene viewport' }).press('f');
+  await assertFramed(1160, 740, 1200, 980);
+  await expect(platform).toHaveAccessibleDescription('');
+  await expect(page.getByRole('spinbutton', { name: 'X', exact: true })).toHaveValue('20.00');
+  await page.getByRole('button', { name: 'Play', exact: true }).click();
+  expect(await readView()).toMatchObject({ x: 40, y: 30, zoom: 1 });
+});
+
 test('uses the selected world grid for Library drops and pointer and keyboard moves', async ({ page }) => {
   await page.route('**/files', route => route.fulfill({ json: ['script'] }));
   await page.route('**/api/scripts/script', route => route.fulfill({ json: `
