@@ -3,8 +3,8 @@ import Editor from '@monaco-editor/react';
 import { typescript, type editor } from 'monaco-editor';
 import * as Dino from 'dino-ge';
 import { createScript, getScript, getFilesList, setCurrentScriptId, readGameFolder, importGameFolder, type GameFolder } from '../utils/helpers';
-import { Edit, instrumentCode, getSourceMapping, getSceneObjectCreation, getSceneObjectDeletion, getSceneObjectDuplication } from '../utils/ast-utils';
-import { createSceneObject, duplicateSceneObject, restoreSceneTransform, type SceneObjectPlacement, type SceneTransformState } from '../utils/scene-objects';
+import { Edit, instrumentCode, getSourceMapping, getSceneObjectCreation, getSceneObjectDeletion, getSceneObjectDuplication, getSpriteImageReplacement } from '../utils/ast-utils';
+import { createSceneObject, duplicateSceneObject, isReplaceableSprite, restoreSceneTransform, type SceneObjectPlacement, type SceneTransformState } from '../utils/scene-objects';
 import { useMonacoEditor } from '../hooks/useMonacoEditor';
 import '../styles/editor.css';
 
@@ -21,6 +21,7 @@ interface SceneHistoryEntry {
   before: number;
   after: number;
   transform?: { before: SceneTransformState; after: SceneTransformState };
+  spriteImage?: { before: HTMLImageElement; after: HTMLImageElement };
   removed?: boolean;
 }
 
@@ -247,6 +248,31 @@ const CodeEditor: React.FC<EditorProps> = ({ currentScriptId, onRefresh }) => {
       }
     };
 
+    const replaceSpriteImage = (event: Event) => {
+      const { object, image, source } = (event as CustomEvent<{
+        object: Dino.Sprite; image: HTMLImageElement; source: string;
+      }>).detail;
+      const { Engine } = Dino;
+      const model = monacoEditorRef.current?.getModel();
+      const run = document.querySelector<HTMLElement>('script[data-playground-script]');
+      const scene = Engine.currentScene;
+      if (!model || loadedScriptId.current !== currentScriptId || run?.dataset.playgroundScript !== currentScriptId ||
+          !Engine.paused || !Engine.debug || Engine.selectedObject !== object || !isReplaceableSprite(object)) return;
+      const sourceId = object.metadata.sourceId;
+      if (!sourceId) return;
+      const matches = Array.from(scene?.objects ?? Engine.objects).filter(item => item.metadata.sourceId === sourceId);
+      if (matches.length !== 1 || matches[0] !== object) return;
+      const edit = getSpriteImageReplacement(model.getValue(), sourceId, source);
+      const before = model.getAlternativeVersionId();
+      if (!edit || !applySourceEdits([edit])) return;
+      const previousImage = object.img;
+      object.img = image;
+      const after = model.getAlternativeVersionId();
+      if (before !== after) recordSceneHistory({ model, run, scene, object, before, after,
+        spriteImage: { before: previousImage, after: image } });
+      event.preventDefault();
+    };
+
     const editPaletteObject = (event: Event) => {
       const { detail: object } = event as CustomEvent<Dino.GameObject>;
       const model: editor.ITextModel | null = monacoEditorRef.current?.getModel();
@@ -377,6 +403,7 @@ const CodeEditor: React.FC<EditorProps> = ({ currentScriptId, onRefresh }) => {
     window.addEventListener('playground-get-value', handleGetValueEvent);
     window.addEventListener('playground-sync-source-mapping', syncSourceMapping);
     window.addEventListener('playground-apply-placement', applyPlacement);
+    window.addEventListener('playground-update-sprite-image', replaceSpriteImage);
     window.addEventListener('playground-add-scene-object', addSceneObject);
     window.addEventListener('playground-remove-scene-object', editPaletteObject);
     window.addEventListener('playground-duplicate-scene-object', editPaletteObject);
@@ -399,6 +426,7 @@ const CodeEditor: React.FC<EditorProps> = ({ currentScriptId, onRefresh }) => {
       window.removeEventListener('playground-get-value', handleGetValueEvent);
       window.removeEventListener('playground-sync-source-mapping', syncSourceMapping);
       window.removeEventListener('playground-apply-placement', applyPlacement);
+      window.removeEventListener('playground-update-sprite-image', replaceSpriteImage);
       window.removeEventListener('playground-add-scene-object', addSceneObject);
       window.removeEventListener('playground-remove-scene-object', editPaletteObject);
       window.removeEventListener('playground-duplicate-scene-object', editPaletteObject);
@@ -417,9 +445,17 @@ const CodeEditor: React.FC<EditorProps> = ({ currentScriptId, onRefresh }) => {
       revision === (event.isUndoing ? item.before : item.after));
     if (!entry) return;
 
-    const { object, scene, transform, removed } = entry;
+    const { object, scene, transform, spriteImage, removed } = entry;
     const active = scene === Dino.Engine.currentScene;
     const objects = scene?.objects ?? Dino.Engine.objects;
+    if (spriteImage) {
+      if (object instanceof Dino.Sprite && objects.has(object)) {
+        object.img = event.isUndoing ? spriteImage.before : spriteImage.after;
+        const detail = `${event.isUndoing ? 'Restored the previous' : 'Restored the replacement'} image for ${object.metadata.tag}.`;
+        window.dispatchEvent(new CustomEvent('playground-scene-history', { detail }));
+      }
+      return;
+    }
     if (transform) {
       if (!objects.has(object)) return;
       const state = event.isUndoing ? transform.before : transform.after;

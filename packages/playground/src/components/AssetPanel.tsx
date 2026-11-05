@@ -1,7 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { Loader } from 'dino-ge';
+import { Engine, Loader } from 'dino-ge';
 import { usePlayground } from '../context/PlaygroundContext';
-import { getSceneAssetPreviewType, sceneAssetDragType, type SceneImageAsset } from '../utils/scene-objects';
+import { getSceneAssetPreviewType, isReplaceableSprite, sceneAssetDragType, type SceneImageAsset } from '../utils/scene-objects';
 import { listSpriteImages, spriteImageTypes, type StoredSpriteImage } from '../utils/helpers';
 import '../styles/asset-panel.css';
 
@@ -11,61 +11,79 @@ interface AssetEntry {
   image?: HTMLImageElement;
 }
 
-function AssetTile({ asset, isEditing }: { asset: AssetEntry; isEditing: boolean }) {
+function AssetTile({ asset, isEditing, canReplace }: { asset: AssetEntry; isEditing: boolean; canReplace: boolean }) {
   const [thumbnail, setThumbnail] = useState<HTMLImageElement>();
   const [unavailable, setUnavailable] = useState(false);
   const image = asset.image ?? thumbnail;
   return (
-    <button type="button" className="scene-control asset-item" title={asset.url}
-      aria-label={`Add ${asset.tag} as sprite`} disabled={!isEditing || !image} draggable={isEditing && !!image}
-      onClick={() => {
-        if (image) window.dispatchEvent(new CustomEvent<SceneImageAsset>('playground-place-asset', { detail: { tag: asset.tag, image } }));
-      }}
-      onDragStart={event => {
-        if (!image) return;
-        event.dataTransfer.setData(sceneAssetDragType, asset.tag);
-        event.dataTransfer.setData(getSceneAssetPreviewType(asset.tag), '');
-        event.dataTransfer.effectAllowed = 'copy';
-        window.dispatchEvent(new CustomEvent<SceneImageAsset>('playground-drag-scene-asset', { detail: { tag: asset.tag, image } }));
-      }}
-      onDragEnd={() => window.dispatchEvent(new CustomEvent('playground-drag-scene-asset', { detail: null }))}
-    >
-      <div className="asset-preview">
-        {!unavailable && <img src={asset.url} alt="" draggable={false} loading="lazy"
-          onLoad={event => {
-            if (asset.image) return;
-            // Keep the sprite image detached so its dimensions are independent of the thumbnail CSS.
-            const original = new Image();
-            original.src = event.currentTarget.src;
-            void original.decode().then(() => setThumbnail(original)).catch(() => setUnavailable(true));
-          }}
-          onError={() => setUnavailable(true)} />}
-      </div>
-      <div className="asset-info">
-        <span className="asset-tag">{asset.tag}</span>
-        <span className="asset-details">
-          {image ? `${image.naturalWidth} × ${image.naturalHeight} px` : unavailable ? 'Image unavailable' : 'Loading image…'}
-        </span>
-      </div>
-    </button>
+    <div className="asset-tile">
+      <button type="button" className="scene-control asset-item" title={asset.url}
+        aria-label={`Add ${asset.tag} as sprite`} disabled={!isEditing || !image} draggable={isEditing && !!image}
+        onClick={() => {
+          if (image) window.dispatchEvent(new CustomEvent<SceneImageAsset>('playground-place-asset', { detail: { tag: asset.tag, image } }));
+        }}
+        onDragStart={event => {
+          if (!image) return;
+          event.dataTransfer.setData(sceneAssetDragType, asset.tag);
+          event.dataTransfer.setData(getSceneAssetPreviewType(asset.tag), '');
+          event.dataTransfer.effectAllowed = 'copy';
+          window.dispatchEvent(new CustomEvent<SceneImageAsset>('playground-drag-scene-asset', { detail: { tag: asset.tag, image } }));
+        }}
+        onDragEnd={() => window.dispatchEvent(new CustomEvent('playground-drag-scene-asset', { detail: null }))}
+      >
+        <div className="asset-preview">
+          {!unavailable && <img src={asset.url} alt="" draggable={false} loading="lazy"
+            onLoad={event => {
+              if (asset.image) return;
+              // Keep the sprite image detached so its dimensions are independent of the thumbnail CSS.
+              const original = new Image();
+              original.src = event.currentTarget.src;
+              void original.decode().then(() => setThumbnail(original)).catch(() => setUnavailable(true));
+            }}
+            onError={() => setUnavailable(true)} />}
+        </div>
+        <div className="asset-info">
+          <span className="asset-tag">{asset.tag}</span>
+          <span className="asset-details">
+            {image ? `${image.naturalWidth} × ${image.naturalHeight} px` : unavailable ? 'Image unavailable' : 'Loading image…'}
+          </span>
+        </div>
+      </button>
+      {canReplace && (
+        <button type="button" className="scene-control asset-replace" disabled={!image}
+          aria-label={`Replace selected sprite with ${asset.tag}`} title="Replace the selected sprite’s image"
+          onClick={() => {
+            if (image) window.dispatchEvent(new CustomEvent<SceneImageAsset>('playground-replace-sprite-image', {
+              detail: { tag: asset.tag, image },
+            }));
+          }}>
+          <i className="fa-solid fa-right-left" aria-hidden="true" />
+        </button>
+      )}
+    </div>
   );
 }
 
 const AssetPanel: React.FC = () => {
   const [loadedImages, setLoadedImages] = useState<SceneImageAsset[]>([]);
+  const [selected, setSelected] = useState(Engine.selectedObject);
   const [catalogue, setCatalogue] = useState<{ scriptId: string; images: StoredSpriteImage[]; error?: string }>();
   const filePicker = useRef<HTMLInputElement>(null);
   const { currentScriptId, isPaused, isDebug } = usePlayground();
   const isEditing = isPaused && isDebug;
+  const canReplace = isEditing && isReplaceableSprite(selected);
 
   useEffect(() => {
     const updateAssets = () => setLoadedImages(Loader.getLoadedAssets());
     const clearAssets = () => setLoadedImages([]);
+    const updateSelection = () => setSelected(Engine.selectedObject);
     updateAssets();
+    Engine.on('selectedObjectChanged', updateSelection);
     const interval = setInterval(updateAssets, 1000);
     window.addEventListener('playground-before-run', clearAssets);
     return () => {
       clearInterval(interval);
+      Engine.off('selectedObjectChanged', updateSelection);
       window.removeEventListener('playground-before-run', clearAssets);
     };
   }, []);
@@ -125,8 +143,9 @@ const AssetPanel: React.FC = () => {
         </p>
       )}
       {workspace?.error && <p className="asset-help" role="status">{workspace.error}</p>}
+      {canReplace && <p className="asset-help">Use the swap button to change the selected sprite’s image.</p>}
       <div className="asset-list">
-        {assets.map(asset => <AssetTile key={`${asset.tag}:${asset.url}`} asset={asset} isEditing={isEditing} />)}
+        {assets.map(asset => <AssetTile key={`${asset.tag}:${asset.url}`} asset={asset} isEditing={isEditing} canReplace={canReplace} />)}
         {!assets.length && !workspace?.error && (
           <div className="no-assets">{workspace ? 'Imported images and images loaded by the game appear here.' : 'Loading workspace images…'}</div>
         )}

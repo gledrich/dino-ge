@@ -3,7 +3,7 @@ import { Engine, SpriteComponent, snapToGrid, type ObjectManipulationPreview } f
 import { usePlayground } from '../context/PlaygroundContext';
 import Toolbar from './Toolbar';
 import Logo from './Logo';
-import { getAssetSource, getSceneAssetPreviewType, getSceneSource, getSceneSpriteScale, nudgeSceneSelection, sceneAssetDragType, sceneObjectDefaults, sceneObjectDragType, sceneObjectKinds, type SceneImageAsset, type SceneObjectKind, type SceneObjectPlacement, type ScenePoint } from '../utils/scene-objects';
+import { getAssetSource, getSceneAssetPreviewType, getSceneSource, getSceneSpriteScale, isReplaceableSprite, nudgeSceneSelection, sceneAssetDragType, sceneObjectDefaults, sceneObjectDragType, sceneObjectKinds, type SceneImageAsset, type SceneObjectKind, type SceneObjectPlacement, type ScenePoint } from '../utils/scene-objects';
 import { maxSpriteImageBytes, spriteImageTypes, storeSpriteImage } from '../utils/helpers';
 
 const shapePreviewDimensions: Partial<Record<SceneObjectKind, { width: number; height: number }>> = {
@@ -242,18 +242,36 @@ const Viewport: React.FC = () => {
   useEffect(() => {
     if (!isEditingScene) return;
     const placeAsset = (event: Event) => placeLoadedImage((event as CustomEvent<SceneImageAsset>).detail);
+    const replaceAsset = (event: Event) => {
+      const { tag, image } = (event as CustomEvent<SceneImageAsset>).detail;
+      const object = Engine.selectedObject;
+      if (!isReplaceableSprite(object)) return;
+      const source = getAssetSource(image.src, currentScriptId);
+      if (!source) {
+        setPlacementStatus({ message: 'This image needs a reusable URL before it can be saved to the script.', error: true });
+        return;
+      }
+      const replaced = !window.dispatchEvent(new CustomEvent('playground-update-sprite-image', {
+        detail: { object, image, source }, cancelable: true,
+      }));
+      setPlacementStatus(replaced
+        ? { message: `Changed ${object.metadata.tag} to ${tag}. Save the script to keep it.` }
+        : { message: 'Select a single-frame Library sprite defined in the open script.', error: true });
+    };
     const trackAssetDrag = (event: Event) => { draggedAsset.current = (event as CustomEvent<SceneImageAsset | null>).detail; };
     const clearAssetDrag = () => { draggedAsset.current = null; };
     window.addEventListener('playground-place-asset', placeAsset);
+    window.addEventListener('playground-replace-sprite-image', replaceAsset);
     window.addEventListener('playground-drag-scene-asset', trackAssetDrag);
     window.addEventListener('playground-before-run', clearAssetDrag);
     return () => {
       window.removeEventListener('playground-place-asset', placeAsset);
+      window.removeEventListener('playground-replace-sprite-image', replaceAsset);
       window.removeEventListener('playground-drag-scene-asset', trackAssetDrag);
       window.removeEventListener('playground-before-run', clearAssetDrag);
       clearAssetDrag();
     };
-  }, [placeLoadedImage, isEditingScene]);
+  }, [currentScriptId, placeLoadedImage, isEditingScene]);
 
   const toggleSceneEditing = () => {
     const editing = !isEditingScene;

@@ -754,6 +754,7 @@ test('drops a loaded project image as a sprite and reopens it using a relative a
 new Engine({
   async onLoad() {
     Loader.queueImage('gem', new URL('../assets/gem.svg', import.meta.url).href);
+    Loader.queueImage('leaf', new URL('../assets/leaf.svg', import.meta.url).href);
     await Loader.loadAll();
   },
 }, { containerId: 'playground-canvas-container' });`;
@@ -769,6 +770,10 @@ new Engine({
   await page.route('**/project-runs/*/sprite-demo/assets/gem.svg', route => route.fulfill({
     contentType: 'image/svg+xml',
     body: '<svg xmlns="http://www.w3.org/2000/svg" width="48" height="32"><rect width="48" height="32" fill="orange"/></svg>',
+  }));
+  await page.route('**/project-runs/*/sprite-demo/assets/leaf.svg', route => route.fulfill({
+    contentType: 'image/svg+xml',
+    body: '<svg xmlns="http://www.w3.org/2000/svg" width="64" height="40"><rect width="64" height="40" fill="green"/></svg>',
   }));
 
   await page.goto('/');
@@ -794,24 +799,33 @@ new Engine({
   await expect(sprite).toHaveAttribute('aria-pressed', 'true');
   await expect(page.getByRole('spinbutton', { name: 'X', exact: true })).toHaveValue('175.00');
   await expect(page.getByRole('spinbutton', { name: 'Width', exact: true })).toHaveValue('48.00');
+  const width = page.getByRole('spinbutton', { name: 'Width', exact: true });
+  const selectedId = () => page.evaluate(() => (window as any).Engine.selectedObject?.id);
+  const idBeforeSwap = await selectedId();
+  await page.getByRole('button', { name: 'Replace selected sprite with leaf', exact: true }).click();
+  await expect(width).toHaveValue('64.00');
+  await expect.poll(selectedId).toBe(idBeforeSwap);
+  await expect(page.getByRole('spinbutton', { name: 'X', exact: true })).toHaveValue('175.00');
+  await page.getByRole('button', { name: 'Undo code edit', exact: true }).click();
+  await expect(width).toHaveValue('48.00');
+  await page.getByRole('button', { name: 'Redo code edit', exact: true }).click();
+  await expect(width).toHaveValue('64.00');
 
-  await page.locator('.monaco-editor .view-lines').click();
-  const modifier = await page.evaluate(() => navigator.userAgent.includes('Macintosh') ? 'Meta' : 'Control');
   const saved = page.waitForResponse(response => response.request().method() === 'PUT' &&
     response.url().endsWith(`/api/scripts/${encodeURIComponent(id)}`));
-  await page.keyboard.press(`${modifier}+s`);
+  await page.getByRole('button', { name: 'Save script', exact: true }).click();
   await saved;
-  expect(source).toMatch(/src: new URL\(["']\.\.\/assets\/gem\.svg["'], import\.meta\.url\)\.href/);
+  expect(source).toMatch(/src: new URL\(["']\.\.\/assets\/leaf\.svg["'], import\.meta\.url\)\.href/);
   await page.reload();
   await page.locator('.script-selector').selectOption(id);
   await sprite.press('Enter');
   await expect(page.getByRole('spinbutton', { name: 'Y', exact: true })).toHaveValue('145.00');
-  await expect(page.getByRole('spinbutton', { name: 'Height', exact: true })).toHaveValue('32.00');
+  await expect(page.getByRole('spinbutton', { name: 'Height', exact: true })).toHaveValue('40.00');
   await page.getByRole('button', { name: 'Edit scene', exact: true }).click();
   await page.getByRole('button', { name: 'Duplicate object' }).click();
   await expect(page.getByRole('button', { name: 'gem sprite copy', exact: true })).toHaveAttribute('aria-pressed', 'true');
   await expect(page.getByRole('spinbutton', { name: 'Y', exact: true })).toHaveValue('169.00');
-  await expect(page.getByRole('spinbutton', { name: 'Height', exact: true })).toHaveValue('32.00');
+  await expect(page.getByRole('spinbutton', { name: 'Height', exact: true })).toHaveValue('40.00');
 });
 
 test('keyboard format and save act on the selected script after switching files', async ({ page }) => {

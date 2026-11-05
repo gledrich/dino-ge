@@ -10,7 +10,14 @@
   gap: 6px;
 }
 
+.asset-tile {
+  display: flex;
+  gap: 4px;
+}
+
 .asset-item {
+  flex: 1;
+  min-width: 0;
   justify-content: flex-start;
   padding: 8px;
   gap: 12px;
@@ -19,6 +26,7 @@
 
 .asset-item:not(:disabled) { cursor: grab; }
 .asset-item:disabled { opacity: 0.7; cursor: default; }
+.asset-replace:disabled { opacity: 0.7; cursor: default; }
 
 .asset-preview {
   flex-shrink: 0;

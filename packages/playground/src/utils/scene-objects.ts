@@ -18,6 +18,11 @@ export function getSceneSpriteScale(image: HTMLImageElement): number {
 
 export interface SceneImageAsset { tag: string; image: HTMLImageElement }
 
+export function isReplaceableSprite(object: Dino.GameObject | null): object is Dino.Sprite {
+  return object instanceof Dino.Sprite && object.rows === 1 && object.cols === 1 &&
+    object.metadata.sourceId?.startsWith('DinoPlace') === true;
+}
+
 export interface ScenePoint { x: number; y: number }
 
 export interface SceneTransformState {

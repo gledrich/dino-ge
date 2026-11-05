@@ -309,6 +309,15 @@ export function getSceneObjectDeletion(source: string, sourceId: string): Edit |
   return { start: statement.start, end: statement.end, newText: '' };
 }
 
+const spriteImageExpression = (source: string) => `Object.assign(new Image(), { src: ${source} })`;
+
+export function getSpriteImageReplacement(source: string, sourceId: string, imageSource: string): Edit | null {
+  const match = findPaletteStatement(source, sourceId);
+  const img = match?.mapping.properties.img;
+  if (match?.mapping.type !== 'Sprite' || !img) return null;
+  return { start: img.valueStart, end: img.valueEnd, newText: spriteImageExpression(imageSource) };
+}
+
 /** Copy the constructor's static options without evaluating the game script. */
 export function getSceneObjectDuplication(source: string, sourceId: string, x: number, y: number) {
   const match = findPaletteStatement(source, sourceId);
@@ -460,7 +469,7 @@ export function getSceneObjectCreation(source: string, placement: SceneObjectPla
   let tag = placement.tag;
   for (let i = 2; source.includes(tag); i++) tag = `${placement.tag} ${i}`;
   const options = placement.kind === 'Sprite'
-    ? `img: Object.assign(new Image(), { src: ${placement.asset.source} }), rows: 1, cols: 1, scale: new ${vector}(${placement.asset.scale}, ${placement.asset.scale})`
+    ? `img: ${spriteImageExpression(placement.asset.source)}, rows: 1, cols: 1, scale: new ${vector}(${placement.asset.scale}, ${placement.asset.scale})`
     : placement.kind === 'Line'
       ? `p1: new ${vector}(0, 0), p2: new ${vector}(${sceneObjectDefaults.Line.length}, 0), width: ${sceneObjectDefaults.Line.strokeWidth}, visible: true`
       : Object.entries(sceneObjectDefaults[placement.kind])
