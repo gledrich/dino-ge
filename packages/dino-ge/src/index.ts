@@ -24,7 +24,7 @@ export { default as Camera } from './core/Camera.js';
 export { default as Canvas } from './core/Canvas.js';
 export { default as Circle } from './objects/Circle.js';
 export { default as Input, type ObjectManipulationPreview } from './core/Input.js';
-export { snapToGrid } from './core/ViewportGeometry.js';
+export { getViewportBounds, getViewportGeometry, snapToGrid } from './core/ViewportGeometry.js';
 export { default as Line } from './objects/Line.js';
 export { default as Loader } from './core/Loader.js';
 export { default as Physics } from './physics/Physics.js';

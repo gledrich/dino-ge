@@ -43,6 +43,28 @@ export function getViewportGeometry(object: GameObject) {
   return { origin, scaleX, scaleY, width, height, rotation, cos, sin, cornerX, cornerY, line };
 }
 
+/** The world-space rectangle used to cull an object's rendered geometry. */
+export function getViewportBounds({ origin, width, height, cos, sin, line }: ReturnType<typeof getViewportGeometry>) {
+  if (line) {
+    return {
+      left: Math.min(line.x1, line.x2) - line.padding,
+      right: Math.max(line.x1, line.x2) + line.padding,
+      top: Math.min(line.y1, line.y2) - line.padding,
+      bottom: Math.max(line.y1, line.y2) + line.padding,
+    };
+  }
+  const acrossX = width * cos;
+  const acrossY = width * sin;
+  const downX = -height * sin;
+  const downY = height * cos;
+  return {
+    left: origin.x + Math.min(0, acrossX) + Math.min(0, downX),
+    right: origin.x + Math.max(0, acrossX) + Math.max(0, downX),
+    top: origin.y + Math.min(0, acrossY) + Math.min(0, downY),
+    bottom: origin.y + Math.max(0, acrossY) + Math.max(0, downY),
+  };
+}
+
 export function projectOntoObjectAxes(geometry: ReturnType<typeof getViewportGeometry>, x: number, y: number) {
   const dx = x - geometry.origin.x;
   const dy = y - geometry.origin.y;

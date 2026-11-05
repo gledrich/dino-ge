@@ -7,7 +7,7 @@ import PhysicsComponent from '../components/PhysicsComponent.js';
 import Vector2 from '../math/Vector2.js';
 import Line from '../objects/Line.js';
 import { getEngineState } from '../core/EngineState.js';
-import { getViewportDrawOrder, getViewportGeometry, getViewportLineEndpoints, getViewportRotationHandle } from '../core/ViewportGeometry.js';
+import { getViewportBounds, getViewportDrawOrder, getViewportGeometry, getViewportLineEndpoints, getViewportRotationHandle } from '../core/ViewportGeometry.js';
 
 /**
  * A system that processes entities with RenderComponents.
@@ -98,15 +98,8 @@ export default class RenderingSystem extends System {
 
     state.sortedObjects.forEach((object) => {
       const geometry = getViewportGeometry(object);
-      const { origin: worldPosition, width, height, rotation, cos, sin, cornerX, cornerY, line } = geometry;
-      const acrossX = width * cos;
-      const acrossY = width * sin;
-      const downX = -height * sin;
-      const downY = height * cos;
-      const left = line ? Math.min(line.x1, line.x2) - line.padding : worldPosition.x + Math.min(0, acrossX) + Math.min(0, downX);
-      const right = line ? Math.max(line.x1, line.x2) + line.padding : worldPosition.x + Math.max(0, acrossX) + Math.max(0, downX);
-      const top = line ? Math.min(line.y1, line.y2) - line.padding : worldPosition.y + Math.min(0, acrossY) + Math.min(0, downY);
-      const bottom = line ? Math.max(line.y1, line.y2) + line.padding : worldPosition.y + Math.max(0, acrossY) + Math.max(0, downY);
+      const { origin: worldPosition, width, height, rotation, cornerX, cornerY, line } = geometry;
+      const { left, right, top, bottom } = getViewportBounds(geometry);
 
       // Frustum Culling
       if (left < bounds.x + bounds.width && right > bounds.x && top < bounds.y + bounds.height && bottom > bounds.y) {
