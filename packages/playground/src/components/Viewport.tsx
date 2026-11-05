@@ -83,6 +83,13 @@ function getCameraContactFrame(contacts: ReadonlyMap<number, ScenePoint>) {
   };
 }
 
+function getEdgePanStrength(offset: number, size: number) {
+  const edge = Math.min(40, size / 4);
+  if (offset < edge) return (offset - edge) / edge;
+  if (offset > size - edge) return (offset - (size - edge)) / edge;
+  return 0;
+}
+
 const Viewport: React.FC = () => {
   const { 
     currentScriptId,
@@ -488,6 +495,63 @@ const Viewport: React.FC = () => {
     savedCamera.current = { canvas, scene, x: position.x, y: position.y, zoom };
   }, []);
 
+  useEffect(() => {
+    if (!isEditingScene) return;
+    let frame: number | undefined;
+    let canvas: HTMLCanvasElement | undefined;
+    let scene = Engine.currentScene;
+    let previousTime = 0;
+
+    const stop = () => {
+      if (frame !== undefined) cancelAnimationFrame(frame);
+      frame = undefined;
+      canvas = undefined;
+    };
+
+    const panAtEdge = (now: number) => {
+      if (!canvas?.isConnected || scene !== Engine.currentScene || !Input.isManipulatingObject) {
+        stop();
+        return;
+      }
+      frame = requestAnimationFrame(panAtEdge);
+      const elapsed = Math.max(0, Math.min(now - previousTime, 50)) / 1000;
+      previousTime = now;
+      const projection = getCanvasProjection(canvas);
+      if (!projection) return;
+      const { bounds, position, scaleX, scaleY } = projection;
+      const x = (Input.mouseX - position.x) * scaleX;
+      const y = (Input.mouseY - position.y) * scaleY;
+      if (x < 0 || x > bounds.width || y < 0 || y > bounds.height) return;
+      const travel = 450 * elapsed;
+      const dx = getEdgePanStrength(x, bounds.width) * travel / scaleX;
+      const dy = getEdgePanStrength(y, bounds.height) * travel / scaleY;
+      if (!dx && !dy) return;
+      rememberCamera(canvas);
+      Input.panObjectDragBy(dx, dy);
+    };
+
+    const update = ({ detail }: CustomEvent<ObjectManipulationPreview | null>) => {
+      if (detail?.kind !== 'drag') {
+        stop();
+        return;
+      }
+      if (frame !== undefined) return;
+      canvas = viewportContainerRef.current?.querySelector<HTMLCanvasElement>('canvas#canvas') ?? undefined;
+      if (!canvas) return;
+      scene = Engine.currentScene;
+      previousTime = performance.now();
+      frame = requestAnimationFrame(panAtEdge);
+    };
+
+    Engine.on('objectManipulationPreview', update);
+    window.addEventListener('playground-before-run', stop);
+    return () => {
+      Engine.off('objectManipulationPreview', update);
+      window.removeEventListener('playground-before-run', stop);
+      stop();
+    };
+  }, [isEditingScene, rememberCamera]);
+
   const endPan = useCallback((cancel = false) => {
     const drag = pan.current;
     if (!drag) return;
@@ -508,6 +572,7 @@ const Viewport: React.FC = () => {
     savedCamera.current = null;
     endPan();
     if (saved?.canvas.isConnected && saved.scene === Engine.currentScene) {
+      Input.cancelObjectManipulation();
       Engine.camera.position.set(saved.x, saved.y);
       Engine.camera.zoom = saved.zoom;
     }

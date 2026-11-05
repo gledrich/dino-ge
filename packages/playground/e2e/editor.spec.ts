@@ -1457,6 +1457,76 @@ new Engine({ onLoad() {
   await expect.poll(readCamera).toEqual({ x: 40, y: 30, zoom: 1 });
 });
 
+test('pans at the edge while dragging and restores the camera and object on cancellation', async ({ page }) => {
+  await page.route('**/files', route => route.fulfill({ json: ['script'] }));
+  await page.route('**/api/scripts/script', route => route.fulfill({ json: `
+import { Engine, Rectangle, Vector2 } from 'dino-ge';
+new Engine({ onLoad() {
+  Engine.camera.position.set(40, 30);
+  new Rectangle({ tag: 'Platform', position: new Vector2(350, 250), width: 64, height: 48 });
+}, update() {} }, { containerId: 'playground-canvas-container' });` }));
+  await page.goto('/');
+  const platform = page.getByRole('button', { name: 'Platform', exact: true });
+  await expect(platform).toBeVisible();
+  await page.getByRole('button', { name: 'Edit scene', exact: true }).click();
+  await page.getByRole('button', { name: 'Zoom in', exact: true }).click();
+  const canvas = page.locator('#canvas');
+  const box = (await canvas.boundingBox())!;
+  const view = () => canvas.evaluate((element: HTMLCanvasElement) => {
+    const { Engine } = window as unknown as {
+      Engine: {
+        camera: { position: { x: number; y: number }; zoom: number };
+        objects: Iterable<{ transform: { position: { x: number } } }>;
+      };
+    };
+    const { position, zoom } = Engine.camera;
+    return { x: position.x, y: position.y, zoom, width: element.width, height: element.height,
+      objectX: Array.from(Engine.objects)[0].transform.position.x };
+  });
+  const baseline = await view();
+  const origin = { x: box.x + (370 - baseline.x) * baseline.zoom * box.width / baseline.width,
+    y: box.y + (270 - baseline.y) * baseline.zoom * box.height / baseline.height };
+  const edgeX = box.x + box.width - 8;
+  const readout = page.getByRole('group', { name: 'Current scene gesture' });
+  const x = page.getByRole('spinbutton', { name: 'X', exact: true });
+  const dragToEdge = async () => {
+    await page.mouse.move(origin.x, origin.y);
+    await page.mouse.down();
+    await page.mouse.move(edgeX, origin.y, { steps: 6 });
+    await expect(readout).toContainText('Move');
+    await expect.poll(async () => (await view()).x).toBeGreaterThan(baseline.x + 20);
+  };
+
+  await dragToEdge();
+  const panned = await view();
+  const worldX = panned.x + (edgeX - box.x) * panned.width / box.width / panned.zoom;
+  expect(panned.objectX).toBeCloseTo(worldX - 20, 0);
+  await page.mouse.move(box.x + box.width / 2, origin.y);
+  const inside = await view();
+  await page.evaluate(() => new Promise<void>(resolve => requestAnimationFrame(() => requestAnimationFrame(() => resolve()))));
+  expect(await view()).toEqual(inside);
+  await page.keyboard.press('Escape');
+  await page.mouse.up();
+  await expect.poll(view).toEqual(baseline);
+  await expect(x).toHaveValue('350.00');
+  await expect(platform).toHaveAccessibleDescription('');
+
+  await page.getByRole('button', { name: 'Snap to grid', exact: true }).click();
+  await dragToEdge();
+  await page.mouse.up();
+  await expect(platform).toHaveAccessibleDescription('Pending canvas changes');
+  const placedX = (await view()).objectX;
+  expect(placedX % 16).toBe(0);
+  expect((await view()).x).toBeGreaterThan(baseline.x + 20);
+  await page.getByRole('button', { name: 'Apply placement to code' }).click();
+  await expect.poll(() => page.evaluate(() => {
+    const { monaco } = window as typeof window & { monaco: Monaco };
+    return monaco.editor.getEditors()[0].getValue();
+  })).toContain(`new Vector2(${placedX}, 256)`);
+  await page.getByRole('button', { name: 'Play', exact: true }).click();
+  await expect.poll(view).toMatchObject({ x: 40, y: 30, zoom: 1 });
+});
+
 test('zooms at the pointer and preserves world coordinates for placement', async ({ page }) => {
   await page.route('**/files', route => route.fulfill({ json: ['script'] }));
   await page.route('**/api/scripts/script', route => route.fulfill({ json: `

@@ -25,7 +25,9 @@ type ObjectGesture = {
   previewValue?: Vector2;
   previewProportional?: boolean;
 } & (
-  | { kind: 'drag'; offset: Vector2 }
+  | { kind: 'drag'; offset: Vector2; panOrigin?: {
+    camera: typeof Engine.camera; scene: typeof Engine.currentScene; position: Vector2;
+  } }
   | { kind: 'resize'; offset: Vector2; initialBounds?: Vector2; initialWorldSize: Vector2 }
   | { kind: 'rotate'; pointerAngle: number; rotation: number }
   | { kind: 'p1' | 'p2'; object: Line; offset: Vector2 }
@@ -48,6 +50,23 @@ export default class Input {
     return this.gesture !== null;
   }
 
+  /** Roll back any in-progress object manipulation. */
+  static cancelObjectManipulation(): void {
+    this.finishGesture();
+  }
+
+  /** Pan by a world-space delta during a paused drag and refresh the object under the pointer. */
+  static panObjectDragBy(x: number, y: number): void {
+    const gesture = this.gesture;
+    if (gesture?.kind !== 'drag' || !gesture.previewValue || !gesture.startedPaused || !this.isGestureActive(gesture) ||
+        !Number.isFinite(x) || !Number.isFinite(y) || (!x && !y)) return;
+    const { camera, currentScene: scene } = Engine;
+    gesture.panOrigin ??= { camera, scene, position: camera.position.clone() };
+    if (gesture.panOrigin.camera !== camera || gesture.panOrigin.scene !== scene) return;
+    camera.position.set(camera.position.x + x, camera.position.y + y);
+    this.moveObjectDrag(gesture);
+  }
+
   private static isGestureActive(gesture: ObjectGesture) {
     return Engine.debug && gesture.object === Engine.selectedObject && (!gesture.startedPaused || Engine.paused);
   }
@@ -59,6 +78,10 @@ export default class Input {
     const pointer = gesture.pointer;
     if (pointer?.canvas.hasPointerCapture(pointer.id)) pointer.canvas.releasePointerCapture(pointer.id);
     const { object, kind, initial, previewValue } = gesture;
+    if (!commit && kind === 'drag' && gesture.panOrigin && gesture.panOrigin.camera === Engine.camera &&
+        gesture.panOrigin.scene === Engine.currentScene) {
+      Engine.camera.position.copy(gesture.panOrigin.position);
+    }
     if (!commit && initial && previewValue) {
       if (kind === 'drag') {
         if (object instanceof Line) object.setOrigin(initial.x, initial.y);
@@ -234,6 +257,34 @@ export default class Input {
     this.publishPreview(gesture, proportional);
   }
 
+  private static moveObjectDrag(gesture: Extract<ObjectGesture, { kind: 'drag' }>) {
+    const { object } = gesture;
+    const { parent, position } = object.transform;
+    const step = Engine.debugPositionGridSize;
+    let x = snapToGrid(this.mouseX - gesture.offset.x, step);
+    let y = snapToGrid(this.mouseY - gesture.offset.y, step);
+    if (parent) {
+      const origin = parent.worldPosition;
+      const scale = parent.worldScale;
+      const rotation = parent.worldRotation;
+      const dx = x - origin.x;
+      const dy = y - origin.y;
+      const cos = Math.cos(rotation);
+      const sin = Math.sin(rotation);
+      // Undo the parent's translation, rotation and scale in reverse order.
+      // A collapsed axis has no inverse, so retain its local coordinate.
+      x = scale.x === 0 ? position.x : (dx * cos + dy * sin) / scale.x;
+      y = scale.y === 0 ? position.y : (-dx * sin + dy * cos) / scale.y;
+    }
+    if (object instanceof Line) {
+      object.setOrigin(x, y);
+    } else {
+      position.x = x;
+      position.y = y;
+    }
+    this.publishPreview(gesture);
+  }
+
   /**
    * initialises input event listeners.
    */
@@ -297,31 +348,7 @@ export default class Input {
       }
 
       if (gesture?.kind === 'drag') {
-        const { object } = gesture;
-        const { parent, position } = object.transform;
-        const step = Engine.debugPositionGridSize;
-        let x = snapToGrid(this.mouseX - gesture.offset.x, step);
-        let y = snapToGrid(this.mouseY - gesture.offset.y, step);
-        if (parent) {
-          const origin = parent.worldPosition;
-          const scale = parent.worldScale;
-          const rotation = parent.worldRotation;
-          const dx = x - origin.x;
-          const dy = y - origin.y;
-          const cos = Math.cos(rotation);
-          const sin = Math.sin(rotation);
-          // Undo the parent's translation, rotation and scale in reverse order.
-          // A collapsed axis has no inverse, so retain its local coordinate.
-          x = scale.x === 0 ? position.x : (dx * cos + dy * sin) / scale.x;
-          y = scale.y === 0 ? position.y : (-dx * sin + dy * cos) / scale.y;
-        }
-        if (object instanceof Line) {
-          object.setOrigin(x, y);
-        } else {
-          position.x = x;
-          position.y = y;
-        }
-        this.publishPreview(gesture);
+        this.moveObjectDrag(gesture);
         return;
       }
 
