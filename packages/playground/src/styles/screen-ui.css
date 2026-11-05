@@ -1,0 +1,35 @@
+.screen-ui-explorer {
+  margin-top: 8px;
+  border-top: 1px solid var(--border-color);
+}
+
+.screen-ui-explorer h3 {
+  margin: 8px 10px 4px;
+  font-size: 11px;
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  letter-spacing: .05em;
+}
+
+.screen-ui-properties {
+  margin-block: 8px;
+}
+
+.screen-ui-properties dd {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+.screen-ui-outline-layer {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  pointer-events: none;
+  z-index: 20;
+}
+
+.screen-ui-outline {
+  position: absolute;
+  outline: 2px solid var(--accent-primary);
+  box-shadow: 0 0 0 3px var(--bg-primary);
+}

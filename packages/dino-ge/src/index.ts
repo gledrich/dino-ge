@@ -33,4 +33,7 @@ export { default as Rectangle } from './objects/Rectangle.js';
 export { default as Text } from './objects/Text.js';
 export { default as Tilemap } from './objects/Tilemap.js';
 export { default as Sound, type SoundChannel, type SoundPlaybackOptions, type SoundVolumeChannel } from './core/Sound.js';
-export { default as ScreenUI, type ScreenButton, type ScreenLabel, type ScreenProgressBar, type ScreenRect } from './core/ScreenUI.js';
+export {
+  default as ScreenUI, type ScreenButton, type ScreenLabel, type ScreenProgressBar, type ScreenRect,
+  type ScreenUIControl, type ScreenUISnapshot,
+} from './core/ScreenUI.js';

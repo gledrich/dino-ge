@@ -1,4 +1,6 @@
 import { playgroundLogs, type LogLevel } from './LogManager';
+import { isScreenUIBounds, isScreenUIFrame, screenUIPreview } from './screen-ui-preview';
+import { findScreenUICall, resolveScreenUISource } from './screen-ui-source';
 
 type Snapshot = { entry: string; files: Map<string, Blob> };
 type Controls = { paused: boolean; debug: boolean };
@@ -60,6 +62,7 @@ export function startBrowserPreview(
   snapshot: Snapshot,
   initialControls: Controls,
   reportError: (message: string) => void,
+  scriptId?: string,
 ) {
   const brokerUrl = previewOrigin(address);
   const origin = brokerUrl.origin;
@@ -79,6 +82,9 @@ export function startBrowserPreview(
   let controls = initialControls;
   let prepared = false;
   let startupStage = 'connecting to the isolated preview';
+  let sourceRequest = 0;
+  const screenUI = screenUIPreview.start(index =>
+    frame?.contentWindow?.postMessage({ type: 'preview-screen-ui-source', index, request: ++sourceRequest }, origin));
   const sendCommand = (command: SceneCommand) => frame?.contentWindow?.postMessage({
     type: 'preview-scene-command', ...command
   }, origin);
@@ -96,6 +102,7 @@ export function startBrowserPreview(
     clearTimeout(timer);
     window.removeEventListener('message', receiveMessage);
     channel.port1.close();
+    screenUI.dispose();
     if (!prepared) channel.port2.close();
     broker.remove();
     frame?.remove();
@@ -143,6 +150,21 @@ export function startBrowserPreview(
           (selectedId === null || (typeof selectedId === 'string' && selectedId.length <= 100))) {
         publishScene({ objects, selectedId });
       }
+    } else if (type === 'preview-screen-ui' && isScreenUIFrame(event.data.frame) && isScreenUIBounds(event.data.canvas)) {
+      screenUI.publish(event.data.frame, event.data.canvas);
+    } else if (type === 'preview-screen-ui-source') {
+      const { index, stack, request } = event.data;
+      const control = Number.isInteger(index) ? screenUIPreview.getSnapshot().frame?.controls[index] : undefined;
+      if (!scriptId || request !== sourceRequest || !control || typeof stack !== 'string' || stack.length > 4_000) return;
+      const location = resolveScreenUISource(stack, new URL(frame.src));
+      const file = location && snapshot.files.get(location.path);
+      if (!location || !file || !location.path.endsWith('.js')) return;
+      void file.text().then(source => {
+        const call = findScreenUICall(source, control.kind, location);
+        if (call && request === sourceRequest) {
+          screenUI.setSource(index, { ...location, ...call, source, kind: control.kind, scriptId, entry: location.path === snapshot.entry });
+        }
+      }).catch(() => {});
     } else if (type === 'preview-console' && logLevels.has(level) && typeof message === 'string') {
       playgroundLogs.add(level as LogLevel, message.slice(0, 8_000));
     }

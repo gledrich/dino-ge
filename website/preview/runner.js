@@ -8,6 +8,7 @@ const report = error => tellEditor("preview-error", { message: messageOf(error).
 
 const sceneObjects = () => Engine.currentScene?.objects ?? Engine.objects;
 let lastScene = "";
+let screenUISourceRequest;
 
 function publishScene() {
   const objects = [];
@@ -33,6 +34,9 @@ window.addEventListener("message", event => {
   if (data?.type === "preview-controls" && typeof data.paused === "boolean" && typeof data.debug === "boolean") {
     Engine.paused = data.paused;
     Engine.debug = data.debug;
+  } else if (data?.type === "preview-screen-ui-source" && Number.isInteger(data.index) &&
+      data.index >= 0 && data.index < 250 && Number.isInteger(data.request)) {
+    screenUISourceRequest = { index: data.index, request: data.request };
   } else if (data?.type === "preview-scene-command" && typeof data.id === "string") {
     const object = [...sceneObjects()].find(candidate => candidate.id === data.id);
     if (!object) return;
@@ -52,6 +56,29 @@ window.addEventListener("message", event => {
     publishScene();
   }
 });
+
+Engine.observeScreenUI(({ width, height, controls, source }) => {
+  const surface = document.querySelector("#playground-canvas-container canvas");
+  if (!surface || width <= 0 || height <= 0) return;
+  const { x, y, width: cssWidth, height: cssHeight } = surface.getBoundingClientRect();
+  const previewControls = controls.slice(0, 250).map(control => {
+    const bounded = { ...control };
+    for (const key of ["id", "text", "colour", "background", "font"]) {
+      if (bounded[key]?.length > 500) bounded[key] = bounded[key].slice(0, 500);
+    }
+    return bounded;
+  });
+  tellEditor("preview-screen-ui", {
+    frame: { width, height, controls: previewControls },
+    canvas: { x, y, width: cssWidth, height: cssHeight },
+  });
+  if (source && source.index === screenUISourceRequest?.index) {
+    tellEditor("preview-screen-ui-source", {
+      index: source.index, request: screenUISourceRequest.request, stack: source.stack.slice(0, 4000),
+    });
+    screenUISourceRequest = undefined;
+  }
+}, () => screenUISourceRequest?.index);
 
 Engine.on("gameRuntimeError", ({ detail }) => report(detail.error));
 window.addEventListener("error", event => report(event.error ?? event.message));

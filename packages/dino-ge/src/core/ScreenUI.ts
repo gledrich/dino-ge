@@ -34,6 +34,38 @@ export interface ScreenProgressBar extends ScreenRect {
   background?: string;
 }
 
+/** Data describing one logical ScreenUI draw in canvas pixels. */
+export interface ScreenUIControl extends ScreenRect {
+  kind: 'panel' | 'label' | 'image' | 'button' | 'progressBar';
+  id?: string;
+  text?: string;
+  enabled?: boolean;
+  value?: number;
+  colour?: string;
+  background?: string;
+  font?: string;
+}
+
+export interface ScreenUISnapshot {
+  width: number;
+  height: number;
+  controls: readonly ScreenUIControl[];
+  source?: { index: number; stack: string };
+}
+
+export interface ScreenUIObservation {
+  listener: (snapshot: ScreenUISnapshot) => void;
+  getSourceIndex?: () => number | undefined;
+}
+
+interface ObservedFrame {
+  controls: ScreenUIControl[];
+  requests: Map<ScreenUIObservation, number | undefined>;
+  stacks: Map<number, string | undefined>;
+}
+
+const controlTextFields = ['id', 'text', 'colour', 'background', 'font'] as const;
+
 /** A screen-space canvas layer. The game chooses which controls to draw each frame. */
 export default class ScreenUI {
   private readonly lifetime = new AbortController();
@@ -42,6 +74,12 @@ export default class ScreenUI {
   private pointer?: Vector2;
   private focused?: string;
   private previousCursor?: string;
+  private observedFrame?: ObservedFrame;
+  private observers?: ReadonlySet<ScreenUIObservation>;
+  private readonly lastPublished = new WeakMap<ScreenUIObservation, {
+    frame: string;
+    source?: ScreenUISnapshot['source'];
+  }>();
 
   constructor(private readonly ctx: CanvasRenderingContext2D) {
     this.canvas = ctx.canvas;
@@ -95,8 +133,11 @@ export default class ScreenUI {
     return new Vector2(left + x, top + y);
   }
 
-  render(draw: (ui: ScreenUI) => void): void {
+  render(draw: (ui: ScreenUI) => void, observers?: ReadonlySet<ScreenUIObservation>): void {
     this.buttons = [];
+    this.observers = observers;
+    const frame = this.beginObservation(observers);
+    this.observedFrame = frame;
     this.ctx.save();
     try {
       draw(this);
@@ -110,26 +151,23 @@ export default class ScreenUI {
         this.previousCursor = undefined;
       }
     } finally {
+      this.observedFrame = undefined;
       this.ctx.restore();
     }
+    if (frame && !this.lifetime.signal.aborted) this.publish(frame, observers);
   }
 
-  panel({ x, y, width, height }: ScreenRect, colour: string): void {
-    this.ctx.fillStyle = colour;
-    this.ctx.fillRect(x, y, width, height);
+  panel(rect: ScreenRect, colour: string): void {
+    this.drawPanel(rect, colour, this.observedFrame);
   }
 
-  label({ x, y, text, colour = '#fff', font = '16px sans-serif', align = 'left', maxWidth }: ScreenLabel): void {
-    this.ctx.fillStyle = colour;
-    this.ctx.font = font;
-    this.ctx.textAlign = align;
-    this.ctx.textBaseline = 'middle';
-    if (maxWidth === undefined) this.ctx.fillText(text, x, y);
-    else this.ctx.fillText(text, x, y, maxWidth);
+  label(label: ScreenLabel): void {
+    this.drawLabel(label, this.observedFrame);
   }
 
   image(image: CanvasImageSource, { x, y, width, height }: ScreenRect): void {
     this.ctx.drawImage(image, x, y, width, height);
+    if (this.observedFrame) this.record(this.observedFrame, { kind: 'image', x, y, width, height });
   }
 
   button(button: ScreenButton): void {
@@ -138,19 +176,108 @@ export default class ScreenUI {
       background = '#25383e', hoverBackground = '#39515a', font = 'bold 14px sans-serif' } = button;
     const highlighted = enabled && ((this.pointer && this.contains(button, this.pointer)) ||
       (this.focused === (button.id ?? text) && document.activeElement === this.canvas));
-    this.panel(button, highlighted ? hoverBackground : enabled ? background : '#424c4e');
-    this.label({ x: x + width / 2, y: y + height / 2, text, align: 'center', colour, font, maxWidth: width - 8 });
+    this.drawPanel(button, highlighted ? hoverBackground : enabled ? background : '#424c4e');
+    this.drawLabel({ x: x + width / 2, y: y + height / 2, text, align: 'center', colour, font, maxWidth: width - 8 });
+    if (this.observedFrame) this.record(this.observedFrame, {
+      kind: 'button', x, y, width, height, id: button.id, text, enabled, colour, background, font,
+    });
   }
 
-  progressBar({ value, colour = '#f6b754', background = '#30434a', ...rect }: ScreenProgressBar): void {
-    this.panel(rect, background);
+  progressBar({ value, colour = '#f6b754', background = '#30434a', x, y, width, height }: ScreenProgressBar): void {
+    this.drawPanel({ x, y, width, height }, background);
     const progress = Number.isFinite(value) ? Math.min(1, Math.max(0, value)) : 0;
-    this.panel({ ...rect, width: rect.width * progress }, colour);
+    this.drawPanel({ x, y, width: width * progress, height }, colour);
+    if (this.observedFrame) this.record(this.observedFrame, {
+      kind: 'progressBar', x, y, width, height, value: progress, colour, background,
+    });
   }
 
   dispose(): void {
+    if (this.lifetime.signal.aborted) return;
     this.lifetime.abort();
     this.buttons = [];
+    const observers = this.observers;
+    this.observers = undefined;
+    if (observers?.size) {
+      const snapshot = { width: this.width, height: this.height, controls: [] };
+      for (const observer of observers) observer.listener(snapshot);
+    }
+  }
+
+  private drawPanel({ x, y, width, height }: ScreenRect, colour: string, frame?: ObservedFrame): void {
+    this.ctx.fillStyle = colour;
+    this.ctx.fillRect(x, y, width, height);
+    if (frame) this.record(frame, { kind: 'panel', x, y, width, height, colour });
+  }
+
+  private drawLabel(
+    { x, y, text, colour = '#fff', font = '16px sans-serif', align = 'left', maxWidth }: ScreenLabel,
+    frame?: ObservedFrame,
+  ): void {
+    this.ctx.fillStyle = colour;
+    this.ctx.font = font;
+    this.ctx.textAlign = align;
+    this.ctx.textBaseline = 'middle';
+    if (maxWidth === undefined) this.ctx.fillText(text, x, y);
+    else this.ctx.fillText(text, x, y, maxWidth);
+    if (!frame || typeof text !== 'string') return;
+    const metrics = this.ctx.measureText(text);
+    const scale = maxWidth === undefined || metrics.width <= 0
+      ? 1 : Math.min(1, Math.max(0, maxWidth) / metrics.width);
+    this.record(frame, {
+      kind: 'label',
+      x: x - metrics.actualBoundingBoxLeft * scale,
+      y: y - metrics.actualBoundingBoxAscent,
+      width: (metrics.actualBoundingBoxLeft + metrics.actualBoundingBoxRight) * scale,
+      height: metrics.actualBoundingBoxAscent + metrics.actualBoundingBoxDescent,
+      text, colour, font: this.ctx.font,
+    });
+  }
+
+  private beginObservation(observers?: ReadonlySet<ScreenUIObservation>): ObservedFrame | undefined {
+    if (!observers?.size) return;
+    const frame: ObservedFrame = { controls: [], requests: new Map(), stacks: new Map() };
+    for (const observer of observers) {
+      const index = observer.getSourceIndex?.();
+      frame.requests.set(observer, index);
+      if (index !== undefined) frame.stacks.set(index, undefined);
+    }
+    return frame;
+  }
+
+  private record(frame: ObservedFrame, control: ScreenUIControl): void {
+    const { width, height } = control;
+    if (width < 0) {
+      control.x += width;
+      control.width = -width;
+    }
+    if (height < 0) {
+      control.y += height;
+      control.height = -height;
+    }
+    if (![control.x, control.y, width, height].every(Number.isFinite)) return;
+    for (const field of controlTextFields) {
+      if (typeof control[field] !== 'string') delete control[field];
+    }
+    if (typeof control.enabled !== 'boolean') delete control.enabled;
+    const index = frame.controls.length;
+    if (frame.stacks.has(index)) frame.stacks.set(index, new Error().stack ?? '');
+    frame.controls.push(control);
+  }
+
+  private publish(frame: ObservedFrame, observers?: ReadonlySet<ScreenUIObservation>): void {
+    const snapshot = { width: this.width, height: this.height, controls: frame.controls };
+    const signature = JSON.stringify(snapshot);
+    for (const [observer, index] of frame.requests) {
+      if (this.lifetime.signal.aborted) break;
+      if (!observers?.has(observer)) continue;
+      const previous = this.lastPublished.get(observer);
+      const stack = index === undefined ? undefined : frame.stacks.get(index);
+      const source = index !== undefined && stack !== undefined ? { index, stack } : undefined;
+      const changedSource = source && (source.index !== previous?.source?.index || source.stack !== previous.source.stack);
+      this.lastPublished.set(observer, { frame: signature, source });
+      if (previous?.frame !== signature || changedSource) observer.listener(source ? { ...snapshot, source } : snapshot);
+    }
   }
 
   private position(event: MouseEvent): Vector2 {

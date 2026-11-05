@@ -6,6 +6,7 @@ import Editor from './components/Editor';
 import Inspector from './components/Inspector';
 import SceneExplorer from './components/SceneExplorer';
 import { BrowserInspector, BrowserSceneExplorer } from './components/BrowserSceneTools';
+import { ScreenUIInspector } from './components/ScreenUITools';
 import Console from './components/Console';
 import Viewport from './components/Viewport';
 import CanvasChangesDialog from './components/CanvasChangesDialog';
@@ -195,7 +196,9 @@ function App() {
         <div className="explorer-scene">{browserPreviewUrl ? <BrowserSceneExplorer /> : <SceneExplorer />}</div>
         <div className="explorer-library"><Sidebar mobileDock={mobile} /></div>
       </>, explorerHost)}
-      {createPortal(browserPreviewUrl ? <BrowserInspector visible /> : <Inspector visible />, inspectorHost)}
+      {createPortal(<ScreenUIInspector>
+        {browserPreviewUrl ? <BrowserInspector visible /> : <Inspector visible />}
+      </ScreenUIInspector>, inspectorHost)}
       {createPortal(<Editor currentScriptId={currentScriptId} onSave={handleSave} onSelectScript={selectScript} />, editorHost)}
       {createPortal(isToolVisible('console') && <Console />, consoleHost)}
       {pendingRunChange && (

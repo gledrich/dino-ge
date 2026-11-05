@@ -3,6 +3,7 @@ import { Engine, Input, SpriteComponent, getViewportAlignment, snapToGrid, type 
 import { usePlayground } from '../context/PlaygroundContext';
 import type { GameRunError } from '../hooks/usePlaygroundScripts';
 import Toolbar from './Toolbar';
+import { ScreenUIOutline } from './ScreenUITools';
 import Logo from './Logo';
 import { frameSceneObjectEvent, getAssetSource, getDefaultSceneObjectTag, getSceneArrowMovement, getSceneAssetPreviewType, getSceneSelectionBounds, getSceneSource, getSceneSpritePlacement, getSceneSpriteScale, isReplaceableSprite, isSceneFrameShortcut, nudgeSceneSelection, sceneAssetDragEvent, sceneAssetDragType, sceneKeyboardPlacementEvent, sceneObjectDefaults, sceneObjectDragType, sceneObjectKinds, scenePointerDragEvent, type SceneImageAsset, type SceneKeyboardPlacementRequest, type SceneObjectKind, type SceneObjectPlacement, type ScenePointerDrag, type ScenePoint } from '../utils/scene-objects';
 import { browserPreviewUrl, getSpriteImageFileError, importSpriteImage } from '../utils/helpers';
@@ -1111,6 +1112,7 @@ const Viewport: React.FC<{
           Play Amber Ruins directly
         </a>}
       </div>}
+      <ScreenUIOutline />
       <Toolbar 
         isPaused={isPaused}
         isDebug={isDebug}

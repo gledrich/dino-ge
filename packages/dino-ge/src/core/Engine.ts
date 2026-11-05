@@ -2,7 +2,7 @@ import Canvas from './Canvas.js';
 import GameObject from './GameObject.js';
 import Input from './Input.js';
 import Scene from './Scene.js';
-import ScreenUI from './ScreenUI.js';
+import ScreenUI, { type ScreenUISnapshot } from './ScreenUI.js';
 import Camera from './Camera.js';
 import System from './System.js';
 import PhysicsSystem from '../systems/PhysicsSystem.js';
@@ -247,6 +247,29 @@ export default class Engine {
       observers.events.removeEventListener('created', notify);
       if (--observers.count === 0) state.objectCreationObservers = undefined;
     };
+  }
+
+  /** Inspect completed ScreenUI frames. Request a source stack by index when needed. */
+  public static observeScreenUI(
+    listener: (snapshot: ScreenUISnapshot) => void,
+    getSourceIndex?: () => number | undefined,
+  ): () => void {
+    const protect = <Args extends unknown[], Result>(callback: (...args: Args) => Result) =>
+      (...args: Args): Result | undefined => {
+        try {
+          return callback(...args);
+        } catch (error) {
+          try {
+            console.error('Screen UI inspection failed', error);
+          } catch {
+            // A custom Console handler must not interrupt the game frame.
+          }
+        }
+      };
+    const observers = this._state.screenUIObservers ??= new Set();
+    const observer = { listener: protect(listener), getSourceIndex: getSourceIndex && protect(getSourceIndex) };
+    observers.add(observer);
+    return () => { observers.delete(observer); };
   }
 
   /**
@@ -559,7 +582,9 @@ export default class Engine {
     if (Engine.debug && Engine.showDebugHud) {
       this._drawDebug(objects);
     }
-    if (this.screenUI && this.callbacks.drawUI) this.screenUI.render(this.callbacks.drawUI);
+    if (this.screenUI && this.callbacks.drawUI) {
+      this.screenUI.render(this.callbacks.drawUI, Engine._state.screenUIObservers);
+    }
   }
 
   private _drawAlignmentGuides() {

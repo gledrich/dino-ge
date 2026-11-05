@@ -1,6 +1,8 @@
 import { useSyncExternalStore } from 'react';
 import { usePlayground } from '../context/PlaygroundContext';
 import { browserPreviewScene, type PreviewTransform } from '../utils/browser-preview';
+import { screenUIPreview } from '../utils/screen-ui-preview';
+import { ScreenUIExplorer } from './ScreenUITools';
 import '../styles/inspector.css';
 import '../styles/scene-explorer.css';
 
@@ -17,11 +19,15 @@ export function BrowserSceneExplorer() {
         {objects.map(object => (
           <div className={`scene-node ${object.id === selectedId ? 'selected' : ''}`} key={object.id}>
             <button type="button" className="scene-node-select" aria-pressed={object.id === selectedId}
-              onClick={() => browserPreviewScene.select(object.id)}>
+              onClick={() => {
+                screenUIPreview.select(undefined);
+                browserPreviewScene.select(object.id);
+              }}>
               <span className="node-tag">{object.tag || 'Object'}</span>
             </button>
           </div>
         ))}
+        <ScreenUIExplorer />
       </div>
     </div>
   );

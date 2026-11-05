@@ -1,6 +1,8 @@
 import React, { useEffect, useRef, useState } from 'react';
 import * as Dino from 'dino-ge';
 import { usePlayground } from '../context/PlaygroundContext';
+import { ScreenUIExplorer } from './ScreenUITools';
+import { screenUIPreview } from '../utils/screen-ui-preview';
 import { frameSceneObjectEvent, isSceneFrameShortcut, nudgeSceneSelection, revealSceneObjectEvent, type CanvasPlacement } from '../utils/scene-objects';
 import '../styles/scene-explorer.css';
 
@@ -196,6 +198,7 @@ const SceneExplorer: React.FC = () => {
   }, [isExplorerVisible, revealTarget]);
 
   const handleSelect = (obj: Dino.GameObject) => {
+    screenUIPreview.select(undefined);
     Engine.selectedObject = obj;
     // If not in debug mode, enable it to show the selection
     if (!Engine.debug) {
@@ -247,6 +250,7 @@ const SceneExplorer: React.FC = () => {
       <div className="explorer-content">
         {!matches && rootObjects.length === 0 && <div className="empty-scene">No objects in scene</div>}
         {isExplorerVisible && rootObjects.map(object => <SceneNode key={object.id} object={object} depth={0} tree={tree} />)}
+        <ScreenUIExplorer />
       </div>
     </div>
   );

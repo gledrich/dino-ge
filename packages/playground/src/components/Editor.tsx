@@ -6,6 +6,8 @@ import { usePlayground } from '../context/PlaygroundContext';
 import { restoreInspectorProperty, type InspectorPropertyEdit } from './InspectorRow';
 import ProjectFilesDialog from './ProjectFilesDialog';
 import { openProjectObjectSourceEvent, type ProjectObjectSourceRequest } from '../utils/project-object-source';
+import { openScreenUISourceEvent, type OpenScreenUISource } from '../utils/screen-ui-preview';
+import { findScreenUICall } from '../utils/screen-ui-source';
 import { downloadBrowserProject, restoreBrowserProject } from '../utils/browser-project-archive';
 import { browserPreviewUrl, createScript, getCurrentScriptId, getScript, getFilesList, getSpriteImageFileError, readGameFolder, importGameFolder, importSpriteImage, type GameFolder } from '../utils/helpers';
 import { applyEditsToSource, Edit, instrumentCode, getSourceMapping, getSceneObjectCreation, getSceneObjectDeletion, getSceneObjectDuplication, getSceneObjectRename, getSpriteImageReplacement, getUniqueObjectSourceMapping, type CanvasPlacementTransaction } from '../utils/ast-utils';
@@ -53,7 +55,9 @@ const CodeEditor: React.FC<EditorProps> = ({ currentScriptId, onSave, onSelectSc
   const [entryFile, setEntryFile] = useState('');
   const [importing, setImporting] = useState(false);
   const [importError, setImportError] = useState('');
-  const [projectFiles, setProjectFiles] = useState<{ scriptId: string; request?: ProjectObjectSourceRequest; trigger: HTMLButtonElement }>();
+  const [projectFiles, setProjectFiles] = useState<{
+    scriptId: string; request?: ProjectObjectSourceRequest; screenUI?: OpenScreenUISource['location']; trigger: HTMLButtonElement;
+  }>();
   const [dropGuide, setDropGuide] = useState<'code' | 'image'>();
   const [dropFeedback, setDropFeedback] = useState<{ scriptId: string; message: string; error: boolean }>();
   const editorDropTarget = useRef<HTMLDivElement>(null);
@@ -83,6 +87,44 @@ const CodeEditor: React.FC<EditorProps> = ({ currentScriptId, onSave, onSelectSc
     window.addEventListener(openProjectObjectSourceEvent, openSource);
     return () => window.removeEventListener(openProjectObjectSourceEvent, openSource);
   }, [currentScriptId, openTool]);
+
+  useEffect(() => {
+    let frame = 0;
+    const openSource = (event: Event) => {
+      const { location, trigger } = (event as CustomEvent<OpenScreenUISource>).detail;
+      if (location.scriptId !== currentScriptId) return;
+      openTool('editor');
+      if (!location.entry) {
+        setProjectFiles({ scriptId: currentScriptId, screenUI: location, trigger });
+        return;
+      }
+      cancelAnimationFrame(frame);
+      frame = requestAnimationFrame(() => {
+        const codeEditor = monacoEditorRef.current;
+        const model = codeEditor?.getModel();
+        if (!codeEditor || !model) return;
+        const runningSource = normaliseEntryText(location.source);
+        const modelSource = normaliseEntryText(model.getValue());
+        const target = modelSource === runningSource ? location
+          : loadedEntrySource.current === runningSource && isTrustedEntryModel(model)
+            ? findScreenUICall(modelSource, location.kind, location, runningSource) : undefined;
+        if (!target) {
+          setDropFeedback({ scriptId: currentScriptId, message: 'Reset the game to refresh the Screen UI source location.', error: true });
+          return;
+        }
+        codeEditor.layout();
+        const position = model.validatePosition(target);
+        codeEditor.setPosition(position);
+        codeEditor.revealPositionInCenterIfOutsideViewport(position);
+        codeEditor.focus();
+      });
+    };
+    window.addEventListener(openScreenUISourceEvent, openSource);
+    return () => {
+      cancelAnimationFrame(frame);
+      window.removeEventListener(openScreenUISourceEvent, openSource);
+    };
+  }, [currentScriptId, isTrustedEntryModel, monacoEditorRef, openTool]);
 
   const dropObjectCode = useCallback((item: ScenePointerDragItem) => {
     const { sourceId, tag, error } = insertSceneObjectCode(item, currentScriptId);
@@ -892,7 +934,7 @@ const CodeEditor: React.FC<EditorProps> = ({ currentScriptId, onSave, onSelectSc
       )}
       {importError && <p className="import-game-error" role="alert">{importError}</p>}
       {projectFiles?.scriptId === currentScriptId && <ProjectFilesDialog key={currentScriptId} scriptId={currentScriptId}
-        initialSource={projectFiles.request?.source} prepareDraft={projectFiles.request?.prepareDraft}
+        initialSource={projectFiles.request?.source} screenUISource={projectFiles.screenUI} prepareDraft={projectFiles.request?.prepareDraft}
         onClose={() => {
           setProjectFiles(undefined);
           const { trigger } = projectFiles;

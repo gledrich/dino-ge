@@ -3,9 +3,11 @@ import Editor from '@monaco-editor/react';
 import type { editor } from 'monaco-editor';
 import { listProjectModules, ProjectModuleConflict, readProjectModule, saveProjectModule } from '../utils/helpers';
 import { getProjectObjectLocation, markProjectModuleEdited, recordProjectPlacementSave, type ProjectObjectSource, type ProjectObjectSourceRequest, type ProjectPlacementDraft } from '../utils/project-object-source';
+import type { ScreenUISource } from '../utils/screen-ui-preview';
 
-export default function ProjectFilesDialog({ scriptId, initialSource, prepareDraft, onClose }: {
-  scriptId: string; initialSource?: ProjectObjectSource; prepareDraft?: ProjectObjectSourceRequest['prepareDraft']; onClose: () => void;
+export default function ProjectFilesDialog({ scriptId, initialSource, screenUISource, prepareDraft, onClose }: {
+  scriptId: string; initialSource?: ProjectObjectSource; screenUISource?: ScreenUISource;
+  prepareDraft?: ProjectObjectSourceRequest['prepareDraft']; onClose: () => void;
 }) {
   const dialog = useRef<HTMLDialogElement>(null);
   const [modules, setModules] = useState<string[]>();
@@ -21,9 +23,12 @@ export default function ProjectFilesDialog({ scriptId, initialSource, prepareDra
   const [conflict, setConflict] = useState(false);
   const ready = loaded?.path === path && !!path;
   const dirty = ready && draft !== loaded?.value;
-  const sourceLocation = ready && initialSource?.path === path
-    ? getProjectObjectLocation(initialSource, loaded.value, placementDraft) : undefined;
-  const staleLocation = ready && initialSource?.path === path && !sourceLocation;
+  const sourcePath = screenUISource?.path ?? initialSource?.path;
+  const sourceLocation = ready && sourcePath === path
+    ? screenUISource ? loaded.value === screenUISource.source ? screenUISource : undefined
+      : initialSource && getProjectObjectLocation(initialSource, loaded.value, placementDraft)
+    : undefined;
+  const staleLocation = ready && sourcePath === path && !sourceLocation;
 
   useEffect(() => {
     const element = dialog.current;
@@ -36,12 +41,11 @@ export default function ProjectFilesDialog({ scriptId, initialSource, prepareDra
     void listProjectModules(scriptId, controller.signal).then(files => {
       if (controller.signal.aborted) return;
       setModules(files);
-      const sourcePath = initialSource?.path;
-      if (sourcePath && !files.includes(sourcePath)) setError('The selected object’s source module is unavailable.');
+      if (sourcePath && !files.includes(sourcePath)) setError('The selected source module is unavailable.');
       setPath(sourcePath && files.includes(sourcePath) ? sourcePath : files[0] ?? '');
     }).catch(error => { if (!controller.signal.aborted) setError(error.message); });
     return () => controller.abort();
-  }, [scriptId, initialSource]);
+  }, [scriptId, sourcePath]);
 
   useEffect(() => {
     if (!path) return;
@@ -126,7 +130,7 @@ export default function ProjectFilesDialog({ scriptId, initialSource, prepareDra
       {ready && staleLocation && !status && !error && <p role="status">Reset the game to refresh the source location.</p>}
       {ready && (
         <div className="project-module-editor">
-          <Editor height="100%" defaultLanguage="javascript" theme="vs-dark" value={draft} saveViewState={!initialSource}
+          <Editor height="100%" defaultLanguage="javascript" theme="vs-dark" value={draft} saveViewState={!sourcePath}
             path={`file:///projects/${scriptId.split('/')[0]}/${path.split('/').map(encodeURIComponent).join('/')}`}
             onMount={(editor: editor.IStandaloneCodeEditor) => {
               if (!sourceLocation) return;

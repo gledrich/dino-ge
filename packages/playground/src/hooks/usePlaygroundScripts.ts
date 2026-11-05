@@ -1,11 +1,13 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import * as Dino from 'dino-ge';
-import { browserPreviewUrl, getScript, setCurrentScriptId as rememberScriptId, updateScript } from '../utils/helpers';
+import { browserPreviewUrl, getScript, readProjectModule, setCurrentScriptId as rememberScriptId, updateScript } from '../utils/helpers';
 import { instrumentCode, rebaseModule } from '../utils/ast-utils';
-import { trackProjectObjectSources } from '../utils/project-object-source';
+import { isUneditedProjectRunModule, trackProjectObjectSources } from '../utils/project-object-source';
 import runtimeModulePath from '../utils/game-module-runtime.js?url&no-inline';
 import { browserWorkspace } from '../utils/browser-workspace';
 import { startBrowserPreview } from '../utils/browser-preview';
+import { screenUIPreview } from '../utils/screen-ui-preview';
+import { findScreenUICall, resolveScreenUISource } from '../utils/screen-ui-source';
 import { usePlayground } from '../context/PlaygroundContext';
 
 const { Engine, Loader } = Dino;
@@ -76,7 +78,7 @@ export const usePlaygroundScripts = () => {
         window.dispatchEvent(new CustomEvent('playground-before-run', { detail: { scriptId: currentScriptId, source: scriptText } }));
         browserPreview.current = startBrowserPreview(container, browserPreviewUrl, snapshot, previewControls.current, error => {
           if (run === runId.current) setRuntimeError({ phase: 'script', error });
-        });
+        }, currentScriptId);
       } catch (error) {
         if (run === runId.current) setRuntimeError({ phase: 'script', error });
       }
@@ -120,8 +122,12 @@ export const usePlaygroundScripts = () => {
       };
       const releaseUrls = () => moduleUrls.splice(0).forEach(url => URL.revokeObjectURL(url));
       const cancel = () => { delete script.dataset.playgroundRun; };
+      const sources = new AbortController();
+      let stopScreenUI: (() => void) | undefined;
       cancelPendingScript.current = cancel;
       retireScript.current = () => {
+        sources.abort();
+        stopScreenUI?.();
         script.remove();
         releaseUrls();
       };
@@ -135,6 +141,40 @@ export const usePlaygroundScripts = () => {
         const entry = `${rebaseModule(result.code, base, runtimeUrl, run)}\n//# sourceURL=${sourceUrl.href}`;
         const entryUrl = createModuleUrl(entry);
         if (isProject) stopTrackingSources.current = trackProjectObjectSources(currentScriptId, run, entryUrl);
+        const [project, ...modules] = currentScriptId.split('/');
+        const sourceBase = isProject ? new URL(`/project-runs/${run}/${encodeURIComponent(project)}/`, location.href)
+          : new URL('./', sourceUrl);
+        const entryPath = `${isProject ? modules.join('/') : currentScriptId}.js`;
+        let sourceIndex: number | undefined;
+        let sourceRequest = 0;
+        const screenUI = screenUIPreview.start(index => {
+          sourceIndex = index;
+          sourceRequest++;
+        });
+        const unsubscribe = Engine.observeScreenUI(snapshot => {
+          screenUI.publish(snapshot);
+          const drawn = snapshot.source;
+          if (!drawn || drawn.index !== sourceIndex) return;
+          sourceIndex = undefined;
+          const control = snapshot.controls[drawn.index];
+          const position = resolveScreenUISource(drawn.stack, sourceBase, { url: entryUrl, path: entryPath });
+          if (!control || !position || !position.path.endsWith('.js')) return;
+          const isEntry = position.path === entryPath;
+          if (!isEntry && !isUneditedProjectRunModule(currentScriptId, run, position.path)) return;
+          const request = sourceRequest;
+          const loadSource = isEntry ? Promise.resolve(scriptText)
+            : readProjectModule(currentScriptId, position.path, sources.signal).then(file => file.value);
+          void loadSource.then(source => {
+            const call = findScreenUICall(source, control.kind, position, isEntry ? entry : source);
+            if (call && request === sourceRequest) {
+              screenUI.setSource(drawn.index, { ...position, ...call, source, kind: control.kind, scriptId: currentScriptId, entry: isEntry });
+            }
+          }).catch(() => {});
+        }, () => sourceIndex);
+        stopScreenUI = () => {
+          unsubscribe();
+          screenUI.dispose();
+        };
         // A launcher with no exports keeps import() from calling a game's exported `then`.
         const launcherUrl = createModuleUrl(`import ${JSON.stringify(entryUrl)};`);
         await import(/* @vite-ignore */ launcherUrl);

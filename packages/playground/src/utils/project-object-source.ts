@@ -31,6 +31,10 @@ export function markProjectModuleEdited(scriptId: string, path: string) {
   if (activeProject?.scriptId === scriptId) activeProject.modules.set(path, null);
 }
 
+export function isUneditedProjectRunModule(scriptId: string, run: number, path: string) {
+  return activeProject?.scriptId === scriptId && activeProject.run === run && !activeProject.modules.has(path);
+}
+
 export function recordProjectPlacementSave(source: ProjectObjectSource, before: string, draft: ProjectPlacementDraft): boolean {
   if (activeProject?.scriptId !== source.scriptId) return false;
   const previous = activeProject.modules.get(source.path);

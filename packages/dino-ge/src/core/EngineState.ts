@@ -5,6 +5,7 @@ import type System from './System.js';
 import type RenderingSystem from '../systems/RenderingSystem.js';
 import type { CollisionManifold } from '../physics/Physics.js';
 import type { ObjectSet } from './ObjectSet.js';
+import type { ScreenUIObservation } from './ScreenUI.js';
 
 /**
  * Internal state of the engine, shared across instances.
@@ -19,6 +20,7 @@ export interface EngineState {
   renderingSystem?: RenderingSystem;
   events: EventTarget;
   objectCreationObservers?: { events: EventTarget; count: number };
+  screenUIObservers?: Set<ScreenUIObservation>;
   totalPausedTime: number;
   pauseStartTime: number;
   currentScene: Scene | null;
