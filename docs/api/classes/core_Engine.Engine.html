@@ -15,7 +15,7 @@
 <div class="tsd-comment tsd-typography"><p>The core singleton class that manages the game loop, rendering, and scene state.</p>
 </div></section><aside class="tsd-sources">
 <ul>
-<li>Defined in <a href="https://github.com/gledrich/tsge/blob/a10dad59ce9d50469eea15d2242ab0e54b317ba8/packages/dino-ge/src/core/Engine.ts#L72">packages/dino-ge/src/core/Engine.ts:72</a></li></ul></aside>
+<li>Defined in packages/dino-ge/src/core/Engine.ts:85</li></ul></aside>
 <section class="tsd-panel-group tsd-index-group">
 <section class="tsd-panel tsd-index-panel">
 <details class="tsd-index-content tsd-accordion" open><summary class="tsd-accordion-summary tsd-index-summary"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden="true"><use href="../assets/icons.svg#icon-chevronDown"></use></svg>
@@ -43,11 +43,16 @@
 <a href="#currentscene" class="tsd-index-link"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Accessor"><use href="../assets/icons.svg#icon-262144"></use></svg><span>current<wbr/>Scene</span></a>
 <a href="#debug" class="tsd-index-link"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Accessor"><use href="../assets/icons.svg#icon-262144"></use></svg><span>debug</span></a>
 <a href="#debugcollisions" class="tsd-index-link"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Accessor"><use href="../assets/icons.svg#icon-262144"></use></svg><span>debug<wbr/>Collisions</span></a>
+<a href="#debugkeepproportions" class="tsd-index-link"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Accessor"><use href="../assets/icons.svg#icon-262144"></use></svg><span>debug<wbr/>Keep<wbr/>Proportions</span></a>
+<a href="#debugpositiongridsize" class="tsd-index-link"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Accessor"><use href="../assets/icons.svg#icon-262144"></use></svg><span>debug<wbr/>Position<wbr/>Grid<wbr/>Size</span></a>
+<a href="#debugsnapalignment" class="tsd-index-link"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Accessor"><use href="../assets/icons.svg#icon-262144"></use></svg><span>debug<wbr/>Snap<wbr/>Alignment</span></a>
+<a href="#debugsnaprotation" class="tsd-index-link"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Accessor"><use href="../assets/icons.svg#icon-262144"></use></svg><span>debug<wbr/>Snap<wbr/>Rotation</span></a>
 <a href="#objects" class="tsd-index-link"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Accessor"><use href="../assets/icons.svg#icon-262144"></use></svg><span>objects</span></a>
 <a href="#paused" class="tsd-index-link"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Accessor"><use href="../assets/icons.svg#icon-262144"></use></svg><span>paused</span></a>
 <a href="#renderingsystem" class="tsd-index-link"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Accessor"><use href="../assets/icons.svg#icon-262144"></use></svg><span>rendering<wbr/>System</span></a>
 <a href="#selectedobject" class="tsd-index-link"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Accessor"><use href="../assets/icons.svg#icon-262144"></use></svg><span>selected<wbr/>Object</span></a>
 <a href="#showcollisionlines" class="tsd-index-link"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Accessor"><use href="../assets/icons.svg#icon-262144"></use></svg><span>show<wbr/>Collision<wbr/>Lines</span></a>
+<a href="#showdebughud" class="tsd-index-link"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Accessor"><use href="../assets/icons.svg#icon-262144"></use></svg><span>show<wbr/>Debug<wbr/>Hud</span></a>
 <a href="#showphysicsvectors" class="tsd-index-link"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Accessor"><use href="../assets/icons.svg#icon-262144"></use></svg><span>show<wbr/>Physics<wbr/>Vectors</span></a>
 <a href="#sortedobjects" class="tsd-index-link"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Accessor"><use href="../assets/icons.svg#icon-262144"></use></svg><span>sorted<wbr/>Objects</span></a>
 <a href="#totaltime" class="tsd-index-link"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Accessor"><use href="../assets/icons.svg#icon-262144"></use></svg><span>total<wbr/>Time</span></a>
@@ -55,13 +60,18 @@
 </div></section>
 <section class="tsd-index-section">
 <h3 class="tsd-index-heading tsd-anchor-link" id="methods">Methods<a href="#methods" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></h3>
-<div class="tsd-index-list"><a href="#countdown" class="tsd-index-link"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Method"><use href="../assets/icons.svg#icon-2048"></use></svg><span>countdown</span></a>
+<div class="tsd-index-list"><a href="#chromaticaberration" class="tsd-index-link"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Method"><use href="../assets/icons.svg#icon-2048"></use></svg><span>chromatic<wbr/>Aberration</span></a>
+<a href="#countdown" class="tsd-index-link"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Method"><use href="../assets/icons.svg#icon-2048"></use></svg><span>countdown</span></a>
 <a href="#settimeout" class="tsd-index-link"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Method"><use href="../assets/icons.svg#icon-2048"></use></svg><span>set<wbr/>Timeout</span></a>
+<a href="#shakescreen" class="tsd-index-link"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Method"><use href="../assets/icons.svg#icon-2048"></use></svg><span>shake<wbr/>Screen</span></a>
 <a href="#terminate" class="tsd-index-link"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Method"><use href="../assets/icons.svg#icon-2048"></use></svg><span>terminate</span></a>
+<a href="#transitionto" class="tsd-index-link"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Method"><use href="../assets/icons.svg#icon-2048"></use></svg><span>transition<wbr/>To</span></a>
 <a href="#cleandebugcollisions" class="tsd-index-link"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Method"><use href="../assets/icons.svg#icon-2048"></use></svg><span>clean<wbr/>Debug<wbr/>Collisions</span></a>
 <a href="#destroyall" class="tsd-index-link"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Method"><use href="../assets/icons.svg#icon-2048"></use></svg><span>destroy<wbr/>All</span></a>
 <a href="#destroyobject" class="tsd-index-link"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Method"><use href="../assets/icons.svg#icon-2048"></use></svg><span>destroy<wbr/>Object</span></a>
 <a href="#emit" class="tsd-index-link"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Method"><use href="../assets/icons.svg#icon-2048"></use></svg><span>emit</span></a>
+<a href="#observeobjectcreation" class="tsd-index-link"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Method"><use href="../assets/icons.svg#icon-2048"></use></svg><span>observe<wbr/>Object<wbr/>Creation</span></a>
+<a href="#observescreenui" class="tsd-index-link"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Method"><use href="../assets/icons.svg#icon-2048"></use></svg><span>observe<wbr/>Screen<wbr/>UI</span></a>
 <a href="#off" class="tsd-index-link"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Method"><use href="../assets/icons.svg#icon-2048"></use></svg><span>off</span></a>
 <a href="#on" class="tsd-index-link"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Method"><use href="../assets/icons.svg#icon-2048"></use></svg><span>on</span></a>
 <a href="#registerobject" class="tsd-index-link"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Method"><use href="../assets/icons.svg#icon-2048"></use></svg><span>register<wbr/>Object</span></a>
@@ -90,7 +100,7 @@
 </div></li></ul></div>
 <h4 class="tsd-returns-title">Returns <a href="" class="tsd-signature-type tsd-kind-class">Engine</a></h4><aside class="tsd-sources">
 <ul>
-<li>Defined in <a href="https://github.com/gledrich/tsge/blob/a10dad59ce9d50469eea15d2242ab0e54b317ba8/packages/dino-ge/src/core/Engine.ts#L297">packages/dino-ge/src/core/Engine.ts:297</a></li></ul></aside></div></li></ul></section></section></details>
+<li>Defined in packages/dino-ge/src/core/Engine.ts:388</li></ul></aside></div></li></ul></section></section></details>
 <details class="tsd-panel-group tsd-member-group tsd-accordion" open><summary class="tsd-accordion-summary" data-key="section-Properties"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden="true"><use href="../assets/icons.svg#icon-chevronDown"></use></svg>
 <h2 class="tsd-anchor-link" id="properties-1">Properties<a href="#properties-1" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></h2></summary>
 <section>
@@ -100,42 +110,42 @@
 <div class="tsd-comment tsd-typography"><p>Current background colour.</p>
 </div><aside class="tsd-sources">
 <ul>
-<li>Defined in <a href="https://github.com/gledrich/tsge/blob/a10dad59ce9d50469eea15d2242ab0e54b317ba8/packages/dino-ge/src/core/Engine.ts#L259">packages/dino-ge/src/core/Engine.ts:259</a></li></ul></aside></section>
+<li>Defined in packages/dino-ge/src/core/Engine.ts:350</li></ul></aside></section>
 <section class="tsd-panel tsd-member">
 <h3 class="tsd-anchor-link" id="callbacks"><span>callbacks</span><a href="#callbacks" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></h3>
 <div class="tsd-signature"><span class="tsd-kind-property">callbacks</span><span class="tsd-signature-symbol">:</span> <a href="../interfaces/core_Engine.EngineCallbacks.html" class="tsd-signature-type tsd-kind-interface">EngineCallbacks</a></div>
 <div class="tsd-comment tsd-typography"><p>Registered engine callbacks.</p>
 </div><aside class="tsd-sources">
 <ul>
-<li>Defined in <a href="https://github.com/gledrich/tsge/blob/a10dad59ce9d50469eea15d2242ab0e54b317ba8/packages/dino-ge/src/core/Engine.ts#L261">packages/dino-ge/src/core/Engine.ts:261</a></li></ul></aside></section>
+<li>Defined in packages/dino-ge/src/core/Engine.ts:352</li></ul></aside></section>
 <section class="tsd-panel tsd-member">
 <h3 class="tsd-anchor-link" id="fps"><span>fps</span><a href="#fps" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></h3>
 <div class="tsd-signature"><span class="tsd-kind-property">fps</span><span class="tsd-signature-symbol">:</span> <span class="tsd-signature-type">number</span><span class="tsd-signature-symbol"> = 0</span></div>
 <div class="tsd-comment tsd-typography"><p>Current frames per second (rolling average).</p>
 </div><aside class="tsd-sources">
 <ul>
-<li>Defined in <a href="https://github.com/gledrich/tsge/blob/a10dad59ce9d50469eea15d2242ab0e54b317ba8/packages/dino-ge/src/core/Engine.ts#L283">packages/dino-ge/src/core/Engine.ts:283</a></li></ul></aside></section>
+<li>Defined in packages/dino-ge/src/core/Engine.ts:374</li></ul></aside></section>
 <section class="tsd-panel tsd-member">
 <h3 class="tsd-anchor-link" id="frametime"><span>frame<wbr/>Time</span><a href="#frametime" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></h3>
 <div class="tsd-signature"><span class="tsd-kind-property">frameTime</span><span class="tsd-signature-symbol">:</span> <span class="tsd-signature-type">number</span><span class="tsd-signature-symbol"> = 0</span></div>
 <div class="tsd-comment tsd-typography"><p>Current frame time in milliseconds.</p>
 </div><aside class="tsd-sources">
 <ul>
-<li>Defined in <a href="https://github.com/gledrich/tsge/blob/a10dad59ce9d50469eea15d2242ab0e54b317ba8/packages/dino-ge/src/core/Engine.ts#L285">packages/dino-ge/src/core/Engine.ts:285</a></li></ul></aside></section>
+<li>Defined in packages/dino-ge/src/core/Engine.ts:376</li></ul></aside></section>
 <section class="tsd-panel tsd-member">
 <h3 class="tsd-anchor-link" id="height"><span>height</span><a href="#height" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></h3>
 <div class="tsd-signature"><span class="tsd-kind-property">height</span><span class="tsd-signature-symbol">:</span> <span class="tsd-signature-type">number</span></div>
 <div class="tsd-comment tsd-typography"><p>Pixel height of the canvas.</p>
 </div><aside class="tsd-sources">
 <ul>
-<li>Defined in <a href="https://github.com/gledrich/tsge/blob/a10dad59ce9d50469eea15d2242ab0e54b317ba8/packages/dino-ge/src/core/Engine.ts#L266">packages/dino-ge/src/core/Engine.ts:266</a></li></ul></aside></section>
+<li>Defined in packages/dino-ge/src/core/Engine.ts:357</li></ul></aside></section>
 <section class="tsd-panel tsd-member">
 <h3 class="tsd-anchor-link" id="width"><span>width</span><a href="#width" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></h3>
 <div class="tsd-signature"><span class="tsd-kind-property">width</span><span class="tsd-signature-symbol">:</span> <span class="tsd-signature-type">number</span></div>
 <div class="tsd-comment tsd-typography"><p>Pixel width of the canvas.</p>
 </div><aside class="tsd-sources">
 <ul>
-<li>Defined in <a href="https://github.com/gledrich/tsge/blob/a10dad59ce9d50469eea15d2242ab0e54b317ba8/packages/dino-ge/src/core/Engine.ts#L264">packages/dino-ge/src/core/Engine.ts:264</a></li></ul></aside></section></section></details>
+<li>Defined in packages/dino-ge/src/core/Engine.ts:355</li></ul></aside></section></section></details>
 <details class="tsd-panel-group tsd-member-group tsd-accordion" open><summary class="tsd-accordion-summary" data-key="section-Accessors"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden="true"><use href="../assets/icons.svg#icon-chevronDown"></use></svg>
 <h2 class="tsd-anchor-link" id="accessors-1">Accessors<a href="#accessors-1" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></h2></summary>
 <section>
@@ -155,7 +165,7 @@
 </div></li></ul></div>
 <h4 class="tsd-returns-title">Returns <span class="tsd-signature-type">void</span></h4><aside class="tsd-sources">
 <ul>
-<li>Defined in <a href="https://github.com/gledrich/tsge/blob/a10dad59ce9d50469eea15d2242ab0e54b317ba8/packages/dino-ge/src/core/Engine.ts#L611">packages/dino-ge/src/core/Engine.ts:611</a></li></ul></aside></div></li></ul></section>
+<li>Defined in packages/dino-ge/src/core/Engine.ts:799</li></ul></aside></div></li></ul></section>
 <section class="tsd-panel tsd-member">
 <h3 class="tsd-anchor-link" id="mousex"><span>mouse<wbr/>X</span><a href="#mousex" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></h3>
 <ul class="tsd-signatures">
@@ -166,7 +176,7 @@
 </div>
 <h4 class="tsd-returns-title">Returns <span class="tsd-signature-type">number</span></h4><aside class="tsd-sources">
 <ul>
-<li>Defined in <a href="https://github.com/gledrich/tsge/blob/a10dad59ce9d50469eea15d2242ab0e54b317ba8/packages/dino-ge/src/core/Engine.ts#L271">packages/dino-ge/src/core/Engine.ts:271</a></li></ul></aside></div></li></ul></section>
+<li>Defined in packages/dino-ge/src/core/Engine.ts:362</li></ul></aside></div></li></ul></section>
 <section class="tsd-panel tsd-member">
 <h3 class="tsd-anchor-link" id="mousey"><span>mouse<wbr/>Y</span><a href="#mousey" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></h3>
 <ul class="tsd-signatures">
@@ -177,7 +187,7 @@
 </div>
 <h4 class="tsd-returns-title">Returns <span class="tsd-signature-type">number</span></h4><aside class="tsd-sources">
 <ul>
-<li>Defined in <a href="https://github.com/gledrich/tsge/blob/a10dad59ce9d50469eea15d2242ab0e54b317ba8/packages/dino-ge/src/core/Engine.ts#L278">packages/dino-ge/src/core/Engine.ts:278</a></li></ul></aside></div></li></ul></section>
+<li>Defined in packages/dino-ge/src/core/Engine.ts:369</li></ul></aside></div></li></ul></section>
 <section class="tsd-panel tsd-member">
 <h3 class="tsd-anchor-link" id="camera"><code class="tsd-tag">Static</code><span>camera</span><a href="#camera" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></h3>
 <ul class="tsd-signatures">
@@ -188,7 +198,7 @@
 </div>
 <h4 class="tsd-returns-title">Returns <a href="core_Camera.Camera.html" class="tsd-signature-type tsd-kind-class">Camera</a></h4><aside class="tsd-sources">
 <ul>
-<li>Defined in <a href="https://github.com/gledrich/tsge/blob/a10dad59ce9d50469eea15d2242ab0e54b317ba8/packages/dino-ge/src/core/Engine.ts#L227">packages/dino-ge/src/core/Engine.ts:227</a></li></ul></aside></div></li></ul></section>
+<li>Defined in packages/dino-ge/src/core/Engine.ts:311</li></ul></aside></div></li></ul></section>
 <section class="tsd-panel tsd-member">
 <h3 class="tsd-anchor-link" id="currentscene"><code class="tsd-tag">Static</code><span>current<wbr/>Scene</span><a href="#currentscene" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></h3>
 <ul class="tsd-signatures">
@@ -199,7 +209,7 @@
 </div>
 <h4 class="tsd-returns-title">Returns <a href="core_Scene.Scene.html" class="tsd-signature-type tsd-kind-class">Scene</a> <span class="tsd-signature-symbol">|</span> <span class="tsd-signature-type">null</span></h4><aside class="tsd-sources">
 <ul>
-<li>Defined in <a href="https://github.com/gledrich/tsge/blob/a10dad59ce9d50469eea15d2242ab0e54b317ba8/packages/dino-ge/src/core/Engine.ts#L232">packages/dino-ge/src/core/Engine.ts:232</a></li></ul></aside></div></li>
+<li>Defined in packages/dino-ge/src/core/Engine.ts:316</li></ul></aside></div></li>
 <li>
 <div class="tsd-signature" id="currentscenecurrentscene-1"><span class="tsd-signature-keyword">set</span> <span class="tsd-kind-set-signature">currentScene</span><span class="tsd-signature-symbol">(</span><span class="tsd-kind-parameter">scene</span><span class="tsd-signature-symbol">:</span> <a href="core_Scene.Scene.html" class="tsd-signature-type tsd-kind-class">Scene</a> <span class="tsd-signature-symbol">|</span> <span class="tsd-signature-type">null</span><span class="tsd-signature-symbol">)</span><span class="tsd-signature-symbol">:</span> <span class="tsd-signature-type">void</span></div>
 <div class="tsd-description">
@@ -211,7 +221,7 @@
 <li><span><span class="tsd-kind-parameter">scene</span>: <a href="core_Scene.Scene.html" class="tsd-signature-type tsd-kind-class">Scene</a> <span class="tsd-signature-symbol">|</span> <span class="tsd-signature-type">null</span></span></li></ul></div>
 <h4 class="tsd-returns-title">Returns <span class="tsd-signature-type">void</span></h4><aside class="tsd-sources">
 <ul>
-<li>Defined in <a href="https://github.com/gledrich/tsge/blob/a10dad59ce9d50469eea15d2242ab0e54b317ba8/packages/dino-ge/src/core/Engine.ts#L239">packages/dino-ge/src/core/Engine.ts:239</a></li></ul></aside></div></li></ul></section>
+<li>Defined in packages/dino-ge/src/core/Engine.ts:323</li></ul></aside></div></li></ul></section>
 <section class="tsd-panel tsd-member">
 <h3 class="tsd-anchor-link" id="debug"><code class="tsd-tag">Static</code><span>debug</span><a href="#debug" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></h3>
 <ul class="tsd-signatures">
@@ -222,7 +232,7 @@
 </div>
 <h4 class="tsd-returns-title">Returns <span class="tsd-signature-type">boolean</span></h4><aside class="tsd-sources">
 <ul>
-<li>Defined in <a href="https://github.com/gledrich/tsge/blob/a10dad59ce9d50469eea15d2242ab0e54b317ba8/packages/dino-ge/src/core/Engine.ts#L161">packages/dino-ge/src/core/Engine.ts:161</a></li></ul></aside></div></li>
+<li>Defined in packages/dino-ge/src/core/Engine.ts:198</li></ul></aside></div></li>
 <li>
 <div class="tsd-signature" id="debugdebug-1"><span class="tsd-signature-keyword">set</span> <span class="tsd-kind-set-signature">debug</span><span class="tsd-signature-symbol">(</span><span class="tsd-kind-parameter">val</span><span class="tsd-signature-symbol">:</span> <span class="tsd-signature-type">boolean</span><span class="tsd-signature-symbol">)</span><span class="tsd-signature-symbol">:</span> <span class="tsd-signature-type">void</span></div>
 <div class="tsd-description">
@@ -232,7 +242,7 @@
 <li><span><span class="tsd-kind-parameter">val</span>: <span class="tsd-signature-type">boolean</span></span></li></ul></div>
 <h4 class="tsd-returns-title">Returns <span class="tsd-signature-type">void</span></h4><aside class="tsd-sources">
 <ul>
-<li>Defined in <a href="https://github.com/gledrich/tsge/blob/a10dad59ce9d50469eea15d2242ab0e54b317ba8/packages/dino-ge/src/core/Engine.ts#L162">packages/dino-ge/src/core/Engine.ts:162</a></li></ul></aside></div></li></ul></section>
+<li>Defined in packages/dino-ge/src/core/Engine.ts:199</li></ul></aside></div></li></ul></section>
 <section class="tsd-panel tsd-member">
 <h3 class="tsd-anchor-link" id="debugcollisions"><code class="tsd-tag">Static</code><span>debug<wbr/>Collisions</span><a href="#debugcollisions" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></h3>
 <ul class="tsd-signatures">
@@ -243,7 +253,7 @@
 </div>
 <h4 class="tsd-returns-title">Returns <span class="tsd-signature-symbol">{</span> <span class="tsd-kind-property">manifold</span><span class="tsd-signature-symbol">:</span> <a href="../interfaces/physics_Physics.CollisionManifold.html" class="tsd-signature-type tsd-kind-interface">CollisionManifold</a><span class="tsd-signature-symbol">;</span> <span class="tsd-kind-property">timestamp</span><span class="tsd-signature-symbol">:</span> <span class="tsd-signature-type">number</span> <span class="tsd-signature-symbol">}</span><span class="tsd-signature-symbol">[]</span></h4><aside class="tsd-sources">
 <ul>
-<li>Defined in <a href="https://github.com/gledrich/tsge/blob/a10dad59ce9d50469eea15d2242ab0e54b317ba8/packages/dino-ge/src/core/Engine.ts#L109">packages/dino-ge/src/core/Engine.ts:109</a></li></ul></aside></div></li>
+<li>Defined in packages/dino-ge/src/core/Engine.ts:122</li></ul></aside></div></li>
 <li>
 <div class="tsd-signature" id="debugcollisionsdebugcollisions-1"><span class="tsd-signature-keyword">set</span> <span class="tsd-kind-set-signature">debugCollisions</span><span class="tsd-signature-symbol">(</span><br/>    <span class="tsd-kind-parameter">val</span><span class="tsd-signature-symbol">:</span> <span class="tsd-signature-symbol">{</span> <span class="tsd-kind-property">manifold</span><span class="tsd-signature-symbol">:</span> <a href="../interfaces/physics_Physics.CollisionManifold.html" class="tsd-signature-type tsd-kind-interface">CollisionManifold</a><span class="tsd-signature-symbol">;</span> <span class="tsd-kind-property">timestamp</span><span class="tsd-signature-symbol">:</span> <span class="tsd-signature-type">number</span> <span class="tsd-signature-symbol">}</span><span class="tsd-signature-symbol">[]</span><span class="tsd-signature-symbol">,</span><br/><span class="tsd-signature-symbol">)</span><span class="tsd-signature-symbol">:</span> <span class="tsd-signature-type">void</span></div>
 <div class="tsd-description">
@@ -253,7 +263,91 @@
 <li><span><span class="tsd-kind-parameter">val</span>: <span class="tsd-signature-symbol">{</span> <span class="tsd-kind-property">manifold</span><span class="tsd-signature-symbol">:</span> <a href="../interfaces/physics_Physics.CollisionManifold.html" class="tsd-signature-type tsd-kind-interface">CollisionManifold</a><span class="tsd-signature-symbol">;</span> <span class="tsd-kind-property">timestamp</span><span class="tsd-signature-symbol">:</span> <span class="tsd-signature-type">number</span> <span class="tsd-signature-symbol">}</span><span class="tsd-signature-symbol">[]</span></span></li></ul></div>
 <h4 class="tsd-returns-title">Returns <span class="tsd-signature-type">void</span></h4><aside class="tsd-sources">
 <ul>
-<li>Defined in <a href="https://github.com/gledrich/tsge/blob/a10dad59ce9d50469eea15d2242ab0e54b317ba8/packages/dino-ge/src/core/Engine.ts#L112">packages/dino-ge/src/core/Engine.ts:112</a></li></ul></aside></div></li></ul></section>
+<li>Defined in packages/dino-ge/src/core/Engine.ts:125</li></ul></aside></div></li></ul></section>
+<section class="tsd-panel tsd-member">
+<h3 class="tsd-anchor-link" id="debugkeepproportions"><code class="tsd-tag">Static</code><span>debug<wbr/>Keep<wbr/>Proportions</span><a href="#debugkeepproportions" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></h3>
+<ul class="tsd-signatures">
+<li>
+<div class="tsd-signature" id="debugkeepproportionsdebugkeepproportions"><span class="tsd-signature-keyword">get</span> <span class="tsd-kind-get-signature">debugKeepProportions</span><span class="tsd-signature-symbol">()</span><span class="tsd-signature-symbol">:</span> <span class="tsd-signature-type">boolean</span></div>
+<div class="tsd-description">
+<div class="tsd-comment tsd-typography"><p>Whether debug resizing preserves the object's proportions by default.</p>
+</div>
+<h4 class="tsd-returns-title">Returns <span class="tsd-signature-type">boolean</span></h4><aside class="tsd-sources">
+<ul>
+<li>Defined in packages/dino-ge/src/core/Engine.ts:146</li></ul></aside></div></li>
+<li>
+<div class="tsd-signature" id="debugkeepproportionsdebugkeepproportions-1"><span class="tsd-signature-keyword">set</span> <span class="tsd-kind-set-signature">debugKeepProportions</span><span class="tsd-signature-symbol">(</span><span class="tsd-kind-parameter">val</span><span class="tsd-signature-symbol">:</span> <span class="tsd-signature-type">boolean</span><span class="tsd-signature-symbol">)</span><span class="tsd-signature-symbol">:</span> <span class="tsd-signature-type">void</span></div>
+<div class="tsd-description">
+<div class="tsd-parameters">
+<h4 class="tsd-parameters-title">Parameters</h4>
+<ul class="tsd-parameter-list">
+<li><span><span class="tsd-kind-parameter">val</span>: <span class="tsd-signature-type">boolean</span></span></li></ul></div>
+<h4 class="tsd-returns-title">Returns <span class="tsd-signature-type">void</span></h4><aside class="tsd-sources">
+<ul>
+<li>Defined in packages/dino-ge/src/core/Engine.ts:147</li></ul></aside></div></li></ul></section>
+<section class="tsd-panel tsd-member">
+<h3 class="tsd-anchor-link" id="debugpositiongridsize"><code class="tsd-tag">Static</code><span>debug<wbr/>Position<wbr/>Grid<wbr/>Size</span><a href="#debugpositiongridsize" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></h3>
+<ul class="tsd-signatures">
+<li>
+<div class="tsd-signature" id="debugpositiongridsizedebugpositiongridsize"><span class="tsd-signature-keyword">get</span> <span class="tsd-kind-get-signature">debugPositionGridSize</span><span class="tsd-signature-symbol">()</span><span class="tsd-signature-symbol">:</span> <span class="tsd-signature-type">number</span></div>
+<div class="tsd-description">
+<div class="tsd-comment tsd-typography"><p>World units per cell for debug dragging and the viewport grid. Zero disables snapping.</p>
+</div>
+<h4 class="tsd-returns-title">Returns <span class="tsd-signature-type">number</span></h4><aside class="tsd-sources">
+<ul>
+<li>Defined in packages/dino-ge/src/core/Engine.ts:136</li></ul></aside></div></li>
+<li>
+<div class="tsd-signature" id="debugpositiongridsizedebugpositiongridsize-1"><span class="tsd-signature-keyword">set</span> <span class="tsd-kind-set-signature">debugPositionGridSize</span><span class="tsd-signature-symbol">(</span><span class="tsd-kind-parameter">val</span><span class="tsd-signature-symbol">:</span> <span class="tsd-signature-type">number</span><span class="tsd-signature-symbol">)</span><span class="tsd-signature-symbol">:</span> <span class="tsd-signature-type">void</span></div>
+<div class="tsd-description">
+<div class="tsd-parameters">
+<h4 class="tsd-parameters-title">Parameters</h4>
+<ul class="tsd-parameter-list">
+<li><span><span class="tsd-kind-parameter">val</span>: <span class="tsd-signature-type">number</span></span></li></ul></div>
+<h4 class="tsd-returns-title">Returns <span class="tsd-signature-type">void</span></h4><aside class="tsd-sources">
+<ul>
+<li>Defined in packages/dino-ge/src/core/Engine.ts:137</li></ul></aside></div></li></ul></section>
+<section class="tsd-panel tsd-member">
+<h3 class="tsd-anchor-link" id="debugsnapalignment"><code class="tsd-tag">Static</code><span>debug<wbr/>Snap<wbr/>Alignment</span><a href="#debugsnapalignment" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></h3>
+<ul class="tsd-signatures">
+<li>
+<div class="tsd-signature" id="debugsnapalignmentdebugsnapalignment"><span class="tsd-signature-keyword">get</span> <span class="tsd-kind-get-signature">debugSnapAlignment</span><span class="tsd-signature-symbol">()</span><span class="tsd-signature-symbol">:</span> <span class="tsd-signature-type">boolean</span></div>
+<div class="tsd-description">
+<div class="tsd-comment tsd-typography"><p>Snap paused debug drags to the visible objects' edges and centres.</p>
+</div>
+<h4 class="tsd-returns-title">Returns <span class="tsd-signature-type">boolean</span></h4><aside class="tsd-sources">
+<ul>
+<li>Defined in packages/dino-ge/src/core/Engine.ts:142</li></ul></aside></div></li>
+<li>
+<div class="tsd-signature" id="debugsnapalignmentdebugsnapalignment-1"><span class="tsd-signature-keyword">set</span> <span class="tsd-kind-set-signature">debugSnapAlignment</span><span class="tsd-signature-symbol">(</span><span class="tsd-kind-parameter">val</span><span class="tsd-signature-symbol">:</span> <span class="tsd-signature-type">boolean</span><span class="tsd-signature-symbol">)</span><span class="tsd-signature-symbol">:</span> <span class="tsd-signature-type">void</span></div>
+<div class="tsd-description">
+<div class="tsd-parameters">
+<h4 class="tsd-parameters-title">Parameters</h4>
+<ul class="tsd-parameter-list">
+<li><span><span class="tsd-kind-parameter">val</span>: <span class="tsd-signature-type">boolean</span></span></li></ul></div>
+<h4 class="tsd-returns-title">Returns <span class="tsd-signature-type">void</span></h4><aside class="tsd-sources">
+<ul>
+<li>Defined in packages/dino-ge/src/core/Engine.ts:143</li></ul></aside></div></li></ul></section>
+<section class="tsd-panel tsd-member">
+<h3 class="tsd-anchor-link" id="debugsnaprotation"><code class="tsd-tag">Static</code><span>debug<wbr/>Snap<wbr/>Rotation</span><a href="#debugsnaprotation" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></h3>
+<ul class="tsd-signatures">
+<li>
+<div class="tsd-signature" id="debugsnaprotationdebugsnaprotation"><span class="tsd-signature-keyword">get</span> <span class="tsd-kind-get-signature">debugSnapRotation</span><span class="tsd-signature-symbol">()</span><span class="tsd-signature-symbol">:</span> <span class="tsd-signature-type">boolean</span></div>
+<div class="tsd-description">
+<div class="tsd-comment tsd-typography"><p>Whether debug rotation snaps to 15° by default.</p>
+</div>
+<h4 class="tsd-returns-title">Returns <span class="tsd-signature-type">boolean</span></h4><aside class="tsd-sources">
+<ul>
+<li>Defined in packages/dino-ge/src/core/Engine.ts:150</li></ul></aside></div></li>
+<li>
+<div class="tsd-signature" id="debugsnaprotationdebugsnaprotation-1"><span class="tsd-signature-keyword">set</span> <span class="tsd-kind-set-signature">debugSnapRotation</span><span class="tsd-signature-symbol">(</span><span class="tsd-kind-parameter">val</span><span class="tsd-signature-symbol">:</span> <span class="tsd-signature-type">boolean</span><span class="tsd-signature-symbol">)</span><span class="tsd-signature-symbol">:</span> <span class="tsd-signature-type">void</span></div>
+<div class="tsd-description">
+<div class="tsd-parameters">
+<h4 class="tsd-parameters-title">Parameters</h4>
+<ul class="tsd-parameter-list">
+<li><span><span class="tsd-kind-parameter">val</span>: <span class="tsd-signature-type">boolean</span></span></li></ul></div>
+<h4 class="tsd-returns-title">Returns <span class="tsd-signature-type">void</span></h4><aside class="tsd-sources">
+<ul>
+<li>Defined in packages/dino-ge/src/core/Engine.ts:151</li></ul></aside></div></li></ul></section>
 <section class="tsd-panel tsd-member">
 <h3 class="tsd-anchor-link" id="objects"><code class="tsd-tag">Static</code><span>objects</span><a href="#objects" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></h3>
 <ul class="tsd-signatures">
@@ -264,7 +358,7 @@
 </div>
 <h4 class="tsd-returns-title">Returns <a href="core_ObjectSet.ObjectSet.html" class="tsd-signature-type tsd-kind-class">ObjectSet</a></h4><aside class="tsd-sources">
 <ul>
-<li>Defined in <a href="https://github.com/gledrich/tsge/blob/a10dad59ce9d50469eea15d2242ab0e54b317ba8/packages/dino-ge/src/core/Engine.ts#L93">packages/dino-ge/src/core/Engine.ts:93</a></li></ul></aside></div></li></ul></section>
+<li>Defined in packages/dino-ge/src/core/Engine.ts:106</li></ul></aside></div></li></ul></section>
 <section class="tsd-panel tsd-member">
 <h3 class="tsd-anchor-link" id="paused"><code class="tsd-tag">Static</code><span>paused</span><a href="#paused" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></h3>
 <ul class="tsd-signatures">
@@ -275,7 +369,7 @@
 </div>
 <h4 class="tsd-returns-title">Returns <span class="tsd-signature-type">boolean</span></h4><aside class="tsd-sources">
 <ul>
-<li>Defined in <a href="https://github.com/gledrich/tsge/blob/a10dad59ce9d50469eea15d2242ab0e54b317ba8/packages/dino-ge/src/core/Engine.ts#L131">packages/dino-ge/src/core/Engine.ts:131</a></li></ul></aside></div></li>
+<li>Defined in packages/dino-ge/src/core/Engine.ts:168</li></ul></aside></div></li>
 <li>
 <div class="tsd-signature" id="pausedpaused-1"><span class="tsd-signature-keyword">set</span> <span class="tsd-kind-set-signature">paused</span><span class="tsd-signature-symbol">(</span><span class="tsd-kind-parameter">val</span><span class="tsd-signature-symbol">:</span> <span class="tsd-signature-type">boolean</span><span class="tsd-signature-symbol">)</span><span class="tsd-signature-symbol">:</span> <span class="tsd-signature-type">void</span></div>
 <div class="tsd-description">
@@ -285,7 +379,7 @@
 <li><span><span class="tsd-kind-parameter">val</span>: <span class="tsd-signature-type">boolean</span></span></li></ul></div>
 <h4 class="tsd-returns-title">Returns <span class="tsd-signature-type">void</span></h4><aside class="tsd-sources">
 <ul>
-<li>Defined in <a href="https://github.com/gledrich/tsge/blob/a10dad59ce9d50469eea15d2242ab0e54b317ba8/packages/dino-ge/src/core/Engine.ts#L132">packages/dino-ge/src/core/Engine.ts:132</a></li></ul></aside></div></li></ul></section>
+<li>Defined in packages/dino-ge/src/core/Engine.ts:169</li></ul></aside></div></li></ul></section>
 <section class="tsd-panel tsd-member">
 <h3 class="tsd-anchor-link" id="renderingsystem"><code class="tsd-tag">Static</code><span>rendering<wbr/>System</span><a href="#renderingsystem" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></h3>
 <ul class="tsd-signatures">
@@ -296,7 +390,7 @@
 </div>
 <h4 class="tsd-returns-title">Returns <a href="systems_RenderingSystem.RenderingSystem.html" class="tsd-signature-type tsd-kind-class">RenderingSystem</a> <span class="tsd-signature-symbol">|</span> <span class="tsd-signature-type">undefined</span></h4><aside class="tsd-sources">
 <ul>
-<li>Defined in <a href="https://github.com/gledrich/tsge/blob/a10dad59ce9d50469eea15d2242ab0e54b317ba8/packages/dino-ge/src/core/Engine.ts#L103">packages/dino-ge/src/core/Engine.ts:103</a></li></ul></aside></div></li>
+<li>Defined in packages/dino-ge/src/core/Engine.ts:116</li></ul></aside></div></li>
 <li>
 <div class="tsd-signature" id="renderingsystemrenderingsystem-1"><span class="tsd-signature-keyword">set</span> <span class="tsd-kind-set-signature">renderingSystem</span><span class="tsd-signature-symbol">(</span><span class="tsd-kind-parameter">val</span><span class="tsd-signature-symbol">:</span> <a href="systems_RenderingSystem.RenderingSystem.html" class="tsd-signature-type tsd-kind-class">RenderingSystem</a> <span class="tsd-signature-symbol">|</span> <span class="tsd-signature-type">undefined</span><span class="tsd-signature-symbol">)</span><span class="tsd-signature-symbol">:</span> <span class="tsd-signature-type">void</span></div>
 <div class="tsd-description">
@@ -306,7 +400,7 @@
 <li><span><span class="tsd-kind-parameter">val</span>: <a href="systems_RenderingSystem.RenderingSystem.html" class="tsd-signature-type tsd-kind-class">RenderingSystem</a> <span class="tsd-signature-symbol">|</span> <span class="tsd-signature-type">undefined</span></span></li></ul></div>
 <h4 class="tsd-returns-title">Returns <span class="tsd-signature-type">void</span></h4><aside class="tsd-sources">
 <ul>
-<li>Defined in <a href="https://github.com/gledrich/tsge/blob/a10dad59ce9d50469eea15d2242ab0e54b317ba8/packages/dino-ge/src/core/Engine.ts#L104">packages/dino-ge/src/core/Engine.ts:104</a></li></ul></aside></div></li></ul></section>
+<li>Defined in packages/dino-ge/src/core/Engine.ts:117</li></ul></aside></div></li></ul></section>
 <section class="tsd-panel tsd-member">
 <h3 class="tsd-anchor-link" id="selectedobject"><code class="tsd-tag">Static</code><span>selected<wbr/>Object</span><a href="#selectedobject" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></h3>
 <ul class="tsd-signatures">
@@ -317,7 +411,7 @@
 </div>
 <h4 class="tsd-returns-title">Returns <a href="core_GameObject.GameObject.html" class="tsd-signature-type tsd-kind-class">GameObject</a> <span class="tsd-signature-symbol">|</span> <span class="tsd-signature-type">null</span></h4><aside class="tsd-sources">
 <ul>
-<li>Defined in <a href="https://github.com/gledrich/tsge/blob/a10dad59ce9d50469eea15d2242ab0e54b317ba8/packages/dino-ge/src/core/Engine.ts#L204">packages/dino-ge/src/core/Engine.ts:204</a></li></ul></aside></div></li>
+<li>Defined in packages/dino-ge/src/core/Engine.ts:288</li></ul></aside></div></li>
 <li>
 <div class="tsd-signature" id="selectedobjectselectedobject-1"><span class="tsd-signature-keyword">set</span> <span class="tsd-kind-set-signature">selectedObject</span><span class="tsd-signature-symbol">(</span><span class="tsd-kind-parameter">val</span><span class="tsd-signature-symbol">:</span> <a href="core_GameObject.GameObject.html" class="tsd-signature-type tsd-kind-class">GameObject</a> <span class="tsd-signature-symbol">|</span> <span class="tsd-signature-type">null</span><span class="tsd-signature-symbol">)</span><span class="tsd-signature-symbol">:</span> <span class="tsd-signature-type">void</span></div>
 <div class="tsd-description">
@@ -327,7 +421,7 @@
 <li><span><span class="tsd-kind-parameter">val</span>: <a href="core_GameObject.GameObject.html" class="tsd-signature-type tsd-kind-class">GameObject</a> <span class="tsd-signature-symbol">|</span> <span class="tsd-signature-type">null</span></span></li></ul></div>
 <h4 class="tsd-returns-title">Returns <span class="tsd-signature-type">void</span></h4><aside class="tsd-sources">
 <ul>
-<li>Defined in <a href="https://github.com/gledrich/tsge/blob/a10dad59ce9d50469eea15d2242ab0e54b317ba8/packages/dino-ge/src/core/Engine.ts#L205">packages/dino-ge/src/core/Engine.ts:205</a></li></ul></aside></div></li></ul></section>
+<li>Defined in packages/dino-ge/src/core/Engine.ts:289</li></ul></aside></div></li></ul></section>
 <section class="tsd-panel tsd-member">
 <h3 class="tsd-anchor-link" id="showcollisionlines"><code class="tsd-tag">Static</code><span>show<wbr/>Collision<wbr/>Lines</span><a href="#showcollisionlines" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></h3>
 <ul class="tsd-signatures">
@@ -338,7 +432,7 @@
 </div>
 <h4 class="tsd-returns-title">Returns <span class="tsd-signature-type">boolean</span></h4><aside class="tsd-sources">
 <ul>
-<li>Defined in <a href="https://github.com/gledrich/tsge/blob/a10dad59ce9d50469eea15d2242ab0e54b317ba8/packages/dino-ge/src/core/Engine.ts#L125">packages/dino-ge/src/core/Engine.ts:125</a></li></ul></aside></div></li>
+<li>Defined in packages/dino-ge/src/core/Engine.ts:162</li></ul></aside></div></li>
 <li>
 <div class="tsd-signature" id="showcollisionlinesshowcollisionlines-1"><span class="tsd-signature-keyword">set</span> <span class="tsd-kind-set-signature">showCollisionLines</span><span class="tsd-signature-symbol">(</span><span class="tsd-kind-parameter">val</span><span class="tsd-signature-symbol">:</span> <span class="tsd-signature-type">boolean</span><span class="tsd-signature-symbol">)</span><span class="tsd-signature-symbol">:</span> <span class="tsd-signature-type">void</span></div>
 <div class="tsd-description">
@@ -348,7 +442,28 @@
 <li><span><span class="tsd-kind-parameter">val</span>: <span class="tsd-signature-type">boolean</span></span></li></ul></div>
 <h4 class="tsd-returns-title">Returns <span class="tsd-signature-type">void</span></h4><aside class="tsd-sources">
 <ul>
-<li>Defined in <a href="https://github.com/gledrich/tsge/blob/a10dad59ce9d50469eea15d2242ab0e54b317ba8/packages/dino-ge/src/core/Engine.ts#L126">packages/dino-ge/src/core/Engine.ts:126</a></li></ul></aside></div></li></ul></section>
+<li>Defined in packages/dino-ge/src/core/Engine.ts:163</li></ul></aside></div></li></ul></section>
+<section class="tsd-panel tsd-member">
+<h3 class="tsd-anchor-link" id="showdebughud"><code class="tsd-tag">Static</code><span>show<wbr/>Debug<wbr/>Hud</span><a href="#showdebughud" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></h3>
+<ul class="tsd-signatures">
+<li>
+<div class="tsd-signature" id="showdebughudshowdebughud"><span class="tsd-signature-keyword">get</span> <span class="tsd-kind-get-signature">showDebugHud</span><span class="tsd-signature-symbol">()</span><span class="tsd-signature-symbol">:</span> <span class="tsd-signature-type">boolean</span></div>
+<div class="tsd-description">
+<div class="tsd-comment tsd-typography"><p>Whether to draw the on-canvas stats and inspector in debug mode.</p>
+</div>
+<h4 class="tsd-returns-title">Returns <span class="tsd-signature-type">boolean</span></h4><aside class="tsd-sources">
+<ul>
+<li>Defined in packages/dino-ge/src/core/Engine.ts:132</li></ul></aside></div></li>
+<li>
+<div class="tsd-signature" id="showdebughudshowdebughud-1"><span class="tsd-signature-keyword">set</span> <span class="tsd-kind-set-signature">showDebugHud</span><span class="tsd-signature-symbol">(</span><span class="tsd-kind-parameter">val</span><span class="tsd-signature-symbol">:</span> <span class="tsd-signature-type">boolean</span><span class="tsd-signature-symbol">)</span><span class="tsd-signature-symbol">:</span> <span class="tsd-signature-type">void</span></div>
+<div class="tsd-description">
+<div class="tsd-parameters">
+<h4 class="tsd-parameters-title">Parameters</h4>
+<ul class="tsd-parameter-list">
+<li><span><span class="tsd-kind-parameter">val</span>: <span class="tsd-signature-type">boolean</span></span></li></ul></div>
+<h4 class="tsd-returns-title">Returns <span class="tsd-signature-type">void</span></h4><aside class="tsd-sources">
+<ul>
+<li>Defined in packages/dino-ge/src/core/Engine.ts:133</li></ul></aside></div></li></ul></section>
 <section class="tsd-panel tsd-member">
 <h3 class="tsd-anchor-link" id="showphysicsvectors"><code class="tsd-tag">Static</code><span>show<wbr/>Physics<wbr/>Vectors</span><a href="#showphysicsvectors" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></h3>
 <ul class="tsd-signatures">
@@ -359,7 +474,7 @@
 </div>
 <h4 class="tsd-returns-title">Returns <span class="tsd-signature-type">boolean</span></h4><aside class="tsd-sources">
 <ul>
-<li>Defined in <a href="https://github.com/gledrich/tsge/blob/a10dad59ce9d50469eea15d2242ab0e54b317ba8/packages/dino-ge/src/core/Engine.ts#L119">packages/dino-ge/src/core/Engine.ts:119</a></li></ul></aside></div></li>
+<li>Defined in packages/dino-ge/src/core/Engine.ts:156</li></ul></aside></div></li>
 <li>
 <div class="tsd-signature" id="showphysicsvectorsshowphysicsvectors-1"><span class="tsd-signature-keyword">set</span> <span class="tsd-kind-set-signature">showPhysicsVectors</span><span class="tsd-signature-symbol">(</span><span class="tsd-kind-parameter">val</span><span class="tsd-signature-symbol">:</span> <span class="tsd-signature-type">boolean</span><span class="tsd-signature-symbol">)</span><span class="tsd-signature-symbol">:</span> <span class="tsd-signature-type">void</span></div>
 <div class="tsd-description">
@@ -369,7 +484,7 @@
 <li><span><span class="tsd-kind-parameter">val</span>: <span class="tsd-signature-type">boolean</span></span></li></ul></div>
 <h4 class="tsd-returns-title">Returns <span class="tsd-signature-type">void</span></h4><aside class="tsd-sources">
 <ul>
-<li>Defined in <a href="https://github.com/gledrich/tsge/blob/a10dad59ce9d50469eea15d2242ab0e54b317ba8/packages/dino-ge/src/core/Engine.ts#L120">packages/dino-ge/src/core/Engine.ts:120</a></li></ul></aside></div></li></ul></section>
+<li>Defined in packages/dino-ge/src/core/Engine.ts:157</li></ul></aside></div></li></ul></section>
 <section class="tsd-panel tsd-member">
 <h3 class="tsd-anchor-link" id="sortedobjects"><code class="tsd-tag">Static</code><span>sorted<wbr/>Objects</span><a href="#sortedobjects" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></h3>
 <ul class="tsd-signatures">
@@ -380,7 +495,7 @@
 </div>
 <h4 class="tsd-returns-title">Returns <a href="core_GameObject.GameObject.html" class="tsd-signature-type tsd-kind-class">GameObject</a><span class="tsd-signature-symbol">[]</span></h4><aside class="tsd-sources">
 <ul>
-<li>Defined in <a href="https://github.com/gledrich/tsge/blob/a10dad59ce9d50469eea15d2242ab0e54b317ba8/packages/dino-ge/src/core/Engine.ts#L221">packages/dino-ge/src/core/Engine.ts:221</a></li></ul></aside></div></li>
+<li>Defined in packages/dino-ge/src/core/Engine.ts:305</li></ul></aside></div></li>
 <li>
 <div class="tsd-signature" id="sortedobjectssortedobjects-1"><span class="tsd-signature-keyword">set</span> <span class="tsd-kind-set-signature">sortedObjects</span><span class="tsd-signature-symbol">(</span><span class="tsd-kind-parameter">val</span><span class="tsd-signature-symbol">:</span> <a href="core_GameObject.GameObject.html" class="tsd-signature-type tsd-kind-class">GameObject</a><span class="tsd-signature-symbol">[]</span><span class="tsd-signature-symbol">)</span><span class="tsd-signature-symbol">:</span> <span class="tsd-signature-type">void</span></div>
 <div class="tsd-description">
@@ -390,7 +505,7 @@
 <li><span><span class="tsd-kind-parameter">val</span>: <a href="core_GameObject.GameObject.html" class="tsd-signature-type tsd-kind-class">GameObject</a><span class="tsd-signature-symbol">[]</span></span></li></ul></div>
 <h4 class="tsd-returns-title">Returns <span class="tsd-signature-type">void</span></h4><aside class="tsd-sources">
 <ul>
-<li>Defined in <a href="https://github.com/gledrich/tsge/blob/a10dad59ce9d50469eea15d2242ab0e54b317ba8/packages/dino-ge/src/core/Engine.ts#L222">packages/dino-ge/src/core/Engine.ts:222</a></li></ul></aside></div></li></ul></section>
+<li>Defined in packages/dino-ge/src/core/Engine.ts:306</li></ul></aside></div></li></ul></section>
 <section class="tsd-panel tsd-member">
 <h3 class="tsd-anchor-link" id="totaltime"><code class="tsd-tag">Static</code><span>total<wbr/>Time</span><a href="#totaltime" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></h3>
 <ul class="tsd-signatures">
@@ -401,7 +516,7 @@
 </div>
 <h4 class="tsd-returns-title">Returns <span class="tsd-signature-type">number</span></h4><aside class="tsd-sources">
 <ul>
-<li>Defined in <a href="https://github.com/gledrich/tsge/blob/a10dad59ce9d50469eea15d2242ab0e54b317ba8/packages/dino-ge/src/core/Engine.ts#L150">packages/dino-ge/src/core/Engine.ts:150</a></li></ul></aside></div></li></ul></section>
+<li>Defined in packages/dino-ge/src/core/Engine.ts:187</li></ul></aside></div></li></ul></section>
 <section class="tsd-panel tsd-member">
 <h3 class="tsd-anchor-link" id="zorderdirty"><code class="tsd-tag">Static</code><span>z<wbr/>Order<wbr/>Dirty</span><a href="#zorderdirty" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></h3>
 <ul class="tsd-signatures">
@@ -412,7 +527,7 @@
 </div>
 <h4 class="tsd-returns-title">Returns <span class="tsd-signature-type">boolean</span></h4><aside class="tsd-sources">
 <ul>
-<li>Defined in <a href="https://github.com/gledrich/tsge/blob/a10dad59ce9d50469eea15d2242ab0e54b317ba8/packages/dino-ge/src/core/Engine.ts#L215">packages/dino-ge/src/core/Engine.ts:215</a></li></ul></aside></div></li>
+<li>Defined in packages/dino-ge/src/core/Engine.ts:299</li></ul></aside></div></li>
 <li>
 <div class="tsd-signature" id="zorderdirtyzorderdirty-1"><span class="tsd-signature-keyword">set</span> <span class="tsd-kind-set-signature">zOrderDirty</span><span class="tsd-signature-symbol">(</span><span class="tsd-kind-parameter">val</span><span class="tsd-signature-symbol">:</span> <span class="tsd-signature-type">boolean</span><span class="tsd-signature-symbol">)</span><span class="tsd-signature-symbol">:</span> <span class="tsd-signature-type">void</span></div>
 <div class="tsd-description">
@@ -422,10 +537,26 @@
 <li><span><span class="tsd-kind-parameter">val</span>: <span class="tsd-signature-type">boolean</span></span></li></ul></div>
 <h4 class="tsd-returns-title">Returns <span class="tsd-signature-type">void</span></h4><aside class="tsd-sources">
 <ul>
-<li>Defined in <a href="https://github.com/gledrich/tsge/blob/a10dad59ce9d50469eea15d2242ab0e54b317ba8/packages/dino-ge/src/core/Engine.ts#L216">packages/dino-ge/src/core/Engine.ts:216</a></li></ul></aside></div></li></ul></section></section></details>
+<li>Defined in packages/dino-ge/src/core/Engine.ts:300</li></ul></aside></div></li></ul></section></section></details>
 <details class="tsd-panel-group tsd-member-group tsd-accordion" open><summary class="tsd-accordion-summary" data-key="section-Methods"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden="true"><use href="../assets/icons.svg#icon-chevronDown"></use></svg>
 <h2 class="tsd-anchor-link" id="methods-1">Methods<a href="#methods-1" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></h2></summary>
 <section>
+<section class="tsd-panel tsd-member">
+<h3 class="tsd-anchor-link" id="chromaticaberration"><span>chromatic<wbr/>Aberration</span><a href="#chromaticaberration" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></h3>
+<ul class="tsd-signatures">
+<li class="">
+<div class="tsd-signature tsd-anchor-link" id="chromaticaberration-1"><span class="tsd-kind-call-signature">chromaticAberration</span><span class="tsd-signature-symbol">(</span><span class="tsd-kind-parameter">strength</span><span class="tsd-signature-symbol">:</span> <span class="tsd-signature-type">number</span><span class="tsd-signature-symbol">,</span> <span class="tsd-kind-parameter">duration</span><span class="tsd-signature-symbol">?:</span> <span class="tsd-signature-type">number</span><span class="tsd-signature-symbol">)</span><span class="tsd-signature-symbol">:</span> <span class="tsd-signature-type">void</span><a href="#chromaticaberration-1" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></div>
+<div class="tsd-description">
+<div class="tsd-comment tsd-typography"><p>Separates the world's colour channels in screen pixels.</p>
+</div>
+<div class="tsd-parameters">
+<h4 class="tsd-parameters-title">Parameters</h4>
+<ul class="tsd-parameter-list">
+<li><span><span class="tsd-kind-parameter">strength</span>: <span class="tsd-signature-type">number</span></span></li>
+<li><span><span class="tsd-kind-parameter">duration</span>: <span class="tsd-signature-type">number</span><span class="tsd-signature-symbol"> = 0.25</span></span></li></ul></div>
+<h4 class="tsd-returns-title">Returns <span class="tsd-signature-type">void</span></h4><aside class="tsd-sources">
+<ul>
+<li>Defined in packages/dino-ge/src/core/Engine.ts:506</li></ul></aside></div></li></ul></section>
 <section class="tsd-panel tsd-member">
 <h3 class="tsd-anchor-link" id="countdown"><span>countdown</span><a href="#countdown" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></h3>
 <ul class="tsd-signatures">
@@ -448,7 +579,7 @@
 </div></li></ul></div>
 <h4 class="tsd-returns-title">Returns <span class="tsd-signature-type">void</span></h4><aside class="tsd-sources">
 <ul>
-<li>Defined in <a href="https://github.com/gledrich/tsge/blob/a10dad59ce9d50469eea15d2242ab0e54b317ba8/packages/dino-ge/src/core/Engine.ts#L597">packages/dino-ge/src/core/Engine.ts:597</a></li></ul></aside></div></li></ul></section>
+<li>Defined in packages/dino-ge/src/core/Engine.ts:785</li></ul></aside></div></li></ul></section>
 <section class="tsd-panel tsd-member">
 <h3 class="tsd-anchor-link" id="settimeout"><span>set<wbr/>Timeout</span><a href="#settimeout" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></h3>
 <ul class="tsd-signatures">
@@ -469,7 +600,23 @@
 <h4 class="tsd-returns-title">Returns <span class="tsd-signature-type">number</span></h4><p>A timer ID.</p>
 <aside class="tsd-sources">
 <ul>
-<li>Defined in <a href="https://github.com/gledrich/tsge/blob/a10dad59ce9d50469eea15d2242ab0e54b317ba8/packages/dino-ge/src/core/Engine.ts#L581">packages/dino-ge/src/core/Engine.ts:581</a></li></ul></aside></div></li></ul></section>
+<li>Defined in packages/dino-ge/src/core/Engine.ts:769</li></ul></aside></div></li></ul></section>
+<section class="tsd-panel tsd-member">
+<h3 class="tsd-anchor-link" id="shakescreen"><span>shake<wbr/>Screen</span><a href="#shakescreen" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></h3>
+<ul class="tsd-signatures">
+<li class="">
+<div class="tsd-signature tsd-anchor-link" id="shakescreen-1"><span class="tsd-kind-call-signature">shakeScreen</span><span class="tsd-signature-symbol">(</span><span class="tsd-kind-parameter">strength</span><span class="tsd-signature-symbol">:</span> <span class="tsd-signature-type">number</span><span class="tsd-signature-symbol">,</span> <span class="tsd-kind-parameter">duration</span><span class="tsd-signature-symbol">?:</span> <span class="tsd-signature-type">number</span><span class="tsd-signature-symbol">)</span><span class="tsd-signature-symbol">:</span> <span class="tsd-signature-type">void</span><a href="#shakescreen-1" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></div>
+<div class="tsd-description">
+<div class="tsd-comment tsd-typography"><p>Shakes the world in screen pixels for a duration in seconds.</p>
+</div>
+<div class="tsd-parameters">
+<h4 class="tsd-parameters-title">Parameters</h4>
+<ul class="tsd-parameter-list">
+<li><span><span class="tsd-kind-parameter">strength</span>: <span class="tsd-signature-type">number</span></span></li>
+<li><span><span class="tsd-kind-parameter">duration</span>: <span class="tsd-signature-type">number</span><span class="tsd-signature-symbol"> = 0.25</span></span></li></ul></div>
+<h4 class="tsd-returns-title">Returns <span class="tsd-signature-type">void</span></h4><aside class="tsd-sources">
+<ul>
+<li>Defined in packages/dino-ge/src/core/Engine.ts:501</li></ul></aside></div></li></ul></section>
 <section class="tsd-panel tsd-member">
 <h3 class="tsd-anchor-link" id="terminate"><span>terminate</span><a href="#terminate" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></h3>
 <ul class="tsd-signatures">
@@ -480,7 +627,23 @@
 </div>
 <h4 class="tsd-returns-title">Returns <span class="tsd-signature-type">void</span></h4><aside class="tsd-sources">
 <ul>
-<li>Defined in <a href="https://github.com/gledrich/tsge/blob/a10dad59ce9d50469eea15d2242ab0e54b317ba8/packages/dino-ge/src/core/Engine.ts#L397">packages/dino-ge/src/core/Engine.ts:397</a></li></ul></aside></div></li></ul></section>
+<li>Defined in packages/dino-ge/src/core/Engine.ts:511</li></ul></aside></div></li></ul></section>
+<section class="tsd-panel tsd-member">
+<h3 class="tsd-anchor-link" id="transitionto"><span>transition<wbr/>To</span><a href="#transitionto" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></h3>
+<ul class="tsd-signatures">
+<li class="">
+<div class="tsd-signature tsd-anchor-link" id="transitionto-1"><span class="tsd-kind-call-signature">transitionTo</span><span class="tsd-signature-symbol">(</span><span class="tsd-kind-parameter">scene</span><span class="tsd-signature-symbol">:</span> <a href="core_Scene.Scene.html" class="tsd-signature-type tsd-kind-class">Scene</a> <span class="tsd-signature-symbol">|</span> <span class="tsd-signature-type">null</span><span class="tsd-signature-symbol">,</span> <span class="tsd-kind-parameter">options</span><span class="tsd-signature-symbol">:</span> <a href="../interfaces/core_SceneEffects.SceneTransitionOptions.html" class="tsd-signature-type tsd-kind-interface">SceneTransitionOptions</a><span class="tsd-signature-symbol">)</span><span class="tsd-signature-symbol">:</span> <span class="tsd-signature-type">void</span><a href="#transitionto-1" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></div>
+<div class="tsd-description">
+<div class="tsd-comment tsd-typography"><p>Switches scenes at the midpoint of a visual transition.</p>
+</div>
+<div class="tsd-parameters">
+<h4 class="tsd-parameters-title">Parameters</h4>
+<ul class="tsd-parameter-list">
+<li><span><span class="tsd-kind-parameter">scene</span>: <a href="core_Scene.Scene.html" class="tsd-signature-type tsd-kind-class">Scene</a> <span class="tsd-signature-symbol">|</span> <span class="tsd-signature-type">null</span></span></li>
+<li><span><span class="tsd-kind-parameter">options</span>: <a href="../interfaces/core_SceneEffects.SceneTransitionOptions.html" class="tsd-signature-type tsd-kind-interface">SceneTransitionOptions</a></span></li></ul></div>
+<h4 class="tsd-returns-title">Returns <span class="tsd-signature-type">void</span></h4><aside class="tsd-sources">
+<ul>
+<li>Defined in packages/dino-ge/src/core/Engine.ts:491</li></ul></aside></div></li></ul></section>
 <section class="tsd-panel tsd-member">
 <h3 class="tsd-anchor-link" id="cleandebugcollisions"><code class="tsd-tag">Static</code><span>clean<wbr/>Debug<wbr/>Collisions</span><a href="#cleandebugcollisions" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></h3>
 <ul class="tsd-signatures">
@@ -497,7 +660,7 @@
 </div></li></ul></div>
 <h4 class="tsd-returns-title">Returns <span class="tsd-signature-type">void</span></h4><aside class="tsd-sources">
 <ul>
-<li>Defined in <a href="https://github.com/gledrich/tsge/blob/a10dad59ce9d50469eea15d2242ab0e54b317ba8/packages/dino-ge/src/core/Engine.ts#L504">packages/dino-ge/src/core/Engine.ts:504</a></li></ul></aside></div></li></ul></section>
+<li>Defined in packages/dino-ge/src/core/Engine.ts:692</li></ul></aside></div></li></ul></section>
 <section class="tsd-panel tsd-member">
 <h3 class="tsd-anchor-link" id="destroyall"><code class="tsd-tag">Static</code><span>destroy<wbr/>All</span><a href="#destroyall" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></h3>
 <ul class="tsd-signatures">
@@ -508,7 +671,7 @@
 </div>
 <h4 class="tsd-returns-title">Returns <span class="tsd-signature-type">void</span></h4><aside class="tsd-sources">
 <ul>
-<li>Defined in <a href="https://github.com/gledrich/tsge/blob/a10dad59ce9d50469eea15d2242ab0e54b317ba8/packages/dino-ge/src/core/Engine.ts#L635">packages/dino-ge/src/core/Engine.ts:635</a></li></ul></aside></div></li></ul></section>
+<li>Defined in packages/dino-ge/src/core/Engine.ts:823</li></ul></aside></div></li></ul></section>
 <section class="tsd-panel tsd-member">
 <h3 class="tsd-anchor-link" id="destroyobject"><code class="tsd-tag">Static</code><span>destroy<wbr/>Object</span><a href="#destroyobject" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></h3>
 <ul class="tsd-signatures">
@@ -525,7 +688,7 @@
 </div></li></ul></div>
 <h4 class="tsd-returns-title">Returns <span class="tsd-signature-type">void</span></h4><aside class="tsd-sources">
 <ul>
-<li>Defined in <a href="https://github.com/gledrich/tsge/blob/a10dad59ce9d50469eea15d2242ab0e54b317ba8/packages/dino-ge/src/core/Engine.ts#L628">packages/dino-ge/src/core/Engine.ts:628</a></li></ul></aside></div></li></ul></section>
+<li>Defined in packages/dino-ge/src/core/Engine.ts:816</li></ul></aside></div></li></ul></section>
 <section class="tsd-panel tsd-member">
 <h3 class="tsd-anchor-link" id="emit"><code class="tsd-tag">Static</code><span>emit</span><a href="#emit" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></h3>
 <ul class="tsd-signatures">
@@ -545,7 +708,40 @@
 </div></li></ul></div>
 <h4 class="tsd-returns-title">Returns <span class="tsd-signature-type">void</span></h4><aside class="tsd-sources">
 <ul>
-<li>Defined in <a href="https://github.com/gledrich/tsge/blob/a10dad59ce9d50469eea15d2242ab0e54b317ba8/packages/dino-ge/src/core/Engine.ts#L197">packages/dino-ge/src/core/Engine.ts:197</a></li></ul></aside></div></li></ul></section>
+<li>Defined in packages/dino-ge/src/core/Engine.ts:234</li></ul></aside></div></li></ul></section>
+<section class="tsd-panel tsd-member">
+<h3 class="tsd-anchor-link" id="observeobjectcreation"><code class="tsd-tag">Static</code><span>observe<wbr/>Object<wbr/>Creation</span><a href="#observeobjectcreation" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></h3>
+<ul class="tsd-signatures">
+<li class="">
+<div class="tsd-signature tsd-anchor-link" id="observeobjectcreation-1"><span class="tsd-kind-call-signature">observeObjectCreation</span><span class="tsd-signature-symbol">(</span><span class="tsd-kind-parameter">callback</span><span class="tsd-signature-symbol">:</span> <span class="tsd-signature-symbol">(</span><span class="tsd-kind-parameter">object</span><span class="tsd-signature-symbol">:</span> <a href="core_GameObject.GameObject.html" class="tsd-signature-type tsd-kind-class">GameObject</a><span class="tsd-signature-symbol">)</span> <span class="tsd-signature-symbol">=&gt;</span> <span class="tsd-signature-type">void</span><span class="tsd-signature-symbol">)</span><span class="tsd-signature-symbol">:</span> <span class="tsd-signature-symbol">()</span> <span class="tsd-signature-symbol">=&gt;</span> <span class="tsd-signature-type">void</span><a href="#observeobjectcreation-1" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></div>
+<div class="tsd-description">
+<div class="tsd-comment tsd-typography"><p>Observe construction after the base components are initialised and before subclasses finish.</p>
+</div>
+<div class="tsd-parameters">
+<h4 class="tsd-parameters-title">Parameters</h4>
+<ul class="tsd-parameter-list">
+<li><span><span class="tsd-kind-parameter">callback</span>: <span class="tsd-signature-symbol">(</span><span class="tsd-kind-parameter">object</span><span class="tsd-signature-symbol">:</span> <a href="core_GameObject.GameObject.html" class="tsd-signature-type tsd-kind-class">GameObject</a><span class="tsd-signature-symbol">)</span> <span class="tsd-signature-symbol">=&gt;</span> <span class="tsd-signature-type">void</span></span></li></ul></div>
+<h4 class="tsd-returns-title">Returns <span class="tsd-signature-symbol">()</span> <span class="tsd-signature-symbol">=&gt;</span> <span class="tsd-signature-type">void</span></h4><aside class="tsd-sources">
+<ul>
+<li>Defined in packages/dino-ge/src/core/Engine.ts:239</li></ul></aside></div></li></ul></section>
+<section class="tsd-panel tsd-member">
+<h3 class="tsd-anchor-link" id="observescreenui"><code class="tsd-tag">Static</code><span>observe<wbr/>Screen<wbr/>UI</span><a href="#observescreenui" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></h3>
+<ul class="tsd-signatures">
+<li class="">
+<div class="tsd-signature tsd-anchor-link" id="observescreenui-1"><span class="tsd-kind-call-signature">observeScreenUI</span><span class="tsd-signature-symbol">(</span><br/>    <span class="tsd-kind-parameter">listener</span><span class="tsd-signature-symbol">:</span> <span class="tsd-signature-symbol">(</span><span class="tsd-kind-parameter">snapshot</span><span class="tsd-signature-symbol">:</span> <a href="../interfaces/core_ScreenUI.ScreenUISnapshot.html" class="tsd-signature-type tsd-kind-interface">ScreenUISnapshot</a><span class="tsd-signature-symbol">)</span> <span class="tsd-signature-symbol">=&gt;</span> <span class="tsd-signature-type">void</span><span class="tsd-signature-symbol">,</span><br/>    <span class="tsd-kind-parameter">getSourceIndex</span><span class="tsd-signature-symbol">?:</span> <span class="tsd-signature-symbol">()</span> <span class="tsd-signature-symbol">=&gt;</span> <span class="tsd-signature-type">number</span> <span class="tsd-signature-symbol">|</span> <span class="tsd-signature-type">undefined</span><span class="tsd-signature-symbol">,</span><br/>    <span class="tsd-kind-parameter">getEditing</span><span class="tsd-signature-symbol">?:</span> <span class="tsd-signature-symbol">()</span> <span class="tsd-signature-symbol">=&gt;</span> <a href="../interfaces/core_ScreenUI.ScreenUIEditing.html" class="tsd-signature-type tsd-kind-interface">ScreenUIEditing</a> <span class="tsd-signature-symbol">|</span> <span class="tsd-signature-type">undefined</span><span class="tsd-signature-symbol">,</span><br/><span class="tsd-signature-symbol">)</span><span class="tsd-signature-symbol">:</span> <span class="tsd-signature-symbol">()</span> <span class="tsd-signature-symbol">=&gt;</span> <span class="tsd-signature-type">void</span><a href="#observescreenui-1" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></div>
+<div class="tsd-description">
+<div class="tsd-comment tsd-typography"><p>Inspect completed ScreenUI frames and optionally preview screen-space edits.
+Return undefined from getEditing to restore game input and the original positions.</p>
+</div>
+<div class="tsd-parameters">
+<h4 class="tsd-parameters-title">Parameters</h4>
+<ul class="tsd-parameter-list">
+<li><span><span class="tsd-kind-parameter">listener</span>: <span class="tsd-signature-symbol">(</span><span class="tsd-kind-parameter">snapshot</span><span class="tsd-signature-symbol">:</span> <a href="../interfaces/core_ScreenUI.ScreenUISnapshot.html" class="tsd-signature-type tsd-kind-interface">ScreenUISnapshot</a><span class="tsd-signature-symbol">)</span> <span class="tsd-signature-symbol">=&gt;</span> <span class="tsd-signature-type">void</span></span></li>
+<li><span><code class="tsd-tag">Optional</code><span class="tsd-kind-parameter">getSourceIndex</span>: <span class="tsd-signature-symbol">()</span> <span class="tsd-signature-symbol">=&gt;</span> <span class="tsd-signature-type">number</span> <span class="tsd-signature-symbol">|</span> <span class="tsd-signature-type">undefined</span></span></li>
+<li><span><code class="tsd-tag">Optional</code><span class="tsd-kind-parameter">getEditing</span>: <span class="tsd-signature-symbol">()</span> <span class="tsd-signature-symbol">=&gt;</span> <a href="../interfaces/core_ScreenUI.ScreenUIEditing.html" class="tsd-signature-type tsd-kind-interface">ScreenUIEditing</a> <span class="tsd-signature-symbol">|</span> <span class="tsd-signature-type">undefined</span></span></li></ul></div>
+<h4 class="tsd-returns-title">Returns <span class="tsd-signature-symbol">()</span> <span class="tsd-signature-symbol">=&gt;</span> <span class="tsd-signature-type">void</span></h4><aside class="tsd-sources">
+<ul>
+<li>Defined in packages/dino-ge/src/core/Engine.ts:258</li></ul></aside></div></li></ul></section>
 <section class="tsd-panel tsd-member">
 <h3 class="tsd-anchor-link" id="off"><code class="tsd-tag">Static</code><span>off</span><a href="#off" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></h3>
 <ul class="tsd-signatures">
@@ -565,7 +761,7 @@
 </div></li></ul></div>
 <h4 class="tsd-returns-title">Returns <span class="tsd-signature-type">void</span></h4><aside class="tsd-sources">
 <ul>
-<li>Defined in <a href="https://github.com/gledrich/tsge/blob/a10dad59ce9d50469eea15d2242ab0e54b317ba8/packages/dino-ge/src/core/Engine.ts#L188">packages/dino-ge/src/core/Engine.ts:188</a></li></ul></aside></div></li></ul></section>
+<li>Defined in packages/dino-ge/src/core/Engine.ts:225</li></ul></aside></div></li></ul></section>
 <section class="tsd-panel tsd-member">
 <h3 class="tsd-anchor-link" id="on"><code class="tsd-tag">Static</code><span>on</span><a href="#on" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></h3>
 <ul class="tsd-signatures">
@@ -585,7 +781,7 @@
 </div></li></ul></div>
 <h4 class="tsd-returns-title">Returns <span class="tsd-signature-type">void</span></h4><aside class="tsd-sources">
 <ul>
-<li>Defined in <a href="https://github.com/gledrich/tsge/blob/a10dad59ce9d50469eea15d2242ab0e54b317ba8/packages/dino-ge/src/core/Engine.ts#L179">packages/dino-ge/src/core/Engine.ts:179</a></li></ul></aside></div></li></ul></section>
+<li>Defined in packages/dino-ge/src/core/Engine.ts:216</li></ul></aside></div></li></ul></section>
 <section class="tsd-panel tsd-member">
 <h3 class="tsd-anchor-link" id="registerobject"><code class="tsd-tag">Static</code><span>register<wbr/>Object</span><a href="#registerobject" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></h3>
 <ul class="tsd-signatures">
@@ -602,7 +798,7 @@
 </div></li></ul></div>
 <h4 class="tsd-returns-title">Returns <span class="tsd-signature-type">void</span></h4><aside class="tsd-sources">
 <ul>
-<li>Defined in <a href="https://github.com/gledrich/tsge/blob/a10dad59ce9d50469eea15d2242ab0e54b317ba8/packages/dino-ge/src/core/Engine.ts#L620">packages/dino-ge/src/core/Engine.ts:620</a></li></ul></aside></div></li></ul></section>
+<li>Defined in packages/dino-ge/src/core/Engine.ts:808</li></ul></aside></div></li></ul></section>
 <section class="tsd-panel tsd-member">
 <h3 class="tsd-anchor-link" id="resetstate"><code class="tsd-tag">Static</code><span>reset<wbr/>State</span><a href="#resetstate" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></h3>
 <ul class="tsd-signatures">
@@ -614,7 +810,7 @@ Useful for testing to prevent state bleed between test cases.</p>
 </div>
 <h4 class="tsd-returns-title">Returns <span class="tsd-signature-type">void</span></h4><aside class="tsd-sources">
 <ul>
-<li>Defined in <a href="https://github.com/gledrich/tsge/blob/a10dad59ce9d50469eea15d2242ab0e54b317ba8/packages/dino-ge/src/core/Engine.ts#L86">packages/dino-ge/src/core/Engine.ts:86</a></li></ul></aside></div></li></ul></section>
+<li>Defined in packages/dino-ge/src/core/Engine.ts:99</li></ul></aside></div></li></ul></section>
 <section class="tsd-panel tsd-member">
 <h3 class="tsd-anchor-link" id="terminatecurrent"><code class="tsd-tag">Static</code><span>terminate<wbr/>Current</span><a href="#terminatecurrent" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></h3>
 <ul class="tsd-signatures">
@@ -625,7 +821,7 @@ Useful for testing to prevent state bleed between test cases.</p>
 </div>
 <h4 class="tsd-returns-title">Returns <span class="tsd-signature-type">void</span></h4><aside class="tsd-sources">
 <ul>
-<li>Defined in <a href="https://github.com/gledrich/tsge/blob/a10dad59ce9d50469eea15d2242ab0e54b317ba8/packages/dino-ge/src/core/Engine.ts#L391">packages/dino-ge/src/core/Engine.ts:391</a></li></ul></aside></div></li></ul></section></section></details></div>
+<li>Defined in packages/dino-ge/src/core/Engine.ts:485</li></ul></aside></div></li></ul></section></section></details></div>
 <div class="col-sidebar">
 <div class="page-menu">
 <div class="tsd-navigation settings">
@@ -646,9 +842,9 @@ Useful for testing to prevent state bleed between test cases.</p>
 <details open class="tsd-accordion tsd-page-navigation-section"><summary class="tsd-accordion-summary" data-key="section-Properties"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden="true"><use href="../assets/icons.svg#icon-chevronDown"></use></svg>Properties</summary>
 <div><a href="#backgroundcolour"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Property"><use href="../assets/icons.svg#icon-1024"></use></svg><span>background<wbr/>Colour</span></a><a href="#callbacks"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Property"><use href="../assets/icons.svg#icon-1024"></use></svg><span>callbacks</span></a><a href="#fps"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Property"><use href="../assets/icons.svg#icon-1024"></use></svg><span>fps</span></a><a href="#frametime"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Property"><use href="../assets/icons.svg#icon-1024"></use></svg><span>frame<wbr/>Time</span></a><a href="#height"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Property"><use href="../assets/icons.svg#icon-1024"></use></svg><span>height</span></a><a href="#width"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Property"><use href="../assets/icons.svg#icon-1024"></use></svg><span>width</span></a></div></details>
 <details open class="tsd-accordion tsd-page-navigation-section"><summary class="tsd-accordion-summary" data-key="section-Accessors"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden="true"><use href="../assets/icons.svg#icon-chevronDown"></use></svg>Accessors</summary>
-<div><a href="#cursor"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Accessor"><use href="../assets/icons.svg#icon-262144"></use></svg><span>cursor</span></a><a href="#mousex"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Accessor"><use href="../assets/icons.svg#icon-262144"></use></svg><span>mouse<wbr/>X</span></a><a href="#mousey"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Accessor"><use href="../assets/icons.svg#icon-262144"></use></svg><span>mouse<wbr/>Y</span></a><a href="#camera"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Accessor"><use href="../assets/icons.svg#icon-262144"></use></svg><span>camera</span></a><a href="#currentscene"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Accessor"><use href="../assets/icons.svg#icon-262144"></use></svg><span>current<wbr/>Scene</span></a><a href="#debug"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Accessor"><use href="../assets/icons.svg#icon-262144"></use></svg><span>debug</span></a><a href="#debugcollisions"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Accessor"><use href="../assets/icons.svg#icon-262144"></use></svg><span>debug<wbr/>Collisions</span></a><a href="#objects"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Accessor"><use href="../assets/icons.svg#icon-262144"></use></svg><span>objects</span></a><a href="#paused"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Accessor"><use href="../assets/icons.svg#icon-262144"></use></svg><span>paused</span></a><a href="#renderingsystem"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Accessor"><use href="../assets/icons.svg#icon-262144"></use></svg><span>rendering<wbr/>System</span></a><a href="#selectedobject"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Accessor"><use href="../assets/icons.svg#icon-262144"></use></svg><span>selected<wbr/>Object</span></a><a href="#showcollisionlines"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Accessor"><use href="../assets/icons.svg#icon-262144"></use></svg><span>show<wbr/>Collision<wbr/>Lines</span></a><a href="#showphysicsvectors"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Accessor"><use href="../assets/icons.svg#icon-262144"></use></svg><span>show<wbr/>Physics<wbr/>Vectors</span></a><a href="#sortedobjects"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Accessor"><use href="../assets/icons.svg#icon-262144"></use></svg><span>sorted<wbr/>Objects</span></a><a href="#totaltime"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Accessor"><use href="../assets/icons.svg#icon-262144"></use></svg><span>total<wbr/>Time</span></a><a href="#zorderdirty"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Accessor"><use href="../assets/icons.svg#icon-262144"></use></svg><span>z<wbr/>Order<wbr/>Dirty</span></a></div></details>
+<div><a href="#cursor"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Accessor"><use href="../assets/icons.svg#icon-262144"></use></svg><span>cursor</span></a><a href="#mousex"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Accessor"><use href="../assets/icons.svg#icon-262144"></use></svg><span>mouse<wbr/>X</span></a><a href="#mousey"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Accessor"><use href="../assets/icons.svg#icon-262144"></use></svg><span>mouse<wbr/>Y</span></a><a href="#camera"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Accessor"><use href="../assets/icons.svg#icon-262144"></use></svg><span>camera</span></a><a href="#currentscene"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Accessor"><use href="../assets/icons.svg#icon-262144"></use></svg><span>current<wbr/>Scene</span></a><a href="#debug"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Accessor"><use href="../assets/icons.svg#icon-262144"></use></svg><span>debug</span></a><a href="#debugcollisions"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Accessor"><use href="../assets/icons.svg#icon-262144"></use></svg><span>debug<wbr/>Collisions</span></a><a href="#debugkeepproportions"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Accessor"><use href="../assets/icons.svg#icon-262144"></use></svg><span>debug<wbr/>Keep<wbr/>Proportions</span></a><a href="#debugpositiongridsize"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Accessor"><use href="../assets/icons.svg#icon-262144"></use></svg><span>debug<wbr/>Position<wbr/>Grid<wbr/>Size</span></a><a href="#debugsnapalignment"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Accessor"><use href="../assets/icons.svg#icon-262144"></use></svg><span>debug<wbr/>Snap<wbr/>Alignment</span></a><a href="#debugsnaprotation"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Accessor"><use href="../assets/icons.svg#icon-262144"></use></svg><span>debug<wbr/>Snap<wbr/>Rotation</span></a><a href="#objects"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Accessor"><use href="../assets/icons.svg#icon-262144"></use></svg><span>objects</span></a><a href="#paused"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Accessor"><use href="../assets/icons.svg#icon-262144"></use></svg><span>paused</span></a><a href="#renderingsystem"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Accessor"><use href="../assets/icons.svg#icon-262144"></use></svg><span>rendering<wbr/>System</span></a><a href="#selectedobject"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Accessor"><use href="../assets/icons.svg#icon-262144"></use></svg><span>selected<wbr/>Object</span></a><a href="#showcollisionlines"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Accessor"><use href="../assets/icons.svg#icon-262144"></use></svg><span>show<wbr/>Collision<wbr/>Lines</span></a><a href="#showdebughud"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Accessor"><use href="../assets/icons.svg#icon-262144"></use></svg><span>show<wbr/>Debug<wbr/>Hud</span></a><a href="#showphysicsvectors"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Accessor"><use href="../assets/icons.svg#icon-262144"></use></svg><span>show<wbr/>Physics<wbr/>Vectors</span></a><a href="#sortedobjects"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Accessor"><use href="../assets/icons.svg#icon-262144"></use></svg><span>sorted<wbr/>Objects</span></a><a href="#totaltime"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Accessor"><use href="../assets/icons.svg#icon-262144"></use></svg><span>total<wbr/>Time</span></a><a href="#zorderdirty"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Accessor"><use href="../assets/icons.svg#icon-262144"></use></svg><span>z<wbr/>Order<wbr/>Dirty</span></a></div></details>
 <details open class="tsd-accordion tsd-page-navigation-section"><summary class="tsd-accordion-summary" data-key="section-Methods"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden="true"><use href="../assets/icons.svg#icon-chevronDown"></use></svg>Methods</summary>
-<div><a href="#countdown"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Method"><use href="../assets/icons.svg#icon-2048"></use></svg><span>countdown</span></a><a href="#settimeout"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Method"><use href="../assets/icons.svg#icon-2048"></use></svg><span>set<wbr/>Timeout</span></a><a href="#terminate"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Method"><use href="../assets/icons.svg#icon-2048"></use></svg><span>terminate</span></a><a href="#cleandebugcollisions"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Method"><use href="../assets/icons.svg#icon-2048"></use></svg><span>clean<wbr/>Debug<wbr/>Collisions</span></a><a href="#destroyall"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Method"><use href="../assets/icons.svg#icon-2048"></use></svg><span>destroy<wbr/>All</span></a><a href="#destroyobject"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Method"><use href="../assets/icons.svg#icon-2048"></use></svg><span>destroy<wbr/>Object</span></a><a href="#emit"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Method"><use href="../assets/icons.svg#icon-2048"></use></svg><span>emit</span></a><a href="#off"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Method"><use href="../assets/icons.svg#icon-2048"></use></svg><span>off</span></a><a href="#on"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Method"><use href="../assets/icons.svg#icon-2048"></use></svg><span>on</span></a><a href="#registerobject"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Method"><use href="../assets/icons.svg#icon-2048"></use></svg><span>register<wbr/>Object</span></a><a href="#resetstate"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Method"><use href="../assets/icons.svg#icon-2048"></use></svg><span>reset<wbr/>State</span></a><a href="#terminatecurrent"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Method"><use href="../assets/icons.svg#icon-2048"></use></svg><span>terminate<wbr/>Current</span></a></div></details></div></details></div>
+<div><a href="#chromaticaberration"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Method"><use href="../assets/icons.svg#icon-2048"></use></svg><span>chromatic<wbr/>Aberration</span></a><a href="#countdown"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Method"><use href="../assets/icons.svg#icon-2048"></use></svg><span>countdown</span></a><a href="#settimeout"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Method"><use href="../assets/icons.svg#icon-2048"></use></svg><span>set<wbr/>Timeout</span></a><a href="#shakescreen"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Method"><use href="../assets/icons.svg#icon-2048"></use></svg><span>shake<wbr/>Screen</span></a><a href="#terminate"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Method"><use href="../assets/icons.svg#icon-2048"></use></svg><span>terminate</span></a><a href="#transitionto"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Method"><use href="../assets/icons.svg#icon-2048"></use></svg><span>transition<wbr/>To</span></a><a href="#cleandebugcollisions"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Method"><use href="../assets/icons.svg#icon-2048"></use></svg><span>clean<wbr/>Debug<wbr/>Collisions</span></a><a href="#destroyall"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Method"><use href="../assets/icons.svg#icon-2048"></use></svg><span>destroy<wbr/>All</span></a><a href="#destroyobject"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Method"><use href="../assets/icons.svg#icon-2048"></use></svg><span>destroy<wbr/>Object</span></a><a href="#emit"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Method"><use href="../assets/icons.svg#icon-2048"></use></svg><span>emit</span></a><a href="#observeobjectcreation"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Method"><use href="../assets/icons.svg#icon-2048"></use></svg><span>observe<wbr/>Object<wbr/>Creation</span></a><a href="#observescreenui"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Method"><use href="../assets/icons.svg#icon-2048"></use></svg><span>observe<wbr/>Screen<wbr/>UI</span></a><a href="#off"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Method"><use href="../assets/icons.svg#icon-2048"></use></svg><span>off</span></a><a href="#on"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Method"><use href="../assets/icons.svg#icon-2048"></use></svg><span>on</span></a><a href="#registerobject"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Method"><use href="../assets/icons.svg#icon-2048"></use></svg><span>register<wbr/>Object</span></a><a href="#resetstate"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Method"><use href="../assets/icons.svg#icon-2048"></use></svg><span>reset<wbr/>State</span></a><a href="#terminatecurrent"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Method"><use href="../assets/icons.svg#icon-2048"></use></svg><span>terminate<wbr/>Current</span></a></div></details></div></details></div>
 <div class="site-menu">
 <nav class="tsd-navigation"><a href="../modules.html">dino-ge</a>
 <ul class="tsd-small-nested-navigation" id="tsd-nav-container">

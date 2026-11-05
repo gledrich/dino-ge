@@ -14,7 +14,7 @@
 <section class="tsd-panel tsd-comment">
 <div class="tsd-comment tsd-typography"><p>Base class for all entities in the game world.</p>
 </div></section>
-<section class="tsd-panel tsd-hierarchy" data-refl="741">
+<section class="tsd-panel tsd-hierarchy" data-refl="1112">
 <h4>Hierarchy (<a href="../hierarchy.html#core/GameObject.GameObject">View Summary</a>)</h4>
 <ul class="tsd-hierarchy">
 <li class="tsd-hierarchy-item"><span class="tsd-hierarchy-target">GameObject</span>
@@ -22,12 +22,13 @@
 <li class="tsd-hierarchy-item"><a href="core_Group.Group.html" class="tsd-signature-type tsd-kind-class">Group</a></li>
 <li class="tsd-hierarchy-item"><a href="objects_Circle.Circle.html" class="tsd-signature-type tsd-kind-class">Circle</a></li>
 <li class="tsd-hierarchy-item"><a href="objects_Line.Line.html" class="tsd-signature-type tsd-kind-class">Line</a></li>
+<li class="tsd-hierarchy-item"><a href="objects_ParticleEmitter.ParticleEmitter.html" class="tsd-signature-type tsd-kind-class">ParticleEmitter</a></li>
 <li class="tsd-hierarchy-item"><a href="objects_Rectangle.Rectangle.html" class="tsd-signature-type tsd-kind-class">Rectangle</a></li>
 <li class="tsd-hierarchy-item"><a href="objects_Sprite.Sprite.html" class="tsd-signature-type tsd-kind-class">Sprite</a></li>
 <li class="tsd-hierarchy-item"><a href="objects_Text.Text.html" class="tsd-signature-type tsd-kind-class">Text</a></li>
 <li class="tsd-hierarchy-item"><a href="objects_Tilemap.Tilemap.html" class="tsd-signature-type tsd-kind-class">Tilemap</a></li></ul></li></ul></section><aside class="tsd-sources">
 <ul>
-<li>Defined in <a href="https://github.com/gledrich/tsge/blob/a10dad59ce9d50469eea15d2242ab0e54b317ba8/packages/dino-ge/src/core/GameObject.ts#L19">packages/dino-ge/src/core/GameObject.ts:19</a></li></ul></aside>
+<li>Defined in packages/dino-ge/src/core/GameObject.ts:20</li></ul></aside>
 <section class="tsd-panel-group tsd-index-group">
 <section class="tsd-panel tsd-index-panel">
 <details class="tsd-index-content tsd-accordion" open><summary class="tsd-accordion-summary tsd-index-summary"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden="true"><use href="../assets/icons.svg#icon-chevronDown"></use></svg>
@@ -85,7 +86,7 @@
 </div></li></ul></div>
 <h4 class="tsd-returns-title">Returns <a href="" class="tsd-signature-type tsd-kind-class">GameObject</a></h4><aside class="tsd-sources">
 <ul>
-<li>Defined in <a href="https://github.com/gledrich/tsge/blob/a10dad59ce9d50469eea15d2242ab0e54b317ba8/packages/dino-ge/src/core/GameObject.ts#L72">packages/dino-ge/src/core/GameObject.ts:72</a></li></ul></aside></div></li></ul></section></section></details>
+<li>Defined in packages/dino-ge/src/core/GameObject.ts:73</li></ul></aside></div></li></ul></section></section></details>
 <details class="tsd-panel-group tsd-member-group tsd-accordion" open><summary class="tsd-accordion-summary" data-key="section-Properties"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden="true"><use href="../assets/icons.svg#icon-chevronDown"></use></svg>
 <h2 class="tsd-anchor-link" id="properties-1">Properties<a href="#properties-1" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></h2></summary>
 <section>
@@ -95,14 +96,14 @@
 <div class="tsd-comment tsd-typography"><p>Unique identifier for the game object.</p>
 </div><aside class="tsd-sources">
 <ul>
-<li>Defined in <a href="https://github.com/gledrich/tsge/blob/a10dad59ce9d50469eea15d2242ab0e54b317ba8/packages/dino-ge/src/core/GameObject.ts#L21">packages/dino-ge/src/core/GameObject.ts:21</a></li></ul></aside></section>
+<li>Defined in packages/dino-ge/src/core/GameObject.ts:22</li></ul></aside></section>
 <section class="tsd-panel tsd-member">
 <h3 class="tsd-anchor-link" id="_registry"><code class="tsd-tag">Static</code><span>_<wbr/>registry</span><a href="#_registry" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></h3>
 <div class="tsd-signature"><span class="tsd-kind-property">_registry</span><span class="tsd-signature-symbol">:</span> <span class="tsd-signature-keyword">typeof</span> <a href="core_Registry.Registry.html" class="tsd-signature-type tsd-kind-class">Registry</a><span class="tsd-signature-symbol"> = Registry</span></div>
 <div class="tsd-comment tsd-typography"><p>Static helper for tests to bypass Registry circularity if mocked.</p>
 </div><aside class="tsd-sources">
 <ul>
-<li>Defined in <a href="https://github.com/gledrich/tsge/blob/a10dad59ce9d50469eea15d2242ab0e54b317ba8/packages/dino-ge/src/core/GameObject.ts#L165">packages/dino-ge/src/core/GameObject.ts:165</a></li></ul></aside></section></section></details>
+<li>Defined in packages/dino-ge/src/core/GameObject.ts:167</li></ul></aside></section></section></details>
 <details class="tsd-panel-group tsd-member-group tsd-accordion" open><summary class="tsd-accordion-summary" data-key="section-Accessors"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden="true"><use href="../assets/icons.svg#icon-chevronDown"></use></svg>
 <h2 class="tsd-anchor-link" id="accessors-1">Accessors<a href="#accessors-1" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></h2></summary>
 <section>
@@ -116,7 +117,7 @@
 </div>
 <h4 class="tsd-returns-title">Returns <a href="components_BoundsComponent.BoundsComponent.html" class="tsd-signature-type tsd-kind-class">BoundsComponent</a> <span class="tsd-signature-symbol">|</span> <span class="tsd-signature-type">undefined</span></h4><aside class="tsd-sources">
 <ul>
-<li>Defined in <a href="https://github.com/gledrich/tsge/blob/a10dad59ce9d50469eea15d2242ab0e54b317ba8/packages/dino-ge/src/core/GameObject.ts#L51">packages/dino-ge/src/core/GameObject.ts:51</a></li></ul></aside></div></li>
+<li>Defined in packages/dino-ge/src/core/GameObject.ts:52</li></ul></aside></div></li>
 <li>
 <div class="tsd-signature" id="boundsbounds-1"><span class="tsd-signature-keyword">set</span> <span class="tsd-kind-set-signature">bounds</span><span class="tsd-signature-symbol">(</span><span class="tsd-kind-parameter">val</span><span class="tsd-signature-symbol">:</span> <a href="components_BoundsComponent.BoundsComponent.html" class="tsd-signature-type tsd-kind-class">BoundsComponent</a> <span class="tsd-signature-symbol">|</span> <span class="tsd-signature-type">undefined</span><span class="tsd-signature-symbol">)</span><span class="tsd-signature-symbol">:</span> <span class="tsd-signature-type">void</span></div>
 <div class="tsd-description">
@@ -128,7 +129,7 @@
 <li><span><span class="tsd-kind-parameter">val</span>: <a href="components_BoundsComponent.BoundsComponent.html" class="tsd-signature-type tsd-kind-class">BoundsComponent</a> <span class="tsd-signature-symbol">|</span> <span class="tsd-signature-type">undefined</span></span></li></ul></div>
 <h4 class="tsd-returns-title">Returns <span class="tsd-signature-type">void</span></h4><aside class="tsd-sources">
 <ul>
-<li>Defined in <a href="https://github.com/gledrich/tsge/blob/a10dad59ce9d50469eea15d2242ab0e54b317ba8/packages/dino-ge/src/core/GameObject.ts#L58">packages/dino-ge/src/core/GameObject.ts:58</a></li></ul></aside></div></li></ul></section>
+<li>Defined in packages/dino-ge/src/core/GameObject.ts:59</li></ul></aside></div></li></ul></section>
 <section class="tsd-panel tsd-member">
 <h3 class="tsd-anchor-link" id="metadata"><span>metadata</span><a href="#metadata" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></h3>
 <ul class="tsd-signatures">
@@ -139,7 +140,7 @@
 </div>
 <h4 class="tsd-returns-title">Returns <a href="components_TagComponent.TagComponent.html" class="tsd-signature-type tsd-kind-class">TagComponent</a></h4><aside class="tsd-sources">
 <ul>
-<li>Defined in <a href="https://github.com/gledrich/tsge/blob/a10dad59ce9d50469eea15d2242ab0e54b317ba8/packages/dino-ge/src/core/GameObject.ts#L39">packages/dino-ge/src/core/GameObject.ts:39</a></li></ul></aside></div></li></ul></section>
+<li>Defined in packages/dino-ge/src/core/GameObject.ts:40</li></ul></aside></div></li></ul></section>
 <section class="tsd-panel tsd-member">
 <h3 class="tsd-anchor-link" id="transform"><span>transform</span><a href="#transform" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></h3>
 <ul class="tsd-signatures">
@@ -150,7 +151,7 @@
 </div>
 <h4 class="tsd-returns-title">Returns <a href="components_TransformComponent.TransformComponent.html" class="tsd-signature-type tsd-kind-class">TransformComponent</a></h4><aside class="tsd-sources">
 <ul>
-<li>Defined in <a href="https://github.com/gledrich/tsge/blob/a10dad59ce9d50469eea15d2242ab0e54b317ba8/packages/dino-ge/src/core/GameObject.ts#L27">packages/dino-ge/src/core/GameObject.ts:27</a></li></ul></aside></div></li></ul></section></section></details>
+<li>Defined in packages/dino-ge/src/core/GameObject.ts:28</li></ul></aside></div></li></ul></section></section></details>
 <details class="tsd-panel-group tsd-member-group tsd-accordion" open><summary class="tsd-accordion-summary" data-key="section-Methods"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden="true"><use href="../assets/icons.svg#icon-chevronDown"></use></svg>
 <h2 class="tsd-anchor-link" id="methods-1">Methods<a href="#methods-1" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></h2></summary>
 <section>
@@ -170,7 +171,7 @@
 </div></li></ul></div>
 <h4 class="tsd-returns-title">Returns <span class="tsd-signature-type">void</span></h4><aside class="tsd-sources">
 <ul>
-<li>Defined in <a href="https://github.com/gledrich/tsge/blob/a10dad59ce9d50469eea15d2242ab0e54b317ba8/packages/dino-ge/src/core/GameObject.ts#L113">packages/dino-ge/src/core/GameObject.ts:113</a></li></ul></aside></div></li></ul></section>
+<li>Defined in packages/dino-ge/src/core/GameObject.ts:115</li></ul></aside></div></li></ul></section>
 <section class="tsd-panel tsd-member">
 <h3 class="tsd-anchor-link" id="destroyself"><span>destroy<wbr/>Self</span><a href="#destroyself" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></h3>
 <ul class="tsd-signatures">
@@ -181,7 +182,7 @@
 </div>
 <h4 class="tsd-returns-title">Returns <span class="tsd-signature-type">void</span></h4><aside class="tsd-sources">
 <ul>
-<li>Defined in <a href="https://github.com/gledrich/tsge/blob/a10dad59ce9d50469eea15d2242ab0e54b317ba8/packages/dino-ge/src/core/GameObject.ts#L170">packages/dino-ge/src/core/GameObject.ts:170</a></li></ul></aside></div></li></ul></section>
+<li>Defined in packages/dino-ge/src/core/GameObject.ts:172</li></ul></aside></div></li></ul></section>
 <section class="tsd-panel tsd-member">
 <h3 class="tsd-anchor-link" id="emit"><span>emit</span><a href="#emit" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></h3>
 <ul class="tsd-signatures">
@@ -201,7 +202,7 @@
 </div></li></ul></div>
 <h4 class="tsd-returns-title">Returns <span class="tsd-signature-type">void</span></h4><aside class="tsd-sources">
 <ul>
-<li>Defined in <a href="https://github.com/gledrich/tsge/blob/a10dad59ce9d50469eea15d2242ab0e54b317ba8/packages/dino-ge/src/core/GameObject.ts#L105">packages/dino-ge/src/core/GameObject.ts:105</a></li></ul></aside></div></li></ul></section>
+<li>Defined in packages/dino-ge/src/core/GameObject.ts:107</li></ul></aside></div></li></ul></section>
 <section class="tsd-panel tsd-member">
 <h3 class="tsd-anchor-link" id="getcomponent"><span>get<wbr/>Component</span><a href="#getcomponent" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></h3>
 <ul class="tsd-signatures">
@@ -223,7 +224,7 @@
 <h4 class="tsd-returns-title">Returns <a class="tsd-signature-type tsd-kind-type-parameter" href="#getcomponentt">T</a> <span class="tsd-signature-symbol">|</span> <span class="tsd-signature-type">undefined</span></h4><p>The component instance, or undefined if not found.</p>
 <aside class="tsd-sources">
 <ul>
-<li>Defined in <a href="https://github.com/gledrich/tsge/blob/a10dad59ce9d50469eea15d2242ab0e54b317ba8/packages/dino-ge/src/core/GameObject.ts#L153">packages/dino-ge/src/core/GameObject.ts:153</a></li></ul></aside></div></li></ul></section>
+<li>Defined in packages/dino-ge/src/core/GameObject.ts:155</li></ul></aside></div></li></ul></section>
 <section class="tsd-panel tsd-member">
 <h3 class="tsd-anchor-link" id="hascomponent"><span>has<wbr/>Component</span><a href="#hascomponent" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></h3>
 <ul class="tsd-signatures">
@@ -245,7 +246,7 @@
 <h4 class="tsd-returns-title">Returns <span class="tsd-signature-type">boolean</span></h4><p>True if the component exists.</p>
 <aside class="tsd-sources">
 <ul>
-<li>Defined in <a href="https://github.com/gledrich/tsge/blob/a10dad59ce9d50469eea15d2242ab0e54b317ba8/packages/dino-ge/src/core/GameObject.ts#L144">packages/dino-ge/src/core/GameObject.ts:144</a></li></ul></aside></div></li></ul></section>
+<li>Defined in packages/dino-ge/src/core/GameObject.ts:146</li></ul></aside></div></li></ul></section>
 <section class="tsd-panel tsd-member">
 <h3 class="tsd-anchor-link" id="off"><span>off</span><a href="#off" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></h3>
 <ul class="tsd-signatures">
@@ -265,7 +266,7 @@
 </div></li></ul></div>
 <h4 class="tsd-returns-title">Returns <span class="tsd-signature-type">void</span></h4><aside class="tsd-sources">
 <ul>
-<li>Defined in <a href="https://github.com/gledrich/tsge/blob/a10dad59ce9d50469eea15d2242ab0e54b317ba8/packages/dino-ge/src/core/GameObject.ts#L96">packages/dino-ge/src/core/GameObject.ts:96</a></li></ul></aside></div></li></ul></section>
+<li>Defined in packages/dino-ge/src/core/GameObject.ts:98</li></ul></aside></div></li></ul></section>
 <section class="tsd-panel tsd-member">
 <h3 class="tsd-anchor-link" id="on"><span>on</span><a href="#on" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></h3>
 <ul class="tsd-signatures">
@@ -285,7 +286,7 @@
 </div></li></ul></div>
 <h4 class="tsd-returns-title">Returns <span class="tsd-signature-type">void</span></h4><aside class="tsd-sources">
 <ul>
-<li>Defined in <a href="https://github.com/gledrich/tsge/blob/a10dad59ce9d50469eea15d2242ab0e54b317ba8/packages/dino-ge/src/core/GameObject.ts#L82">packages/dino-ge/src/core/GameObject.ts:82</a></li></ul></aside></div></li></ul></section>
+<li>Defined in packages/dino-ge/src/core/GameObject.ts:84</li></ul></aside></div></li></ul></section>
 <section class="tsd-panel tsd-member">
 <h3 class="tsd-anchor-link" id="registerself"><span>register<wbr/>Self</span><a href="#registerself" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></h3>
 <ul class="tsd-signatures">
@@ -296,7 +297,7 @@
 </div>
 <h4 class="tsd-returns-title">Returns <span class="tsd-signature-type">void</span></h4><aside class="tsd-sources">
 <ul>
-<li>Defined in <a href="https://github.com/gledrich/tsge/blob/a10dad59ce9d50469eea15d2242ab0e54b317ba8/packages/dino-ge/src/core/GameObject.ts#L160">packages/dino-ge/src/core/GameObject.ts:160</a></li></ul></aside></div></li></ul></section>
+<li>Defined in packages/dino-ge/src/core/GameObject.ts:162</li></ul></aside></div></li></ul></section>
 <section class="tsd-panel tsd-member">
 <h3 class="tsd-anchor-link" id="removecomponent"><span>remove<wbr/>Component</span><a href="#removecomponent" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></h3>
 <ul class="tsd-signatures">
@@ -317,7 +318,7 @@
 </div></li></ul></div>
 <h4 class="tsd-returns-title">Returns <span class="tsd-signature-type">void</span></h4><aside class="tsd-sources">
 <ul>
-<li>Defined in <a href="https://github.com/gledrich/tsge/blob/a10dad59ce9d50469eea15d2242ab0e54b317ba8/packages/dino-ge/src/core/GameObject.ts#L129">packages/dino-ge/src/core/GameObject.ts:129</a></li></ul></aside></div></li></ul></section></section></details></div>
+<li>Defined in packages/dino-ge/src/core/GameObject.ts:131</li></ul></aside></div></li></ul></section></section></details></div>
 <div class="col-sidebar">
 <div class="page-menu">
 <div class="tsd-navigation settings">

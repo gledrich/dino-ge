@@ -50,6 +50,29 @@ progress bars. The <code>onDispose</code> callback can release game resources on
 <p>Full API documentation and guides are available at <a href="https://gledrich.github.io/dino-ge/index.html">https://gledrich.github.io/dino-ge/index.html</a>.</p>
 <h2 id="license" class="tsd-anchor-link">License<a href="#license" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="assets/icons.svg#icon-anchor"></use></svg></a></h2>
 <p>Dino GE is released under the MIT License.</p>
+<h3 id="particle-bursts" class="tsd-anchor-link">Particle bursts<a href="#particle-bursts" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="assets/icons.svg#icon-anchor"></use></svg></a></h3>
+<p>Create a <code>ParticleEmitter</code> while a scene is active to keep its visual effects
+with that scene. Each burst starts at a world-space position and uses seconds
+for its lifetime. The emitter caps the number of live particles and advances
+them on the engine's fixed step.</p>
+<pre><code class="ts"><span class="hl-5">const</span><span class="hl-1"> </span><span class="hl-7">sparks</span><span class="hl-1"> = </span><span class="hl-5">new</span><span class="hl-1"> </span><span class="hl-0">ParticleEmitter</span><span class="hl-1">({ </span><span class="hl-4">capacity:</span><span class="hl-1"> </span><span class="hl-9">128</span><span class="hl-1">, </span><span class="hl-4">zIndex:</span><span class="hl-1"> </span><span class="hl-9">10</span><span class="hl-1"> });</span><br/><span class="hl-4">sparks</span><span class="hl-1">.</span><span class="hl-0">burst</span><span class="hl-1">(</span><span class="hl-5">new</span><span class="hl-1"> </span><span class="hl-0">Vector2</span><span class="hl-1">(</span><span class="hl-9">120</span><span class="hl-1">, </span><span class="hl-9">80</span><span class="hl-1">), {</span><br/><span class="hl-1">  </span><span class="hl-4">count:</span><span class="hl-1"> </span><span class="hl-9">8</span><span class="hl-1">,</span><br/><span class="hl-1">  </span><span class="hl-0">velocity</span><span class="hl-4">:</span><span class="hl-1"> </span><span class="hl-4">index</span><span class="hl-1"> </span><span class="hl-5">=&gt;</span><span class="hl-1"> </span><span class="hl-5">new</span><span class="hl-1"> </span><span class="hl-0">Vector2</span><span class="hl-1">((</span><span class="hl-4">index</span><span class="hl-1"> - </span><span class="hl-9">3.5</span><span class="hl-1">) * </span><span class="hl-9">20</span><span class="hl-1">, -</span><span class="hl-9">80</span><span class="hl-1">),</span><br/><span class="hl-1">  </span><span class="hl-4">gravity:</span><span class="hl-1"> </span><span class="hl-5">new</span><span class="hl-1"> </span><span class="hl-0">Vector2</span><span class="hl-1">(</span><span class="hl-9">0</span><span class="hl-1">, </span><span class="hl-9">160</span><span class="hl-1">),</span><br/><span class="hl-1">  </span><span class="hl-4">lifetime:</span><span class="hl-1"> </span><span class="hl-9">0.4</span><span class="hl-1">,</span><br/><span class="hl-1">  </span><span class="hl-4">startRadius:</span><span class="hl-1"> </span><span class="hl-9">4</span><span class="hl-1">,</span><br/><span class="hl-1">  </span><span class="hl-4">endRadius:</span><span class="hl-1"> </span><span class="hl-9">0</span><span class="hl-1">,</span><br/><span class="hl-1">  </span><span class="hl-4">colour:</span><span class="hl-1"> </span><span class="hl-2">&#39;#ffcf64&#39;</span><span class="hl-1">,</span><br/><span class="hl-1">});</span>
+</code><button type="button">Copy</button></pre>
+
+<h3 id="collision-broad-phase" class="tsd-anchor-link">Collision broad phase<a href="#collision-broad-phase" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="assets/icons.svg#icon-anchor"></use></svg></a></h3>
+<p>The default physics system uses a quadtree to find nearby world-space
+colliders before running shape-specific tests. Collisions retain their pair
+order, and later pairs see position changes made by earlier resolution and
+collision handlers. The Bouncy Physics example at <code>/bouncy.html</code> exercises
+the broad phase with a field of 216 static bumpers.</p>
+<h3 id="scene-transitions-and-effects" class="tsd-anchor-link">Scene transitions and effects<a href="#scene-transitions-and-effects" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="assets/icons.svg#icon-anchor"></use></svg></a></h3>
+<p>Use <code>game.transitionTo(nextScene, { type: 'fade', duration: 0.4 })</code> to fade
+through black, or use <code>type: 'slide'</code> to slide the old world off screen and
+the next world in. The engine loads the next scene at the midpoint. Use
+<code>Engine.currentScene = nextScene</code> for an immediate switch.</p>
+<p><code>game.shakeScreen(8, 0.25)</code> and <code>game.chromaticAberration(4, 0.18)</code> take a
+strength in screen pixels and a duration in seconds. Effects decay over
+their duration and freeze when paused. They affect the world before
+<code>drawUI</code>, so the camera coordinates and screen-space HUD stay stable.</p>
 </div></div>
 <div class="col-sidebar">
 <div class="page-menu">
@@ -72,7 +95,12 @@ progress bars. The <code>onDispose</code> callback can release game resources on
 <li><a href="#beta-game-apis"><span>Beta game <wbr/>AP<wbr/>Is</span></a></li>
 <li><a href="#quick-start"><span>Quick <wbr/>Start</span></a></li>
 <li><a href="#documentation"><span>Documentation</span></a></li>
-<li><a href="#license"><span>License</span></a></li></ul></div></details></div>
+<li><a href="#license"><span>License</span></a></li>
+<li>
+<ul>
+<li><a href="#particle-bursts"><span>Particle bursts</span></a></li>
+<li><a href="#collision-broad-phase"><span>Collision broad phase</span></a></li>
+<li><a href="#scene-transitions-and-effects"><span>Scene transitions and effects</span></a></li></ul></li></ul></div></details></div>
 <div class="site-menu">
 <nav class="tsd-navigation"><a href="modules.html">dino-ge</a>
 <ul class="tsd-small-nested-navigation" id="tsd-nav-container">
