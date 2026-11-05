@@ -67,11 +67,20 @@ interface KeyboardPlacement extends SceneKeyboardPlacementRequest {
 }
 
 interface CameraPan {
-  id: number;
   canvas: HTMLCanvasElement;
   scene: typeof Engine.currentScene;
-  pointer: ScenePoint;
-  origin: ScenePoint;
+  pointerType: string;
+  contacts: Map<number, ScenePoint>;
+  origin: ScenePoint & { zoom: number };
+}
+
+function getCameraContactFrame(contacts: ReadonlyMap<number, ScenePoint>) {
+  const [first, second] = contacts.values();
+  if (!second) return { centre: first, distance: 1 };
+  return {
+    centre: { x: (first.x + second.x) / 2, y: (first.y + second.y) / 2 },
+    distance: Math.max(8, Math.hypot(first.x - second.x, first.y - second.y)),
+  };
 }
 
 const Viewport: React.FC = () => {
@@ -486,8 +495,12 @@ const Viewport: React.FC = () => {
     setIsPanning(false);
     if (cancel && drag.canvas.isConnected && drag.scene === Engine.currentScene) {
       Engine.camera.position.set(drag.origin.x, drag.origin.y);
+      Engine.camera.zoom = drag.origin.zoom;
+      setZoomPercent(Math.round(drag.origin.zoom * 100));
     }
-    if (drag.canvas.hasPointerCapture(drag.id)) drag.canvas.releasePointerCapture(drag.id);
+    for (const id of drag.contacts.keys()) {
+      if (drag.canvas.hasPointerCapture(id)) drag.canvas.releasePointerCapture(id);
+    }
   }, []);
 
   const restoreCamera = useCallback(() => {
@@ -507,6 +520,7 @@ const Viewport: React.FC = () => {
     const updateSceneZoom = () => {
       if (Engine.currentScene === scene) return;
       scene = Engine.currentScene;
+      endPan();
       setZoomPercent(undefined);
     };
     const cancelNavigation = () => {
@@ -526,28 +540,30 @@ const Viewport: React.FC = () => {
     };
   }, [isEditingScene, endPan, restoreCamera]);
 
+  const transformView = useCallback((canvas: HTMLCanvasElement, factor: number, from?: ScenePoint, to = from) => {
+    const bounds = canvas.getBoundingClientRect();
+    const { position, zoom } = Engine.camera;
+    if (!bounds.width || !bounds.height || !canvas.width || !canvas.height || !Number.isFinite(zoom) || zoom <= 0) return;
+    const next = factor === 1 ? zoom : clampSceneZoom(zoom * factor);
+    const x = from ? from.x - bounds.left : bounds.width / 2;
+    const y = from ? from.y - bounds.top : bounds.height / 2;
+    const nextX = to ? to.x - bounds.left : x;
+    const nextY = to ? to.y - bounds.top : y;
+    if (next === zoom && nextX === x && nextY === y) return;
+    rememberCamera(canvas);
+    position.set(position.x + (x / zoom - nextX / next) * canvas.width / bounds.width,
+      position.y + (y / zoom - nextY / next) * canvas.height / bounds.height);
+    if (next !== zoom) {
+      Engine.camera.zoom = next;
+      setZoomPercent(Math.round(next * 100));
+    }
+  }, [rememberCamera]);
+
   const zoomView = useCallback((factor: number, pointer?: ScenePoint) => {
     if (pan.current || keyboardPlacement || Input.isManipulatingObject) return;
     const canvas = viewportContainerRef.current?.querySelector<HTMLCanvasElement>('canvas#canvas');
-    if (!canvas || !canvas.width || !canvas.height) return;
-    const { position, zoom } = Engine.camera;
-    if (!Number.isFinite(zoom) || zoom <= 0) return;
-    const next = clampSceneZoom(zoom * factor);
-    if (next === zoom) return;
-    let x = canvas.width / 2;
-    let y = canvas.height / 2;
-    if (pointer) {
-      const bounds = canvas.getBoundingClientRect();
-      if (!bounds.width || !bounds.height) return;
-      x = (pointer.x - bounds.left) * canvas.width / bounds.width;
-      y = (pointer.y - bounds.top) * canvas.height / bounds.height;
-    }
-    rememberCamera(canvas);
-    const adjustment = 1 / zoom - 1 / next;
-    position.set(position.x + x * adjustment, position.y + y * adjustment);
-    Engine.camera.zoom = next;
-    setZoomPercent(Math.round(next * 100));
-  }, [keyboardPlacement, rememberCamera]);
+    if (canvas) transformView(canvas, factor, pointer);
+  }, [keyboardPlacement, transformView]);
 
   useEffect(() => {
     const viewport = viewportContainerRef.current;
@@ -663,48 +679,51 @@ const Viewport: React.FC = () => {
         onPointerDownCapture={event => {
           if (keyboardPlacement) cancelKeyboardPlacement();
           if (!isEditingScene || !(event.target instanceof HTMLCanvasElement)) return;
-          if (pan.current) {
+          const canvas = event.target;
+          const activePan = pan.current;
+          if (activePan) {
             event.preventDefault();
             event.stopPropagation();
+            if (isPanTool && event.pointerType === 'touch' && event.button === 0 && activePan.pointerType === 'touch' &&
+                activePan.canvas === canvas && activePan.contacts.size === 1) {
+              activePan.contacts.set(event.pointerId, { x: event.clientX, y: event.clientY });
+              canvas.setPointerCapture(event.pointerId);
+            }
             return;
           }
           const canPan = event.button === 1 || (event.button === 0 && isPanReady);
           if (!canPan || !event.isPrimary || Input.isManipulatingObject) return;
           event.preventDefault();
           event.stopPropagation();
-          const canvas = event.target;
           rememberCamera(canvas);
-          const { x, y } = Engine.camera.position;
-          pan.current = { id: event.pointerId, canvas, scene: Engine.currentScene,
-            pointer: { x: event.clientX, y: event.clientY }, origin: { x, y } };
+          const { position: { x, y }, zoom } = Engine.camera;
+          pan.current = { canvas, scene: Engine.currentScene, pointerType: event.pointerType,
+            contacts: new Map([[event.pointerId, { x: event.clientX, y: event.clientY }]]), origin: { x, y, zoom } };
           event.currentTarget.focus({ preventScroll: true });
           canvas.setPointerCapture(event.pointerId);
           setIsPanning(true);
         }}
         onPointerMove={event => {
           const drag = pan.current;
-          if (!drag || drag.id !== event.pointerId) return;
+          if (!drag?.contacts.has(event.pointerId)) return;
           if (drag.scene !== Engine.currentScene) {
             endPan();
             return;
           }
-          const { canvas, pointer } = drag;
-          const bounds = canvas.getBoundingClientRect();
-          const { position, zoom } = Engine.camera;
-          if (!bounds.width || !bounds.height) return;
-          position.set(position.x - (event.clientX - pointer.x) * canvas.width / bounds.width / zoom,
-            position.y - (event.clientY - pointer.y) * canvas.height / bounds.height / zoom);
-          pointer.x = event.clientX;
-          pointer.y = event.clientY;
+          const previous = getCameraContactFrame(drag.contacts);
+          drag.contacts.set(event.pointerId, { x: event.clientX, y: event.clientY });
+          const next = getCameraContactFrame(drag.contacts);
+          transformView(drag.canvas, next.distance / previous.distance, previous.centre, next.centre);
         }}
         onPointerUp={event => {
-          if (pan.current?.id === event.pointerId) endPan();
+          const contacts = pan.current?.contacts;
+          if (contacts?.delete(event.pointerId) && !contacts.size) endPan();
         }}
         onPointerCancel={event => {
-          if (pan.current?.id === event.pointerId) endPan(true);
+          if (pan.current?.contacts.has(event.pointerId)) endPan(true);
         }}
         onLostPointerCapture={event => {
-          if (pan.current?.id === event.pointerId) endPan(true);
+          if (pan.current?.contacts.has(event.pointerId)) endPan(true);
         }}
         onDragOver={event => {
           const types = event.dataTransfer.types;
@@ -801,7 +820,7 @@ const Viewport: React.FC = () => {
             </div>
             <div className="scene-object-options" role="group" aria-label="Scene camera and grid">
               <button type="button" className="scene-control scene-icon-control" aria-label="Pan view"
-                title="Pan view · Drag with mouse, touch or pen" aria-pressed={isPanTool}
+                title="Pan view · Drag to pan or pinch to zoom" aria-pressed={isPanTool}
                 disabled={!!keyboardPlacement || !!manipulationReadout} onClick={() => setIsPanTool(enabled => !enabled)}>
                 <i className="fa-solid fa-hand" aria-hidden="true" />
               </button>
@@ -822,7 +841,7 @@ const Viewport: React.FC = () => {
               </select>
             </div>
             {!keyboardPlacement && <span id="scene-keyboard-hint" className="scene-edit-hint">
-              {isPanTool ? 'Hand tool active · Drag to pan' : 'Space or middle drag pans'} · {isGridSnapping ? 'Arrows move 1 cell · Shift moves 10 cells' : 'Arrows move 1 px · Shift moves 10 px'}<br />
+              {isPanTool ? 'Hand tool · Drag to pan · Pinch to zoom' : 'Space or middle drag pans'} · {isGridSnapping ? 'Arrows move 1 cell · Shift moves 10 cells' : 'Arrows move 1 px · Shift moves 10 px'}<br />
               F frames selection · Alt/Option-click cycles overlapping objects<br />
               Round handle rotates · Square resizes · Shift constrains · Esc cancels<br />
               Zoom {zoomPercent ?? Math.round(Engine.camera.zoom * 100)}% · Wheel zooms at pointer · {historyBlockedReason || 'Ctrl/⌘+Z undoes · Add Shift to redo'}

@@ -471,6 +471,70 @@ new Engine({ async onLoad() {
   })).toContain('src: "/gem.svg"');
 });
 
+test('pinches and pans the scene camera with two touches in the Hand tool', async ({ page, browserName }) => {
+  test.skip(browserName !== 'chromium', 'Native multi-touch input in this test uses Chromium’s DevTools protocol.');
+  await page.route('**/files', route => route.fulfill({ json: ['script'] }));
+  await page.route('**/api/scripts/script', route => route.fulfill({ json: `
+import { Engine, Rectangle, Vector2 } from 'dino-ge';
+new Engine({ onLoad() {
+  Engine.camera.position.set(40, 32);
+  new Rectangle({ tag: 'Platform', position: new Vector2(350, 250), width: 64, height: 48 });
+}, update() {} }, { containerId: 'playground-canvas-container' });` }));
+  await page.goto('/');
+  const platform = page.getByRole('button', { name: 'Platform', exact: true });
+  await expect(platform).toBeVisible();
+  await page.getByRole('button', { name: 'Edit scene', exact: true }).click();
+  await platform.click();
+  await page.getByRole('button', { name: 'Pan view', exact: true }).click();
+  const viewport = page.getByRole('region', { name: 'Scene viewport' });
+  const canvas = page.locator('#canvas');
+  const box = (await canvas.boundingBox())!;
+  const { width, height } = await canvas.evaluate((element: HTMLCanvasElement) => ({
+    width: element.width, height: element.height,
+  }));
+  const screen = (x: number, y: number, id: number) => ({
+    x: box.x + x * box.width / width, y: box.y + y * box.height / height, id,
+  });
+  const session = await page.context().newCDPSession(page);
+  const readCamera = () => page.evaluate(() => {
+    const { Engine } = window as unknown as { Engine: { camera: { position: { x: number; y: number }; zoom: number } } };
+    return { x: Engine.camera.position.x, y: Engine.camera.position.y, zoom: Engine.camera.zoom };
+  });
+  const pinch = async () => {
+    await session.send('Input.dispatchTouchEvent', {
+      type: 'touchStart', touchPoints: [screen(300, 250, 1), screen(400, 250, 2)],
+    });
+    await session.send('Input.dispatchTouchEvent', {
+      type: 'touchMove', touchPoints: [screen(250, 250, 1), screen(450, 250, 2)],
+    });
+    // The world point (390, 282) stays at the original midpoint (350, 250).
+    await expect.poll(readCamera).toMatchObject({ x: expect.closeTo(215, 0), y: expect.closeTo(157, 0), zoom: expect.closeTo(2, 2) });
+    await expect(viewport).toHaveAccessibleDescription(/Zoom 200%/);
+    await session.send('Input.dispatchTouchEvent', {
+      type: 'touchMove', touchPoints: [screen(282, 270, 1), screen(482, 270, 2)],
+    });
+    await expect.poll(readCamera).toMatchObject({ x: expect.closeTo(199, 0), y: expect.closeTo(147, 0), zoom: expect.closeTo(2, 2) });
+  };
+
+  await pinch();
+  await session.send('Input.dispatchTouchEvent', { type: 'touchCancel', touchPoints: [] });
+  await expect.poll(readCamera).toEqual({ x: 40, y: 32, zoom: 1 });
+  await expect(viewport).toHaveAccessibleDescription(/Zoom 100%/);
+
+  await pinch();
+  await session.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [screen(282, 270, 1)] });
+  await expect(canvas).toHaveCSS('cursor', 'grabbing');
+  await session.send('Input.dispatchTouchEvent', { type: 'touchMove', touchPoints: [screen(502, 280, 2)] });
+  await expect.poll(readCamera).toMatchObject({ x: expect.closeTo(189, 0), y: expect.closeTo(142, 0), zoom: expect.closeTo(2, 2) });
+  await session.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
+  await expect(canvas).toHaveCSS('cursor', 'grab');
+  await expect.poll(readCamera).toMatchObject({ x: expect.closeTo(189, 0), y: expect.closeTo(142, 0), zoom: expect.closeTo(2, 2) });
+  await expect(platform).toHaveAccessibleDescription('');
+  await expect(page.getByRole('spinbutton', { name: 'X', exact: true })).toHaveValue('350.00');
+  await page.getByRole('button', { name: 'Play', exact: true }).click();
+  await expect.poll(readCamera).toEqual({ x: 40, y: 32, zoom: 1 });
+});
+
 test('edits canvas objects with touch and pen and rolls back cancelled contact', async ({ page, browserName }) => {
   test.skip(browserName !== 'chromium', 'Native touch and pen input in this test use Chromium’s DevTools protocol.');
   await page.route('**/files', route => route.fulfill({ json: ['script'] }));
