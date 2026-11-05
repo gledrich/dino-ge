@@ -90,9 +90,12 @@ const Sidebar: React.FC = () => {
         {activeTab === 'library' ? (
           <div className="object-library">
             <section className="library-section" aria-labelledby="library-objects" aria-describedby="library-placement-hint">
-              <h3 id="library-objects">Scene objects</h3>
+              <h3 id="library-objects">Game objects</h3>
               <p id="library-placement-hint" className="library-hint">
-                Drag or click to place. Shift+Enter positions with keys. Use Insert to add code.
+                Drag to the canvas to place, or to the editor for code.
+              </p>
+              <p className="library-hint library-shortcuts">
+                Click to place. <kbd>Shift+Enter</kbd> to position with keys.
               </p>
               {feedback?.scriptId === currentScriptId && <p className={`library-feedback${feedback.error ? ' library-feedback-error' : ''}`}
                 role={feedback.error ? 'alert' : 'status'}>{feedback.message}</p>}
@@ -100,7 +103,7 @@ const Sidebar: React.FC = () => {
                 <div className="library-row" key={kind}>
                   <button type="button" className="scene-control snippet-btn" draggable
                     aria-label={`Add ${kind.toLowerCase()}`}
-                    title={`Drag ${kind.toLowerCase()} onto the scene or click to add at the centre`}
+                    title={`Place ${kind.toLowerCase()} on the canvas or drag to the editor for code`}
                     {...placementSource.forItem({ kind })}
                     onDragStart={event => {
                       if (placementSource.isActive()) {
@@ -122,7 +125,8 @@ const Sidebar: React.FC = () => {
                   </button>
                   <button type="button" className="scene-control library-code" aria-label={`Insert ${kind.toLowerCase()} code`}
                     title={`Insert ${kind.toLowerCase()} code`} onClick={() => insertShapeCode(kind)}>
-                    <span aria-hidden="true">Insert</span>
+                    <i className="fa-solid fa-code" aria-hidden="true" />
+                    <span>Insert</span>
                   </button>
                 </div>
               ))}
@@ -136,8 +140,9 @@ const Sidebar: React.FC = () => {
                 <i className="fa-solid fa-chevron-right library-affordance" aria-hidden="true" />
               </button>
             </section>
-            <section className="library-section" aria-labelledby="library-code-snippets">
-              <h3 id="library-code-snippets">Code snippets</h3>
+            <section className="library-section" aria-labelledby="library-code-examples">
+              <h3 id="library-code-examples">Code examples</h3>
+              <p className="library-hint">Insert starter code for common tasks.</p>
               {codeSnippets.map(({ label, icon, code }) => (
                 <button type="button" className="scene-control snippet-btn" key={label}
                   title={`Insert ${label} code`} onClick={() => insertSnippet(code)}>

@@ -1382,7 +1382,7 @@ test('keeps Library labels readable in a narrow sidebar', async ({ page }) => {
 import { Engine } from 'dino-ge';
 new Engine({ onLoad() {} }, { containerId: 'playground-canvas-container' });` }));
   await page.goto('/');
-  for (const name of ['Library', 'Assets', 'Rectangle']) {
+  for (const name of ['Library', 'Assets', 'Rectangle', 'Sprite animation']) {
     const label = page.locator('.sidebar').getByText(name, { exact: true });
     await expect(label).toBeVisible();
     expect(await label.evaluate(element => element.scrollWidth <= element.clientWidth), `${name} fits`).toBe(true);

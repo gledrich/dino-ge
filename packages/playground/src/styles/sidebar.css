@@ -81,9 +81,8 @@
 .library-section h3 {
   margin: 0;
   color: var(--text-primary);
-  font-size: 11px;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
+  font-size: 13px;
+  font-weight: 600;
 }
 
 .library-hint,
@@ -92,6 +91,18 @@
   color: var(--text-secondary);
   font-size: 12px;
   line-height: 1.4;
+}
+
+.library-shortcuts { font-size: 11px; }
+
+.library-shortcuts kbd {
+  padding: 1px 3px;
+  border: 1px solid var(--border-color);
+  border-radius: 4px;
+  background: var(--bg-primary);
+  color: var(--text-primary);
+  font: inherit;
+  white-space: nowrap;
 }
 
 .library-feedback {
@@ -115,20 +126,21 @@
 }
 
 .library-row .snippet-btn {
-  justify-content: flex-start;
-  gap: 5px;
   padding-inline: 7px;
 }
 
 .library-row .snippet-btn[draggable='true'] { cursor: grab; touch-action: pan-y; }
 .library-row .snippet-btn[draggable='true']:active { cursor: grabbing; }
 .library-row .library-code {
+  gap: 5px;
   color: var(--text-secondary);
 }
 
-.library-row .library-code:hover { color: var(--text-primary); }
+.library-row .library-code:is(:hover, :focus-visible) { color: var(--text-primary); }
 
-.snippet-btn {
+.library-code i { font-size: 11px; }
+
+.scene-control.snippet-btn {
   justify-content: flex-start;
   text-align: left;
 }
@@ -155,7 +167,8 @@
 
 @container (max-width: 174px) {
   .sidebar-tab i,
-  .library-row .snippet-btn i { display: none; }
+  .snippet-btn i,
+  .library-code i { display: none; }
 
   .sidebar-tabs,
   .sidebar-content { padding-inline: 8px; }
