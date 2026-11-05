@@ -2,6 +2,7 @@ import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react
 import * as Dino from 'dino-ge';
 import { getScript, setCurrentScriptId as rememberScriptId, updateScript } from '../utils/helpers';
 import { instrumentCode, rebaseModule } from '../utils/ast-utils';
+import { trackProjectObjectSources } from '../utils/project-object-source';
 import { usePlayground } from '../context/PlaygroundContext';
 
 const { Engine, Loader } = Dino;
@@ -10,6 +11,7 @@ type RunChange = { kind: 'reset' } | { kind: 'switch'; scriptId: string };
 
 export const usePlaygroundScripts = () => {
   const runId = useRef(0);
+  const stopTrackingSources = useRef<() => void>(undefined);
   const [pendingRunChange, setPendingRunChange] = useState<RunChange>();
   const { 
     currentScriptId, 
@@ -21,6 +23,11 @@ export const usePlaygroundScripts = () => {
     setIsPaused 
   } = usePlayground();
   const keepSceneOnSave = useRef(false);
+  useEffect(() => () => {
+    ++runId.current;
+    stopTrackingSources.current?.();
+    stopTrackingSources.current = undefined;
+  }, []);
   useLayoutEffect(() => {
     keepSceneOnSave.current = (isPaused && isDebug) || pendingCanvasPlacements.size > 0;
   }, [isPaused, isDebug, pendingCanvasPlacements]);
@@ -34,6 +41,8 @@ export const usePlaygroundScripts = () => {
     window.dispatchEvent(new CustomEvent('playground-syntax-error', { detail: result.error ?? null }));
     if (result.error) return;
 
+    stopTrackingSources.current?.();
+    stopTrackingSources.current = undefined;
     window.dispatchEvent(new Event('playground-before-run'));
     Engine.terminateCurrent();
     Engine.destroyAll();
@@ -59,9 +68,11 @@ export const usePlaygroundScripts = () => {
       const script = document.createElement('script');
       script.type = 'module';
       const encodedPath = currentScriptId.split('/').map(encodeURIComponent).join('/');
-      script.textContent = currentScriptId.includes('/')
-        ? rebaseModule(result.code, new URL(`/project-runs/${run}/${encodedPath}.js`, location.href))
-        : result.code;
+      if (currentScriptId.includes('/')) {
+        const entryUrl = new URL(`/project-runs/${run}/${encodedPath}.js`, location.href);
+        script.textContent = `${rebaseModule(result.code, entryUrl)}\n//# sourceURL=${entryUrl.href}`;
+        stopTrackingSources.current = trackProjectObjectSources(currentScriptId, run);
+      } else script.textContent = result.code;
       script.setAttribute('data-playground-script', currentScriptId);
       document.body.appendChild(script);
     });

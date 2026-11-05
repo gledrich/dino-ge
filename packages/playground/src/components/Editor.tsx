@@ -4,6 +4,7 @@ import { typescript, type editor } from 'monaco-editor';
 import * as Dino from 'dino-ge';
 import { usePlayground } from '../context/PlaygroundContext';
 import ProjectFilesDialog from './ProjectFilesDialog';
+import { openProjectObjectSourceEvent, type ProjectObjectSourceRequest } from '../utils/project-object-source';
 import { createScript, getCurrentScriptId, getScript, getFilesList, getSpriteImageFileError, readGameFolder, importGameFolder, importSpriteImage, type GameFolder } from '../utils/helpers';
 import { Edit, instrumentCode, getSourceMapping, getSceneObjectCreation, getSceneObjectDeletion, getSceneObjectDuplication, getSpriteImageReplacement, type CanvasPlacementTransaction } from '../utils/ast-utils';
 import { createSceneObject, duplicateSceneObject, getSceneSource, insertSceneObjectCode, isReplaceableSprite, restoreSceneTransform, sceneAssetDragEvent, sceneAssetDragType, sceneObjectCodeEvent, sceneObjectDragType, sceneObjectKinds, scenePointerDragEvent, type CanvasTransformChange, type SceneImageAsset, type SceneObjectPlacement, type ScenePointerDrag, type ScenePointerDragItem } from '../utils/scene-objects';
@@ -37,17 +38,28 @@ const CodeEditor: React.FC<EditorProps> = ({ currentScriptId, onSave, onSelectSc
   const [entryFile, setEntryFile] = useState('');
   const [importing, setImporting] = useState(false);
   const [importError, setImportError] = useState('');
-  const [projectFilesOpen, setProjectFilesOpen] = useState(false);
+  const [projectFiles, setProjectFiles] = useState<{ scriptId: string; source?: ProjectObjectSourceRequest['source']; trigger: HTMLButtonElement }>();
   const [dropGuide, setDropGuide] = useState<'code' | 'image'>();
   const [dropFeedback, setDropFeedback] = useState<{ scriptId: string; message: string; error: boolean }>();
   const editorDropTarget = useRef<HTMLDivElement>(null);
   const draggedAsset = useRef<SceneImageAsset | null>(null);
   const imageImportRun = useRef<HTMLElement | null>(null);
-  const projectFilesButton = useRef<HTMLButtonElement>(null);
   const folderPicker = useRef<HTMLInputElement>(null);
   const loadedScriptId = useRef('');
   const sceneHistory = useRef<SceneHistoryEntry[]>([]);
   const { monacoEditorRef, formatCode, applyEdits, pushEditOperations } = useMonacoEditor();
+
+  useEffect(() => {
+    const openSource = (event: Event) => {
+      const { source, trigger } = (event as CustomEvent<ProjectObjectSourceRequest>).detail;
+      if (source.scriptId !== currentScriptId) return;
+      setIsEditorVisible(true);
+      setActiveTab('editor');
+      setProjectFiles({ scriptId: currentScriptId, source, trigger });
+    };
+    window.addEventListener(openProjectObjectSourceEvent, openSource);
+    return () => window.removeEventListener(openProjectObjectSourceEvent, openSource);
+  }, [currentScriptId, setActiveTab, setIsEditorVisible]);
 
   const dropObjectCode = useCallback((item: ScenePointerDragItem) => {
     const { sourceId, tag, error } = insertSceneObjectCode(item, currentScriptId);
@@ -724,8 +736,8 @@ const CodeEditor: React.FC<EditorProps> = ({ currentScriptId, onSave, onSelectSc
               <option key={s} value={s}>{s}</option>
             ))}
           </select>
-          {currentScriptId.includes('/') && <button type="button" className="import-game-button" ref={projectFilesButton}
-            disabled={importing} onClick={() => setProjectFilesOpen(true)}>Project files</button>}
+          {currentScriptId.includes('/') && <button type="button" className="import-game-button"
+            disabled={importing} onClick={event => setProjectFiles({ scriptId: currentScriptId, trigger: event.currentTarget })}>Project files</button>}
           <button type="button" className="import-game-button" disabled={importing}
             onClick={() => folderPicker.current?.click()}>Import game folder</button>
           <input ref={folderPicker} type="file" multiple hidden {...{ webkitdirectory: '' }}
@@ -758,10 +770,11 @@ const CodeEditor: React.FC<EditorProps> = ({ currentScriptId, onSave, onSelectSc
         </div>
       )}
       {importError && <p className="import-game-error" role="alert">{importError}</p>}
-      {projectFilesOpen && <ProjectFilesDialog key={currentScriptId} scriptId={currentScriptId}
+      {projectFiles?.scriptId === currentScriptId && <ProjectFilesDialog key={currentScriptId} scriptId={currentScriptId}
+        initialSource={projectFiles.source}
         onClose={() => {
-          setProjectFilesOpen(false);
-          projectFilesButton.current?.focus();
+          setProjectFiles(undefined);
+          projectFiles.trigger.focus();
         }} />}
       {dropFeedback?.scriptId === currentScriptId && <p className={`editor-drop-feedback${dropFeedback.error ? ' editor-drop-error' : ''}`}
         role={dropFeedback.error ? 'alert' : 'status'}>{dropFeedback.message}</p>}

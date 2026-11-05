@@ -1,8 +1,12 @@
 import { useEffect, useRef, useState } from 'react';
 import Editor from '@monaco-editor/react';
+import type { editor } from 'monaco-editor';
 import { listProjectModules, readProjectModule, saveProjectModule } from '../utils/helpers';
+import { isProjectObjectLocationCurrent, markProjectModuleEdited, type ProjectObjectSource } from '../utils/project-object-source';
 
-export default function ProjectFilesDialog({ scriptId, onClose }: { scriptId: string; onClose: () => void }) {
+export default function ProjectFilesDialog({ scriptId, initialSource, onClose }: {
+  scriptId: string; initialSource?: ProjectObjectSource; onClose: () => void;
+}) {
   const dialog = useRef<HTMLDialogElement>(null);
   const [modules, setModules] = useState<string[]>();
   const [path, setPath] = useState('');
@@ -13,6 +17,7 @@ export default function ProjectFilesDialog({ scriptId, onClose }: { scriptId: st
   const [error, setError] = useState('');
   const ready = loaded?.path === path && !!path;
   const dirty = ready && draft !== loaded?.value;
+  const staleLocation = initialSource?.path === path && !isProjectObjectLocationCurrent(initialSource);
 
   useEffect(() => {
     const element = dialog.current;
@@ -25,10 +30,12 @@ export default function ProjectFilesDialog({ scriptId, onClose }: { scriptId: st
     void listProjectModules(scriptId, controller.signal).then(files => {
       if (controller.signal.aborted) return;
       setModules(files);
-      setPath(files[0] ?? '');
+      const sourcePath = initialSource?.path;
+      if (sourcePath && !files.includes(sourcePath)) setError('The selected object’s source module is unavailable.');
+      setPath(sourcePath && files.includes(sourcePath) ? sourcePath : files[0] ?? '');
     }).catch(error => { if (!controller.signal.aborted) setError(error.message); });
     return () => controller.abort();
-  }, [scriptId]);
+  }, [scriptId, initialSource]);
 
   useEffect(() => {
     if (!path) return;
@@ -48,6 +55,7 @@ export default function ProjectFilesDialog({ scriptId, onClose }: { scriptId: st
     setStatus('');
     try {
       await saveProjectModule(scriptId, path, draft);
+      markProjectModuleEdited(scriptId, path);
       setLoaded({ path, value: draft });
       setStatus('Saved. Reset the game to run the updated module.');
     } catch (error) {
@@ -91,12 +99,21 @@ export default function ProjectFilesDialog({ scriptId, onClose }: { scriptId: st
         </label>
       )}
       {path && !ready && !error && <p role="status">Loading module…</p>}
+      {ready && staleLocation && !status && <p role="status">Reset the game to refresh the source location.</p>}
       {ready && (
         <div className="project-module-editor">
-          <Editor height="100%" defaultLanguage="javascript" theme="vs-dark" value={draft}
+          <Editor height="100%" defaultLanguage="javascript" theme="vs-dark" value={draft} saveViewState={!initialSource}
             path={`file:///projects/${scriptId.split('/')[0]}/${path.split('/').map(encodeURIComponent).join('/')}`}
+            onMount={(editor: editor.IStandaloneCodeEditor) => {
+              if (path !== initialSource?.path || !isProjectObjectLocationCurrent(initialSource)) return;
+              const position = editor.getModel()?.validatePosition(initialSource);
+              if (!position) return;
+              editor.setPosition(position);
+              editor.revealPositionInCenterIfOutsideViewport(position);
+              editor.focus();
+            }}
             onChange={(value: string | undefined) => { setDraft(value ?? ''); setStatus(''); }}
-            options={{ automaticLayout: true, minimap: { enabled: false }, readOnly: saving, wordWrap: 'on' }} />
+            options={{ automaticLayout: true, minimap: { enabled: false }, readOnly: saving, scrollBeyondLastLine: false, wordWrap: 'on' }} />
         </div>
       )}
       {error && <p className="import-game-error" role="alert">{error}</p>}

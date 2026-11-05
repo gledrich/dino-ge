@@ -208,6 +208,91 @@ export const run = window.gameRuns;`);
   }
 });
 
+test('opens the imported module that created the selected object', async ({ page }) => {
+  await page.setViewportSize({ width: 768, height: 800 });
+  const id = 'source-links/src/index';
+  const modulePath = 'src/objects/factory.mjs';
+  let module = `import { Rectangle, Text, Vector2 } from 'dino-ge';
+
+export function makePlatform() {
+  return new Rectangle({ tag: 'Imported platform', position: new Vector2(60, 60), width: 64, height: 20 });
+}
+
+export function makeLabel() {
+  return new Text({ tag: 'Deferred label', text: 'Deferred', position: new Vector2(80, 80), register: false });
+}
+
+import { makeExternal } from '/shared-object.mjs';
+export const call = callback => callback();
+export const spawnExternal = () => makeExternal();`;
+  const entry = `import { Engine, Rectangle, Vector2 } from 'dino-ge';
+import { call, makePlatform, makeLabel, spawnExternal } from './objects/factory.mjs';
+new Engine({ onLoad() {
+  makePlatform();
+  makeLabel().registerSelf();
+  new Rectangle({ tag: 'Entry platform', position: new Vector2(160, 60), width: 64, height: 20 });
+  const options = { tag: 'Entry callback', position: new Vector2(160, 90), width: 64, height: 20 };
+  call(() => new Rectangle(options));
+  spawnExternal();
+} }, { containerId: 'playground-canvas-container' });`;
+  await page.route('**/files', route => route.fulfill({ json: ['script', id] }));
+  await page.route('**/api/scripts/script', route => route.fulfill({ json: '' }));
+  await page.route(`**/api/scripts/${encodeURIComponent(id)}`, route => route.fulfill({ json: entry }));
+  await page.route(`**/api/scripts/${encodeURIComponent(id)}/modules`, route => route.fulfill({ json: ['src/other.js', modulePath] }));
+  await page.route(`**/api/scripts/${encodeURIComponent(id)}/modules?*`, route => {
+    if (route.request().method() === 'PUT') {
+      module = route.request().postDataJSON().data;
+      return route.fulfill({ json: { success: true } });
+    }
+    return route.fulfill({ json: module });
+  });
+  await page.route(`**/project-runs/*/source-links/${modulePath}`, route => route.fulfill({ contentType: 'text/javascript', body: module }));
+  await page.route('**/shared-object.mjs', route => route.fulfill({ contentType: 'text/javascript', body: `
+import { Rectangle, Vector2 } from 'dino-ge';
+export const makeExternal = () => new Rectangle({ tag: 'External platform', position: new Vector2(160, 120), width: 64, height: 20 });` }));
+  await page.goto('/');
+  await page.getByRole('combobox', { name: 'Current script' }).selectOption(id);
+  await expect(page.locator('#canvas')).toBeVisible({ timeout: 3000 });
+  await page.getByRole('button', { name: 'Edit scene', exact: true }).click();
+  await page.getByRole('tab', { name: 'Console', exact: true }).click();
+  await page.getByRole('button', { name: 'Entry platform', exact: true }).click({ timeout: 3000 });
+  const source = page.getByRole('button', { name: 'View source', exact: true });
+  await expect(source).toHaveCount(0);
+  await page.getByRole('button', { name: 'Entry callback', exact: true }).click();
+  await expect(source).toHaveCount(0);
+  await page.getByRole('button', { name: 'External platform', exact: true }).click();
+  await expect(source).toHaveCount(0);
+  await page.getByRole('button', { name: 'Imported platform', exact: true }).click();
+  await source.click({ timeout: 3000 });
+  const dialog = page.getByRole('dialog', { name: 'Project files', exact: true });
+  await expect(dialog.getByLabel('JavaScript module')).toHaveValue(modulePath);
+  await expect(dialog.locator('.monaco-editor')).toContainText('Imported platform');
+  await expect.poll(() => dialog.locator('.monaco-editor').evaluate(element => {
+    const { monaco } = window as typeof window & { monaco: Monaco };
+    const editor = monaco.editor.getEditors().find(item => item.getDomNode() === element);
+    const position = editor?.getPosition();
+    if (!editor || !position) return;
+    const visible = editor.getScrolledVisiblePosition(position);
+    return { line: position.lineNumber, visible: !!visible && visible.top >= 0 && visible.top < editor.getLayoutInfo().height };
+  })).toEqual({ line: 4, visible: true });
+  await dialog.getByRole('button', { name: 'Close', exact: true }).click();
+  await expect(source).toBeFocused();
+  await page.getByRole('button', { name: 'Deferred label', exact: true }).click();
+  await source.click({ timeout: 3000 });
+  await expect(dialog.getByLabel('JavaScript module')).toHaveValue(modulePath);
+  await dialog.locator('.monaco-editor').evaluate(element => {
+    const { monaco } = window as typeof window & { monaco: Monaco };
+    const editor = monaco.editor.getEditors().find(item => item.getDomNode() === element)!;
+    editor.setValue('// Edited after this run\n' + editor.getValue());
+  });
+  await dialog.getByRole('button', { name: 'Save module', exact: true }).click();
+  await expect(dialog.getByRole('status')).toContainText('Saved');
+  await dialog.getByRole('button', { name: 'Close', exact: true }).click();
+  await source.click();
+  await expect(dialog.getByLabel('JavaScript module')).toHaveValue(modulePath);
+  await expect(dialog.getByRole('status')).toHaveText('Reset the game to refresh the source location.');
+});
+
 test('keeps an imported image available after deleting its sprite and reloading', async ({ page }) => {
   const workspace = await mkdtemp(join(tmpdir(), 'dino-ge-sprite-import-'));
   const scripts = join(workspace, 'scripts');

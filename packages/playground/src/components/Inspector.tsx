@@ -3,6 +3,7 @@ import * as Dino from 'dino-ge';
 import InspectorRow, { InspectableObject, PropertyRowDef, resolveComponentPath } from './InspectorRow';
 import { getLineOriginEdit, getStandaloneSceneObject, getSurgicalEdit, getSourceMapping, type CanvasPlacementTransaction, type Edit } from '../utils/ast-utils';
 import { usePlayground } from '../context/PlaygroundContext';
+import { getProjectObjectSource, openProjectObjectSourceEvent, type ProjectObjectSourceRequest } from '../utils/project-object-source';
 import { getCanvasPlacementBaseline, isCanvasTransformProperty, restoreSceneTransform, type CanvasPlacement, type SceneTransformState } from '../utils/scene-objects';
 import '../styles/inspector.css';
 
@@ -173,7 +174,7 @@ function prepareCanvasPlacement(object: Dino.GameObject, placement: CanvasPlacem
 }
 
 const Inspector: React.FC<InspectorProps> = ({ visible }) => {
-  const { isDebug, isPaused, selectedObject, pendingCanvasPlacements } = usePlayground();
+  const { currentScriptId, isDebug, isPaused, selectedObject, pendingCanvasPlacements } = usePlayground();
   const placement = selectedObject ? pendingCanvasPlacements.get(selectedObject) : undefined;
   const [isApplying, setIsApplying] = useState(false);
   const [syntaxError, setSyntaxError] = useState<string | null>(null);
@@ -184,6 +185,8 @@ const Inspector: React.FC<InspectorProps> = ({ visible }) => {
   const hasPendingCanvasChanges = pendingCanvasPlacements.size > 0;
   const baseline = selectedObject && placement ? getCanvasPlacementBaseline(selectedObject, placement) : undefined;
   const sourceId = selectedObject?.metadata.sourceId;
+  const moduleSource = selectedObject ? getProjectObjectSource(selectedObject) : undefined;
+  const canOpenModule = moduleSource?.scriptId === currentScriptId;
   const standalone = isPaused && !syntaxError && sourceId && selectedObject &&
     !selectedObject.transform.parent && !selectedObject.transform.children.size ? getStandaloneSceneObject(sourceId) : null;
   const objectActions = standalone && Dino[standalone.mapping.type as keyof typeof Dino] === selectedObject?.constructor &&
@@ -330,7 +333,7 @@ const Inspector: React.FC<InspectorProps> = ({ visible }) => {
       <div className="inspector-header">
         <div className="header-left">
           <h2>Inspector</h2>
-          {selectedObject && !syntaxError && (
+          {sourceId && !syntaxError && (
             <button 
               className={`apply-btn ${isApplying ? 'applying' : ''}`} 
               onClick={handleApplyToCode}
@@ -379,15 +382,23 @@ const Inspector: React.FC<InspectorProps> = ({ visible }) => {
               </section>
             )}
             {placementStatus && <span className="inspector-action-status" role="status">{placementStatus}</span>}
-            {objectActions && (
+            {(objectActions || canOpenModule) && (
               <div className="inspector-section">
                 <h3>Object actions</h3>
-                {objectActions.statement.canDuplicate && <button type="button" className="scene-control" onClick={duplicateObject}>
+                {canOpenModule && <button type="button" className="scene-control"
+                  title={moduleSource.path} onClick={event => {
+                    window.dispatchEvent(new CustomEvent<ProjectObjectSourceRequest>(openProjectObjectSourceEvent, {
+                      detail: { source: moduleSource, trigger: event.currentTarget },
+                    }));
+                  }}>
+                  <i className="fa-solid fa-code" aria-hidden="true" /> View source
+                </button>}
+                {objectActions?.statement.canDuplicate && <button type="button" className="scene-control" onClick={duplicateObject}>
                   <i className="fa-solid fa-copy" aria-hidden="true" /> Duplicate object
                 </button>}
-                <button type="button" className="scene-control inspector-delete" onClick={deleteObject}>
+                {objectActions && <button type="button" className="scene-control inspector-delete" onClick={deleteObject}>
                   <i className="fa-solid fa-trash" aria-hidden="true" /> Delete object
-                </button>
+                </button>}
               </div>
             )}
             <div className="inspector-section">
