@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import * as Dino from 'dino-ge';
 import { usePlayground } from '../context/PlaygroundContext';
-import { nudgeSceneSelection } from '../utils/scene-objects';
+import { nudgeSceneSelection, type CanvasPlacement } from '../utils/scene-objects';
 import '../styles/scene-explorer.css';
 
 const { Engine } = Dino;
@@ -13,9 +13,11 @@ interface SceneNodeProps {
   editing: boolean;
   depth: number;
   members: ReadonlySet<Dino.GameObject>;
+  pending: ReadonlyMap<Dino.GameObject, CanvasPlacement>;
+  pendingBranches: ReadonlySet<Dino.GameObject>;
 }
 
-const SceneNode: React.FC<SceneNodeProps> = ({ object, selectedId, onSelect, editing, depth, members }) => {
+const SceneNode: React.FC<SceneNodeProps> = ({ object, selectedId, onSelect, editing, depth, members, pending, pendingBranches }) => {
   const [isExpanded, setIsExpanded] = useState(true);
   
   const children = Array.from(object.transform.children, transform => transform.gameObject)
@@ -23,41 +25,42 @@ const SceneNode: React.FC<SceneNodeProps> = ({ object, selectedId, onSelect, edi
 
   const hasChildren = children.length > 0;
   const isSelected = selectedId === object;
+  const tag = object.metadata?.tag || 'GameObject';
+  const hasPendingChanges = pending.has(object);
+  const hasHiddenChanges = hasChildren && !isExpanded && pendingBranches.has(object);
+  const pendingDescription = hasHiddenChanges
+    ? (hasPendingChanges ? 'Pending canvas changes here and in collapsed children' : 'Pending canvas changes in collapsed children')
+    : (hasPendingChanges ? 'Pending canvas changes' : undefined);
 
   return (
     <div className="scene-node-container">
-      <div 
+      <div
         className={`scene-node ${isSelected ? 'selected' : ''}`}
         style={{ paddingLeft: `${depth * 12 + 5}px` }}
-        role="button"
-        tabIndex={0}
-        aria-pressed={isSelected}
-        onClick={() => onSelect(object)}
-        onKeyDown={event => {
-          if (editing && isSelected && nudgeSceneSelection(event)) {
-            event.preventDefault();
-            event.stopPropagation();
-            return;
-          }
-          if (event.key !== 'Enter' && event.key !== ' ') return;
-          event.preventDefault();
-          event.stopPropagation();
-          onSelect(object);
-        }}
       >
         {hasChildren ? (
-          <i 
-            className={`fa-solid ${isExpanded ? 'fa-caret-down' : 'fa-caret-right'} toggle-icon`}
-            onClick={(e) => {
-              e.stopPropagation();
-              setIsExpanded(!isExpanded);
-            }}
-          />
+          <button type="button" className="scene-branch-toggle" aria-expanded={isExpanded}
+            aria-label={`${isExpanded ? 'Collapse' : 'Expand'} children of ${tag}`}
+            onClick={() => setIsExpanded(expanded => !expanded)}>
+            <i className={`fa-solid ${isExpanded ? 'fa-caret-down' : 'fa-caret-right'}`} aria-hidden="true" />
+          </button>
         ) : (
           <span className="spacer" />
         )}
-        <i className={`fa-solid ${getIconForObject(object)} type-icon`} />
-        <span className="node-tag">{object.metadata?.tag || 'GameObject'}</span>
+        <button type="button" className="scene-node-select" aria-pressed={isSelected}
+          aria-description={pendingDescription} onClick={() => onSelect(object)}
+          onKeyDown={event => {
+            if (editing && isSelected && nudgeSceneSelection(event)) {
+              event.preventDefault();
+              event.stopPropagation();
+            }
+          }}>
+          <i className={`fa-solid ${getIconForObject(object)} type-icon`} aria-hidden="true" />
+          <span className="node-tag">{tag}</span>
+          {pendingDescription && (
+            <i className="fa-solid fa-pen scene-node-pending" title={pendingDescription} aria-hidden="true" />
+          )}
+        </button>
       </div>
       {hasChildren && isExpanded && (
         <div className="node-children">
@@ -70,6 +73,8 @@ const SceneNode: React.FC<SceneNodeProps> = ({ object, selectedId, onSelect, edi
               editing={editing}
               depth={depth + 1}
               members={members}
+              pending={pending}
+              pendingBranches={pendingBranches}
             />
           ))}
         </div>
@@ -89,13 +94,21 @@ const getIconForObject = (obj: Dino.GameObject): string => {
 };
 
 const SceneExplorer: React.FC = () => {
-  const { isPaused, isDebug } = usePlayground();
+  const { isPaused, isDebug, selectedObject, pendingCanvasPlacements } = usePlayground();
   const [members, setMembers] = useState(() => new Set(Engine.currentScene?.objects ?? Engine.objects));
   const rootObjects = Array.from(members).filter(object => {
     const parent = object.transform.parent?.gameObject;
     return !parent || !members.has(parent);
   });
-  const [selectedObject, setSelectedObject] = useState<Dino.GameObject | null>(Engine.selectedObject);
+  const pendingBranches = new Set<Dino.GameObject>();
+  for (const object of pendingCanvasPlacements.keys()) {
+    if (!members.has(object)) continue;
+    let parent = object.transform.parent?.gameObject;
+    while (parent && members.has(parent) && !pendingBranches.has(parent)) {
+      pendingBranches.add(parent);
+      parent = parent.transform.parent?.gameObject;
+    }
+  }
 
   useEffect(() => {
     let scheduled = false;
@@ -108,16 +121,10 @@ const SceneExplorer: React.FC = () => {
         if (!disposed) setMembers(new Set(Engine.currentScene?.objects ?? Engine.objects));
       });
     };
-    const onSelectedObjectChanged = (event: CustomEvent<Dino.GameObject | null>) => {
-      setSelectedObject(event.detail);
-    };
-
-    Engine.on('selectedObjectChanged', onSelectedObjectChanged);
     Engine.on('sceneHierarchyChanged', updateHierarchy);
     updateHierarchy();
     return () => {
       disposed = true;
-      Engine.off('selectedObjectChanged', onSelectedObjectChanged);
       Engine.off('sceneHierarchyChanged', updateHierarchy);
     };
   }, []);
@@ -145,6 +152,8 @@ const SceneExplorer: React.FC = () => {
               editing={isPaused && isDebug}
               depth={0}
               members={members}
+              pending={pendingCanvasPlacements}
+              pendingBranches={pendingBranches}
             />
           ))
         )}

@@ -251,6 +251,52 @@ new Engine({ onLoad() {
   await expect.poll(readSource).toBe(original);
 });
 
+test('shows pending canvas changes on objects and their collapsed branches', async ({ page }) => {
+  await page.route('**/files', route => route.fulfill({ json: ['script'] }));
+  await page.route('**/api/scripts/script', route => route.fulfill({ json: `
+import { Engine, Rectangle, Vector2 } from 'dino-ge';
+new Engine({ onLoad() {
+  const platform = new Rectangle({ tag: 'Platform', position: new Vector2(300, 220), width: 64, height: 48 });
+  const rail = new Rectangle({ tag: 'Rail', position: new Vector2(8, -20), width: 50, height: 10 });
+  platform.transform.addChild(rail.transform);
+  new Rectangle({ tag: 'Wall', position: new Vector2(500, 220), width: 25, height: 100 });
+}, update() {} }, { containerId: 'playground-canvas-container' });` }));
+  await page.goto('/');
+  const platform = page.getByRole('button', { name: 'Platform', exact: true });
+  const rail = page.getByRole('button', { name: 'Rail', exact: true });
+  const wall = page.getByRole('button', { name: 'Wall', exact: true });
+  await expect(rail).toBeVisible();
+  await page.getByRole('button', { name: 'Edit scene', exact: true }).click();
+  await rail.click();
+  await rail.press('Shift+ArrowRight');
+  await expect(rail).toHaveAccessibleDescription('Pending canvas changes');
+  await expect(rail.getByTitle('Pending canvas changes')).toBeVisible();
+  await wall.click();
+  await wall.press('Shift+ArrowDown');
+  await expect(wall).toHaveAccessibleDescription('Pending canvas changes');
+  await expect(rail).toHaveAccessibleDescription('Pending canvas changes');
+
+  await page.getByRole('button', { name: 'Collapse children of Platform', exact: true }).press('Enter');
+  await expect(rail).toHaveCount(0);
+  await expect(platform).toHaveAccessibleDescription('Pending canvas changes in collapsed children');
+  await expect(wall).toHaveAttribute('aria-pressed', 'true');
+  await page.getByRole('button', { name: 'Apply placement to code' }).click();
+  await expect(wall).toHaveAccessibleDescription('');
+  await expect(platform).toHaveAccessibleDescription('Pending canvas changes in collapsed children');
+
+  await page.getByRole('button', { name: 'Expand children of Platform', exact: true }).press('Space');
+  await expect(platform).toHaveAccessibleDescription('');
+  await rail.click();
+  await page.getByRole('button', { name: 'Discard canvas changes', exact: true }).click();
+  await expect(rail).toHaveAccessibleDescription('');
+
+  await rail.press('Shift+ArrowRight');
+  await expect(rail).toHaveAccessibleDescription('Pending canvas changes');
+  await page.getByRole('button', { name: 'Reset game', exact: true }).click();
+  await expect(rail).toHaveAccessibleDescription('');
+  await expect(wall).toHaveAccessibleDescription('');
+});
+
 test('rotates a scene object by its handle and saves the angle', async ({ page }) => {
   await page.route('**/files', route => route.fulfill({ json: ['script'] }));
   await page.route('**/api/scripts/script', route => route.fulfill({ json: `
