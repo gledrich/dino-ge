@@ -18,6 +18,7 @@ export interface PropertyLocation {
 export interface ObjectSourceMapping {
   sourceId: string;
   type: string;
+  literalTag?: string;
   start: number;
   end: number;
   // Boundaries of the ObjectExpression { ... }
@@ -29,7 +30,8 @@ export interface ObjectSourceMapping {
   standalone?: { start: number; end: number; options?: Record<string, unknown>; canDuplicate: boolean };
 }
 
-let sourceMappingRegistry: Record<string, ObjectSourceMapping> = {};
+type SourceMappings = Record<string, ObjectSourceMapping>;
+let sourceMappingRegistry: SourceMappings = {};
 
 /**
  * Resets the source mapping registry.
@@ -46,7 +48,7 @@ export const getSourceMapping = () => sourceMappingRegistry;
 /**
  * Recursively maps properties of an ObjectExpression.
  */
-const mapProperties = (objExpr: any, imports: DinoImports, code: string): Record<string, PropertyLocation> => {
+const mapProperties = (objExpr: any, imports: DinoImports, code: string, strict = false): Record<string, PropertyLocation> => {
   const mapping: Record<string, PropertyLocation> = {};
   if (!objExpr || objExpr.type !== 'ObjectExpression') return mapping;
 
@@ -65,9 +67,8 @@ const mapProperties = (objExpr: any, imports: DinoImports, code: string): Record
       };
 
       // Handle Vector2 instantiations
-      if (prop.value.type === 'NewExpression' && 
-          (prop.value.callee.name === 'Vector2' || resolveDinoImport(prop.value.callee, imports)?.name === 'Vector2' ||
-            prop.value.callee.property?.name === 'Vector2')) {
+      if (prop.value.type === 'NewExpression' && (resolveDinoImport(prop.value.callee, imports)?.name === 'Vector2' ||
+          (!strict && (prop.value.callee.name === 'Vector2' || prop.value.callee.property?.name === 'Vector2')))) {
         propLoc.vectorConstructor = code.slice(prop.value.callee.start, prop.value.callee.end);
         propLoc.args = prop.value.arguments.map((arg: any) => ({
           start: arg.start,
@@ -78,7 +79,7 @@ const mapProperties = (objExpr: any, imports: DinoImports, code: string): Record
 
       // Handle nested objects
       if (prop.value.type === 'ObjectExpression') {
-        propLoc.properties = mapProperties(prop.value, imports, code);
+        propLoc.properties = mapProperties(prop.value, imports, code, strict);
       }
 
       mapping[prop.key.name] = propLoc;
@@ -98,6 +99,7 @@ type ScopedBindings = Map<string, ScopedBinding[]>;
 interface DinoImports {
   named: Map<string, string>;
   namespaces: ScopedBindings;
+  namedShadows: ScopedBindings;
 }
 
 function collectBindingScopes(ast: acorn.Program, bindings: ScopedBindings) {
@@ -153,25 +155,28 @@ function collectBindingScopes(ast: acorn.Program, bindings: ScopedBindings) {
   visit(ast, ast, ast);
 }
 
-function dinoImports(ast: acorn.Program): DinoImports {
+function dinoImports(ast: acorn.Program, checkNamedShadows = false): DinoImports {
   const named = new Map<string, string>();
   const namespaces: ScopedBindings = new Map();
+  const namedShadows: ScopedBindings = new Map();
   for (const node of ast.body) {
     if (node.type !== 'ImportDeclaration' || node.source.value !== 'dino-ge') continue;
     for (const specifier of node.specifiers) {
       if (specifier.type === 'ImportSpecifier' && specifier.imported.type === 'Identifier') {
         named.set(specifier.local.name, specifier.imported.name);
+        if (checkNamedShadows) namedShadows.set(specifier.local.name, []);
       } else if (specifier.type === 'ImportNamespaceSpecifier') {
         namespaces.set(specifier.local.name, []);
       }
     }
   }
-  if (namespaces.size) collectBindingScopes(ast, namespaces);
-  return { named, namespaces };
+  if (namespaces.size || namedShadows.size) collectBindingScopes(ast, new Map([...namespaces, ...namedShadows]));
+  return { named, namespaces, namedShadows };
 }
 
 function resolveDinoImport(reference: acorn.Expression | acorn.Super | null | undefined, imports: DinoImports) {
   if (reference?.type === 'Identifier') {
+    if (imports.namedShadows.get(reference.name)?.some(({ scope }) => reference.start >= scope.start && reference.end <= scope.end)) return;
     const name = imports.named.get(reference.name);
     return name ? { name } : undefined;
   }
@@ -292,8 +297,13 @@ export function rebaseModule(code: string, moduleUrl: URL): string {
  * Instruments the provided code by injecting __sourceId into Dino GE object instantiations.
  * Also builds the source mapping registry.
  */
-export const instrumentCode = (code: string, trackEditorSource = true, scriptId?: string): InstrumentationResult => {
-  if (trackEditorSource) resetSourceMapping();
+export const instrumentCode = (code: string, trackEditorSource = true, scriptId?: string,
+  mappings?: SourceMappings): InstrumentationResult => {
+  const strict = !!mappings;
+  if (trackEditorSource && !mappings) {
+    resetSourceMapping();
+    mappings = sourceMappingRegistry;
+  }
   const occurrenceCounts: Record<string, number> = {};
   
   // Parse code to AST
@@ -309,7 +319,7 @@ export const instrumentCode = (code: string, trackEditorSource = true, scriptId?
     return { code, error: err.message || 'Syntax Error' };
   }
 
-  const imports = dinoImports(ast);
+  const imports = dinoImports(ast, strict);
   const injections: Edit[] = [];
   if (scriptId) {
     for (const scene of sceneDeclarations(ast, imports)) {
@@ -323,6 +333,7 @@ export const instrumentCode = (code: string, trackEditorSource = true, scriptId?
   const getGameObject = (node: any) => {
     if (node.arguments[0]?.type !== 'ObjectExpression') return;
     const imported = resolveDinoImport(node.callee, imports);
+    if (strict && (!imported || !knownClasses.includes(imported.name))) return;
     if (imported?.namespace && knownClasses.includes(imported.name)) {
       return { constructorName: `${imported.namespace}.${imported.name}`, type: imported.name, namespace: imported.namespace };
     }
@@ -359,21 +370,22 @@ export const instrumentCode = (code: string, trackEditorSource = true, scriptId?
         const sourceId = `${idKey}-${index}`;
         
         // Record property locations (using original offsets)
-        if (trackEditorSource) {
-          const properties = mapProperties(args[0], imports, code);
+        if (mappings) {
+          const properties = mapProperties(args[0], imports, code, strict);
           const statement = standaloneStatements.get(node.start);
           const generated = !namespace && constructorName.startsWith('DinoPlace');
           const options = statement && readSceneObjectOptions(args[0], imports, generated && type === 'Sprite');
           const safeOptions = options && (generated || type !== 'Sprite' || typeof options.img === 'string');
           const canDuplicate = !!safeOptions && typeof options.tag === 'string' && properties.position?.args?.length === 2 &&
             properties.position.args.every(arg => arg.numeric);
-          sourceMappingRegistry[sourceId] = {
+          mappings[sourceId] = {
             sourceId, type, start: node.start, end: node.end,
+            literalTag: typeof tagProp?.value?.value === 'string' ? tagProp.value.value : undefined,
             contentStart: args[0].start + 1, // After {
             contentEnd: args[0].end - 1,    // Before }
             vectorConstructor: namespace && `${namespace}.Vector2`,
             hasDynamicProperties: props.some((prop: any) => prop.type !== 'Property' || prop.computed ||
-              (prop.key.type === 'Literal' && prop.key.value === 'position')),
+              (strict ? prop.kind !== 'init' || prop.key.type !== 'Identifier' : prop.key.type === 'Literal' && prop.key.value === 'position')),
             properties,
             standalone: statement && (generated || safeOptions) ? {
               start: statement.start, end: statement.end, options, canDuplicate,
@@ -411,6 +423,29 @@ export interface Edit {
   start: number;
   end: number;
   newText: string;
+}
+
+export function applyEditsToSource(source: string, edits: Edit[]): string | undefined {
+  let boundary = source.length;
+  for (const { start, end, newText } of [...edits].sort((a, b) => b.start - a.start || b.end - a.end)) {
+    if (start < 0 || end < start || end > boundary) return;
+    source = source.slice(0, start) + newText + source.slice(end);
+    boundary = start;
+  }
+  return source;
+}
+
+export function readObjectSourceMappings(source: string): SourceMappings | undefined {
+  const mappings: SourceMappings = {};
+  return instrumentCode(source, true, undefined, mappings).error ? undefined : mappings;
+}
+
+export function findObjectConstructor(mappings: SourceMappings, source: string, line: number, column: number) {
+  const isAfter = (offset: number) => {
+    const position = acorn.getLineInfo(source, offset);
+    return line > position.line || (line === position.line && column > position.column);
+  };
+  return Object.values(mappings).find(mapping => isAfter(mapping.start) && !isAfter(mapping.contentStart));
 }
 
 export interface CanvasPlacementTransaction {
@@ -660,8 +695,8 @@ export function getSceneObjectCreation(source: string, placement: SceneObjectPla
 }
 
 /** Save an explicit origin for a line whose constructor defaults to its start point. */
-export function getLineOriginEdit(sourceId: string, { x, y }: ScenePoint): Edit | null {
-  const mapping = sourceMappingRegistry[sourceId];
+export function getLineOriginEdit(sourceId: string, { x, y }: ScenePoint, mappings = sourceMappingRegistry): Edit | null {
+  const mapping = mappings[sourceId];
   const start = mapping?.properties.p1;
   if (mapping?.type !== 'Line' || mapping.hasDynamicProperties || mapping.properties.position || !start?.vectorConstructor ||
       !start.args?.every(argument => argument.numeric) ||
@@ -678,9 +713,10 @@ export const getSurgicalEdit = (
   sourceId: string, 
   propertyPath: string, 
   value: any,
-  getRuntimeValue: (path: string) => any
+  getRuntimeValue: (path: string) => any,
+  mappings = sourceMappingRegistry,
 ): Edit | null => {
-  const mapping = sourceMappingRegistry[sourceId];
+  const mapping = mappings[sourceId];
   if (!mapping) return null;
   const vectorConstructor = mapping.vectorConstructor ?? 'Vector2';
 
@@ -720,7 +756,7 @@ export const getSurgicalEdit = (
       : mapping.type === 'Circle' && found?.mapping.numeric;
     if (!valid) return null;
     const group = sourceId.slice(0, sourceId.lastIndexOf('-') + 1);
-    if (Object.keys(sourceMappingRegistry).filter(id => id.startsWith(group) &&
+    if (Object.keys(mappings).filter(id => id.startsWith(group) &&
         /^\d+$/.test(id.slice(group.length))).length !== 1) return null;
   }
   if (mapping.type === 'Line' && paths.length === 2 && (paths[0] === 'p1' || paths[0] === 'p2') &&

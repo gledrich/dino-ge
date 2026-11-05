@@ -1,9 +1,9 @@
 import React, { useEffect, useState } from 'react';
 import * as Dino from 'dino-ge';
 import InspectorRow, { InspectableObject, PropertyRowDef, resolveComponentPath } from './InspectorRow';
-import { getLineOriginEdit, getStandaloneSceneObject, getSurgicalEdit, getSourceMapping, type CanvasPlacementTransaction, type Edit } from '../utils/ast-utils';
+import { applyEditsToSource, findObjectConstructor, getLineOriginEdit, getStandaloneSceneObject, getSurgicalEdit, getSourceMapping, readObjectSourceMappings, type CanvasPlacementTransaction, type Edit } from '../utils/ast-utils';
 import { usePlayground } from '../context/PlaygroundContext';
-import { getProjectObjectSource, openProjectObjectSourceEvent, type ProjectObjectSourceRequest } from '../utils/project-object-source';
+import { getProjectObjectSource, isProjectObjectLocationCurrent, openProjectObjectSourceEvent, type ProjectObjectSourceRequest } from '../utils/project-object-source';
 import { getCanvasPlacementBaseline, isCanvasTransformProperty, restoreSceneTransform, type CanvasPlacement, type SceneTransformState } from '../utils/scene-objects';
 import '../styles/inspector.css';
 
@@ -94,15 +94,10 @@ const getInspectorSections = (object: InspectableObject) => Object.entries(SECTI
   });
 
 function prepareCanvasPlacement(object: Dino.GameObject, placement: CanvasPlacement,
-  objects: ReadonlySet<Dino.GameObject>) {
-  const sourceId = object.metadata.sourceId;
-  if (!sourceId || Array.from(objects).filter(member => member.metadata.sourceId === sourceId).length !== 1) {
-    return 'This object needs its own constructor in the open script.';
-  }
-
-  const mapping = getSourceMapping()[sourceId];
+  sourceId: string, mappings = getSourceMapping()) {
+  const mapping = mappings[sourceId];
   const sourceGroup = sourceId.slice(0, sourceId.lastIndexOf('-') + 1);
-  const sameGroup = Object.keys(getSourceMapping()).filter(id => id.startsWith(sourceGroup) &&
+  const sameGroup = Object.keys(mappings).filter(id => id.startsWith(sourceGroup) &&
     /^\d+$/.test(id.slice(sourceGroup.length)));
   if (sameGroup.length !== 1) {
     return 'Give this object a unique tag in the open script.';
@@ -135,7 +130,7 @@ function prepareCanvasPlacement(object: Dino.GameObject, placement: CanvasPlacem
     const value = valueAt(path);
     if ((!literal?.numeric && !(path === 'rotation' && !property)) ||
         typeof value !== 'number' || !Number.isFinite(value)) break;
-    const edit = getSurgicalEdit(sourceId, path, Number(value.toFixed(6)), valueAt);
+    const edit = getSurgicalEdit(sourceId, path, Number(value.toFixed(6)), valueAt, mappings);
     if (!edit) break;
     edits.push(edit);
   }
@@ -144,7 +139,7 @@ function prepareCanvasPlacement(object: Dino.GameObject, placement: CanvasPlacem
     return 'Use literal transform options in the script to apply this edit.';
   }
   if (needsLineOrigin) {
-    const origin = getLineOriginEdit(sourceId, object.transform.position);
+    const origin = getLineOriginEdit(sourceId, object.transform.position, mappings);
     if (!origin) {
       return 'Give the line an explicit position in the script before applying this edit.';
     }
@@ -182,11 +177,18 @@ const Inspector: React.FC<InspectorProps> = ({ visible }) => {
   const [placementStatus, setPlacementStatus] = useState('');
   const activeObjects = Engine.currentScene?.objects ?? Engine.objects;
   const pendingCount = Array.from(pendingCanvasPlacements.keys()).filter(object => activeObjects.has(object)).length;
+  const hasModulePlacements = Array.from(pendingCanvasPlacements.keys()).some(object =>
+    activeObjects.has(object) && getProjectObjectSource(object)?.scriptId === currentScriptId);
   const hasPendingCanvasChanges = pendingCanvasPlacements.size > 0;
   const baseline = selectedObject && placement ? getCanvasPlacementBaseline(selectedObject, placement) : undefined;
   const sourceId = selectedObject?.metadata.sourceId;
   const moduleSource = selectedObject ? getProjectObjectSource(selectedObject) : undefined;
   const canOpenModule = moduleSource?.scriptId === currentScriptId;
+  const modulePlacements = canOpenModule ? Array.from(pendingCanvasPlacements).flatMap(([object, changes]) => {
+    const source = getProjectObjectSource(object);
+    return activeObjects.has(object) && source?.scriptId === currentScriptId && source.run === moduleSource.run &&
+      source.path === moduleSource.path ? [{ object, changes, source }] : [];
+  }) : [];
   const standalone = isPaused && !syntaxError && sourceId && selectedObject &&
     !selectedObject.transform.parent && !selectedObject.transform.children.size ? getStandaloneSceneObject(sourceId) : null;
   const objectActions = standalone && Dino[standalone.mapping.type as keyof typeof Dino] === selectedObject?.constructor &&
@@ -270,7 +272,10 @@ const Inspector: React.FC<InspectorProps> = ({ visible }) => {
     window.dispatchEvent(new Event('playground-sync-source-mapping'));
     const transaction: CanvasPlacementTransaction = { edits: [], transforms: [] };
     for (const [object, changes] of entries) {
-      const result = prepareCanvasPlacement(object, changes, objects);
+      const id = object.metadata.sourceId;
+      const result = id && Array.from(objects).filter(member => member.metadata.sourceId === id).length === 1
+        ? prepareCanvasPlacement(object, changes, id)
+        : 'This object needs its own constructor in the open script.';
       if (typeof result === 'string') {
         setPlacementStatus(all ? `${object.metadata.tag || 'GameObject'}: ${result}` : result);
         return;
@@ -286,6 +291,61 @@ const Inspector: React.FC<InspectorProps> = ({ visible }) => {
       return;
     }
     setPlacementStatus(all ? `Applied canvas changes for ${entries.length} objects.` : 'Applied to code.');
+  };
+
+  const reviewModulePlacement = (trigger: HTMLButtonElement) => {
+    if (!moduleSource || !modulePlacements.length) return;
+    const scene = Engine.currentScene;
+    const candidates = modulePlacements.map(({ object, changes, source }) => {
+      const positions = Array.from(changes.keys(), kind => {
+        const { x, y } = Dino.Input.getObjectManipulationValue(object, kind);
+        return { kind, x, y };
+      });
+      const placementMatches = () => scene === Engine.currentScene && (scene?.objects ?? Engine.objects).has(object) &&
+        positions.every(({ kind, x, y }) => {
+          const current = Dino.Input.getObjectManipulationValue(object, kind);
+          return current.x === x && current.y === y;
+        });
+      return { object, changes, source, placementMatches };
+    });
+    window.dispatchEvent(new CustomEvent<ProjectObjectSourceRequest>(openProjectObjectSourceEvent, {
+      detail: { source: moduleSource, trigger, prepareDraft: value => {
+        if (!isProjectObjectLocationCurrent(moduleSource)) return 'Reset the game before applying changes to this module.';
+        const mappings = readObjectSourceMappings(value);
+        if (!mappings) return 'Fix the syntax in this module before applying canvas placements.';
+        const edits: Edit[] = [];
+        const applied: { object: Dino.GameObject; state: SceneTransformState; placementMatches: () => boolean }[] = [];
+        for (const { object, changes, source, placementMatches } of candidates) {
+          if (!placementMatches()) return 'The canvas placement changed. Review the latest placement from the Inspector.';
+          const matches = Array.from(scene?.objects ?? Engine.objects).filter(member => {
+            const other = getProjectObjectSource(member);
+            return other?.run === source.run && other.path === source.path &&
+              other.lineNumber === source.lineNumber && other.column === source.column;
+          });
+          const tag = object.metadata.tag;
+          if (matches.length !== 1) return `${tag}: Use a constructor that creates one object in the scene.`;
+          const mapping = findObjectConstructor(mappings, value, source.lineNumber, source.column);
+          if (!mapping || mapping.hasDynamicProperties || Dino[mapping.type as keyof typeof Dino] !== object.constructor ||
+              mapping.literalTag !== tag) {
+            return `${tag}: Use a Dino GE constructor with a literal tag and options at the recorded location.`;
+          }
+          const result = prepareCanvasPlacement(object, changes, mapping.sourceId, mappings);
+          if (typeof result === 'string') return `${tag}: ${result}`;
+          edits.push(...result.edits);
+          applied.push({ object, state: result.transform.after, placementMatches });
+        }
+        const updated = applyEditsToSource(value, edits);
+        if (updated === undefined || updated === value || !readObjectSourceMappings(updated)) {
+          return 'This placement could not be added to the module draft.';
+        }
+        return { value: updated, onSaved: () => {
+          for (const { object, state, placementMatches } of applied) {
+            if (!placementMatches()) continue;
+            window.dispatchEvent(new CustomEvent('playground-placement-history', { detail: { object, state } }));
+          }
+        } };
+      } },
+    }));
   };
 
   const handleApplyToCode = () => {
@@ -362,17 +422,20 @@ const Inspector: React.FC<InspectorProps> = ({ visible }) => {
                 {pendingCount > 1 && (
                   <>
                     <p className="inspector-section-description">{pendingCount} objects in this scene have pending changes.</p>
-                    <button type="button" className="scene-control inspector-apply" onClick={() => applyPlacements(true)}>
+                    {!hasModulePlacements && <button type="button" className="scene-control inspector-apply" onClick={() => applyPlacements(true)}>
                       <i className="fa-solid fa-code" aria-hidden="true" /> Apply all canvas changes
-                    </button>
+                    </button>}
                   </>
                 )}
                 {placement && (
                   <>
-                    {pendingCount <= 1 && <p className="inspector-section-description">Apply these changes before saving the script.</p>}
+                    {canOpenModule ? <p className="inspector-section-description">Review changes in this object’s source module.</p>
+                      : pendingCount <= 1 && <p className="inspector-section-description">Apply these changes before saving the script.</p>}
                     <button type="button" className={`scene-control${pendingCount <= 1 ? ' inspector-apply' : ''}`}
-                      onClick={() => applyPlacements(false)}>
-                      <i className="fa-solid fa-code" aria-hidden="true" /> Apply placement to code
+                      onClick={event => canOpenModule ? reviewModulePlacement(event.currentTarget) : applyPlacements(false)}>
+                      <i className="fa-solid fa-code" aria-hidden="true" /> {canOpenModule
+                        ? (modulePlacements.length > 1 ? `Review ${modulePlacements.length} placements in module` : 'Review placement in module')
+                        : 'Apply placement to code'}
                     </button>
                     <button type="button" className="scene-control" onClick={discardPlacement}>
                       <i className="fa-solid fa-rotate-left" aria-hidden="true" /> Discard canvas changes

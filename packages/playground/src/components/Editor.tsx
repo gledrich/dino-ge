@@ -6,7 +6,7 @@ import { usePlayground } from '../context/PlaygroundContext';
 import ProjectFilesDialog from './ProjectFilesDialog';
 import { openProjectObjectSourceEvent, type ProjectObjectSourceRequest } from '../utils/project-object-source';
 import { createScript, getCurrentScriptId, getScript, getFilesList, getSpriteImageFileError, readGameFolder, importGameFolder, importSpriteImage, type GameFolder } from '../utils/helpers';
-import { Edit, instrumentCode, getSourceMapping, getSceneObjectCreation, getSceneObjectDeletion, getSceneObjectDuplication, getSpriteImageReplacement, type CanvasPlacementTransaction } from '../utils/ast-utils';
+import { applyEditsToSource, Edit, instrumentCode, getSourceMapping, getSceneObjectCreation, getSceneObjectDeletion, getSceneObjectDuplication, getSpriteImageReplacement, type CanvasPlacementTransaction } from '../utils/ast-utils';
 import { createSceneObject, duplicateSceneObject, getSceneSource, insertSceneObjectCode, isReplaceableSprite, restoreSceneTransform, sceneAssetDragEvent, sceneAssetDragType, sceneObjectCodeEvent, sceneObjectDragType, sceneObjectKinds, scenePointerDragEvent, type CanvasTransformChange, type SceneImageAsset, type SceneObjectPlacement, type ScenePointerDrag, type ScenePointerDragItem } from '../utils/scene-objects';
 import { useMonacoEditor } from '../hooks/useMonacoEditor';
 import '../styles/editor.css';
@@ -38,7 +38,7 @@ const CodeEditor: React.FC<EditorProps> = ({ currentScriptId, onSave, onSelectSc
   const [entryFile, setEntryFile] = useState('');
   const [importing, setImporting] = useState(false);
   const [importError, setImportError] = useState('');
-  const [projectFiles, setProjectFiles] = useState<{ scriptId: string; source?: ProjectObjectSourceRequest['source']; trigger: HTMLButtonElement }>();
+  const [projectFiles, setProjectFiles] = useState<{ scriptId: string; request?: ProjectObjectSourceRequest; trigger: HTMLButtonElement }>();
   const [dropGuide, setDropGuide] = useState<'code' | 'image'>();
   const [dropFeedback, setDropFeedback] = useState<{ scriptId: string; message: string; error: boolean }>();
   const editorDropTarget = useRef<HTMLDivElement>(null);
@@ -51,11 +51,11 @@ const CodeEditor: React.FC<EditorProps> = ({ currentScriptId, onSave, onSelectSc
 
   useEffect(() => {
     const openSource = (event: Event) => {
-      const { source, trigger } = (event as CustomEvent<ProjectObjectSourceRequest>).detail;
-      if (source.scriptId !== currentScriptId) return;
+      const request = (event as CustomEvent<ProjectObjectSourceRequest>).detail;
+      if (request.source.scriptId !== currentScriptId) return;
       setIsEditorVisible(true);
       setActiveTab('editor');
-      setProjectFiles({ scriptId: currentScriptId, source, trigger });
+      setProjectFiles({ scriptId: currentScriptId, request, trigger: request.trigger });
     };
     window.addEventListener(openProjectObjectSourceEvent, openSource);
     return () => window.removeEventListener(openProjectObjectSourceEvent, openSource);
@@ -269,13 +269,8 @@ const CodeEditor: React.FC<EditorProps> = ({ currentScriptId, onSave, onSelectSc
       const model = monacoEditorRef.current?.getModel();
       if (!model || loadedScriptId.current !== currentScriptId || !edits.length) return;
       const source: string = model.getValue();
-      let updated = source;
-      let boundary = source.length;
-      for (const { start, end, newText } of [...edits].sort((a, b) => b.start - a.start || b.end - a.end)) {
-        if (start < 0 || end < start || end > boundary) return;
-        updated = updated.slice(0, start) + newText + updated.slice(end);
-        boundary = start;
-      }
+      const updated = applyEditsToSource(source, edits);
+      if (updated === undefined) return;
       if (instrumentCode(updated, false).error) return;
       if (updated !== source) {
         model.pushStackElement();
@@ -771,7 +766,7 @@ const CodeEditor: React.FC<EditorProps> = ({ currentScriptId, onSave, onSelectSc
       )}
       {importError && <p className="import-game-error" role="alert">{importError}</p>}
       {projectFiles?.scriptId === currentScriptId && <ProjectFilesDialog key={currentScriptId} scriptId={currentScriptId}
-        initialSource={projectFiles.source}
+        initialSource={projectFiles.request?.source} prepareDraft={projectFiles.request?.prepareDraft}
         onClose={() => {
           setProjectFiles(undefined);
           projectFiles.trigger.focus();

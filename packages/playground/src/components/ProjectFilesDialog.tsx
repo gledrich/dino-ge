@@ -2,16 +2,18 @@ import { useEffect, useRef, useState } from 'react';
 import Editor from '@monaco-editor/react';
 import type { editor } from 'monaco-editor';
 import { listProjectModules, readProjectModule, saveProjectModule } from '../utils/helpers';
-import { isProjectObjectLocationCurrent, markProjectModuleEdited, type ProjectObjectSource } from '../utils/project-object-source';
+import { isProjectObjectLocationCurrent, markProjectModuleEdited, type ProjectObjectSource, type ProjectObjectSourceRequest, type ProjectPlacementDraft } from '../utils/project-object-source';
 
-export default function ProjectFilesDialog({ scriptId, initialSource, onClose }: {
-  scriptId: string; initialSource?: ProjectObjectSource; onClose: () => void;
+export default function ProjectFilesDialog({ scriptId, initialSource, prepareDraft, onClose }: {
+  scriptId: string; initialSource?: ProjectObjectSource; prepareDraft?: ProjectObjectSourceRequest['prepareDraft']; onClose: () => void;
 }) {
   const dialog = useRef<HTMLDialogElement>(null);
   const [modules, setModules] = useState<string[]>();
   const [path, setPath] = useState('');
   const [loaded, setLoaded] = useState<{ path: string; value: string }>();
   const [draft, setDraft] = useState('');
+  const [placementDraft, setPlacementDraft] = useState<ProjectPlacementDraft>();
+  const prepareInitialDraft = useRef(prepareDraft);
   const [saving, setSaving] = useState(false);
   const [status, setStatus] = useState('');
   const [error, setError] = useState('');
@@ -44,9 +46,17 @@ export default function ProjectFilesDialog({ scriptId, initialSource, onClose }:
       if (controller.signal.aborted) return;
       setLoaded({ path, value });
       setDraft(value);
+      if (path !== initialSource?.path || !prepareInitialDraft.current) return;
+      const proposed = prepareInitialDraft.current(value);
+      prepareInitialDraft.current = undefined;
+      if (typeof proposed === 'string') setError(proposed);
+      else {
+        setPlacementDraft(proposed);
+        setDraft(proposed.value);
+      }
     }).catch(error => { if (!controller.signal.aborted) setError(error.message); });
     return () => controller.abort();
-  }, [path, scriptId]);
+  }, [path, scriptId, initialSource]);
 
   const save = async () => {
     if (!dirty || saving) return;
@@ -54,9 +64,13 @@ export default function ProjectFilesDialog({ scriptId, initialSource, onClose }:
     setError('');
     setStatus('');
     try {
-      await saveProjectModule(scriptId, path, draft);
+      const value = placementDraft?.value ?? draft;
+      await saveProjectModule(scriptId, path, value);
+      placementDraft?.onSaved();
+      setPlacementDraft(undefined);
       markProjectModuleEdited(scriptId, path);
-      setLoaded({ path, value: draft });
+      setLoaded({ path, value });
+      setDraft(value);
       setStatus('Saved. Reset the game to run the updated module.');
     } catch (error) {
       setError(error instanceof Error ? error.message : 'Could not save the module.');
@@ -99,7 +113,7 @@ export default function ProjectFilesDialog({ scriptId, initialSource, onClose }:
         </label>
       )}
       {path && !ready && !error && <p role="status">Loading module…</p>}
-      {ready && staleLocation && !status && <p role="status">Reset the game to refresh the source location.</p>}
+      {ready && staleLocation && !status && !error && <p role="status">Reset the game to refresh the source location.</p>}
       {ready && (
         <div className="project-module-editor">
           <Editor height="100%" defaultLanguage="javascript" theme="vs-dark" value={draft} saveViewState={!initialSource}
@@ -113,15 +127,17 @@ export default function ProjectFilesDialog({ scriptId, initialSource, onClose }:
               editor.focus();
             }}
             onChange={(value: string | undefined) => { setDraft(value ?? ''); setStatus(''); }}
-            options={{ automaticLayout: true, minimap: { enabled: false }, readOnly: saving, scrollBeyondLastLine: false, wordWrap: 'on' }} />
+            options={{ automaticLayout: true, minimap: { enabled: false }, readOnly: saving || !!placementDraft, scrollBeyondLastLine: false, wordWrap: 'on' }} />
         </div>
       )}
       {error && <p className="import-game-error" role="alert">{error}</p>}
       {status && <p role="status">{status}</p>}
+      {placementDraft && !status && <p>Review the proposed placement changes before saving.</p>}
       {dirty && !status && <p>Save or discard your changes to switch files or close.</p>}
       <div className="project-module-actions">
         {dirty && <button type="button" className="scene-control" disabled={saving} onClick={() => {
           setDraft(loaded?.value ?? '');
+          setPlacementDraft(undefined);
           setError('');
         }}>Discard changes</button>}
         <button type="button" className="scene-control" disabled={!dirty || saving} onClick={() => void save()}>

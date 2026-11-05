@@ -293,6 +293,84 @@ export const makeExternal = () => new Rectangle({ tag: 'External platform', posi
   await expect(dialog.getByRole('status')).toHaveText('Reset the game to refresh the source location.');
 });
 
+test('reviews and saves canvas moves in the module that created the objects', async ({ page }) => {
+  const id = 'module-placement/index';
+  const original = `import { Rectangle, Vector2 } from 'dino-ge';
+export const makePlatform = () => new Rectangle({ tag: 'Platform', position: new Vector2(60, 60), width: 64, height: 20 });
+export const makeWall = () => new Rectangle({ tag: 'Wall', position: new Vector2(160, 60), width: 20, height: 64 });
+export const makeQuoted = () => new Rectangle({ tag: 'Quoted', position: new Vector2(260, 60), width: 20, height: 64, 'rotation': 0 });
+export const makeShadowed = (Vector2) => new Rectangle({ tag: 'Shadowed', position: new Vector2(360, 60), width: 20, height: 64 });`;
+  let module = original;
+  let rejectSave = true;
+  await page.route('**/files', route => route.fulfill({ json: ['script', id] }));
+  await page.route('**/api/scripts/script', route => route.fulfill({ json: '' }));
+  await page.route(`**/api/scripts/${encodeURIComponent(id)}`, route => route.fulfill({ json: `
+import { Engine, Vector2 } from 'dino-ge';
+import { makePlatform, makeWall, makeQuoted, makeShadowed } from './platform.js';
+new Engine({ onLoad() { makePlatform(); makeWall(); makeQuoted(); makeShadowed(Vector2); } }, { containerId: 'playground-canvas-container' });` }));
+  await page.route(`**/api/scripts/${encodeURIComponent(id)}/modules`, route => route.fulfill({ json: ['platform.js'] }));
+  await page.route(`**/api/scripts/${encodeURIComponent(id)}/modules?*`, route => {
+    if (route.request().method() === 'PUT') {
+      if (rejectSave) {
+        rejectSave = false;
+        return route.fulfill({ status: 500, json: { error: 'Could not save the module.' } });
+      }
+      module = route.request().postDataJSON().data;
+      return route.fulfill({ json: { success: true } });
+    }
+    return route.fulfill({ json: module });
+  });
+  await page.route('**/project-runs/*/module-placement/platform.js', route => route.fulfill({ contentType: 'text/javascript', body: module }));
+  await page.goto('/');
+  await page.getByRole('combobox', { name: 'Current script' }).selectOption(id);
+  const platform = page.getByRole('button', { name: 'Platform', exact: true });
+  await expect(platform).toBeVisible();
+  await page.getByRole('button', { name: 'Edit scene', exact: true }).click();
+  const apply = page.getByRole('button', { name: 'Review placement in module', exact: true });
+  const dialog = page.getByRole('dialog', { name: 'Project files', exact: true });
+  for (const [tag, reason] of [['Quoted', 'literal tag and options'], ['Shadowed', 'literal transform options']]) {
+    const unsafe = page.getByRole('button', { name: tag, exact: true });
+    await unsafe.click();
+    await unsafe.press('Shift+ArrowRight');
+    await apply.click();
+    await expect(dialog.getByRole('alert')).toContainText(reason);
+    await expect(dialog.getByRole('button', { name: 'Save module', exact: true })).toBeDisabled();
+    await dialog.getByRole('button', { name: 'Close', exact: true }).click();
+    await page.getByRole('button', { name: 'Discard canvas changes', exact: true }).click();
+  }
+  await platform.click();
+  await platform.press('Shift+ArrowRight');
+  const x = page.getByRole('spinbutton', { name: 'X', exact: true });
+  await expect(x).toHaveValue('70.00');
+  await apply.click({ timeout: 3000 });
+  await expect(dialog.locator('.monaco-editor')).toContainText('new Vector2(70, 60)');
+  expect(module).toBe(original);
+  await dialog.getByRole('button', { name: 'Discard changes', exact: true }).click();
+  await dialog.getByRole('button', { name: 'Close', exact: true }).click();
+  await expect(platform).toHaveAccessibleDescription('Pending canvas changes');
+  const wall = page.getByRole('button', { name: 'Wall', exact: true });
+  await wall.click();
+  await wall.press('Shift+ArrowDown');
+  await page.getByRole('button', { name: 'Review 2 placements in module', exact: true }).click();
+  const save = dialog.getByRole('button', { name: 'Save module', exact: true });
+  await save.click();
+  await expect(dialog.getByRole('alert')).toHaveText('Could not save the module.');
+  expect(module).toBe(original);
+  await save.click();
+  await expect(dialog.getByRole('status')).toContainText('Saved');
+  await dialog.getByRole('button', { name: 'Close', exact: true }).click();
+  await expect(platform).not.toHaveAccessibleDescription('Pending canvas changes');
+  await expect(wall).not.toHaveAccessibleDescription('Pending canvas changes');
+  expect(module.replace(/\r\n/g, '\n')).toBe(original.replace('Vector2(60, 60)', 'Vector2(70, 60)')
+    .replace('Vector2(160, 60)', 'Vector2(160, 70)'));
+
+  await page.getByRole('button', { name: 'Reset game', exact: true }).click();
+  await expect(platform).toBeVisible();
+  await page.getByRole('button', { name: 'Edit scene', exact: true }).click();
+  await platform.click();
+  await expect(x).toHaveValue('70.00');
+});
+
 test('keeps an imported image available after deleting its sprite and reloading', async ({ page }) => {
   const workspace = await mkdtemp(join(tmpdir(), 'dino-ge-sprite-import-'));
   const scripts = join(workspace, 'scripts');

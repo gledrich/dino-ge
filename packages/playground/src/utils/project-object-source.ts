@@ -9,7 +9,12 @@ export interface ProjectObjectSource {
 }
 
 export const openProjectObjectSourceEvent = 'playground-open-project-object-source';
-export type ProjectObjectSourceRequest = { source: ProjectObjectSource; trigger: HTMLButtonElement };
+export interface ProjectPlacementDraft { value: string; onSaved: () => void }
+export type ProjectObjectSourceRequest = {
+  source: ProjectObjectSource;
+  trigger: HTMLButtonElement;
+  prepareDraft?: (value: string) => ProjectPlacementDraft | string;
+};
 
 const objectSources = new WeakMap<GameObject, ProjectObjectSource>();
 let activeProject: { scriptId: string; run: number; editedModules: Set<string> } | undefined;
