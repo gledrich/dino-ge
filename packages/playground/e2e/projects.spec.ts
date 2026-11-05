@@ -240,7 +240,7 @@ new Engine({ onLoad() {}, update() {} }, { containerId: 'playground-canvas-conta
     const canvas = page.locator('#canvas');
     await expect(canvas).toBeVisible();
     const box = (await canvas.boundingBox())!;
-    const transfer = await page.evaluateHandle(async () => {
+    const imageTransfer = (name: string) => page.evaluateHandle(async name => {
       const image = document.createElement('canvas');
       image.width = 64;
       image.height = 48;
@@ -249,9 +249,10 @@ new Engine({ onLoad() {}, update() {} }, { containerId: 'playground-canvas-conta
       context.fillRect(0, 0, 64, 48);
       const blob = await new Promise<Blob>(resolve => image.toBlob(value => resolve(value!), 'image/png'));
       const data = new DataTransfer();
-      data.items.add(new File([blob], 'gem.png', { type: 'image/png' }));
+      data.items.add(new File([blob], name, { type: 'image/png' }));
       return data;
-    });
+    }, name);
+    const transfer = await imageTransfer('gem.png');
     const point = { clientX: box.x + 240, clientY: box.y + 170 };
     await canvas.dispatchEvent('dragover', { dataTransfer: transfer, ...point });
     await expect(page.locator('.scene-drop-position')).toHaveText('Import image · X 240 · Y 170');
@@ -290,6 +291,25 @@ new Engine({ onLoad() {}, update() {} }, { containerId: 'playground-canvas-conta
     await expect(sprite).toHaveAttribute('aria-pressed', 'true');
     await expect(page.getByRole('spinbutton', { name: 'Width', exact: true })).toHaveValue('64.00');
     await expect(page.getByRole('spinbutton', { name: 'X', exact: true })).toHaveValue('280.00');
+
+    const editor = page.locator('.monaco-editor');
+    const textTransfer = await page.evaluateHandle(() => {
+      const data = new DataTransfer();
+      data.items.add(new File(['text'], 'notes.txt', { type: 'text/plain' }));
+      return data;
+    });
+    await editor.dispatchEvent('drop', { dataTransfer: textTransfer });
+    await expect(page.getByRole('alert').filter({ hasText: 'Choose a PNG, JPEG, GIF or WebP image.' })).toBeVisible();
+    const editorTransfer = await imageTransfer('coin.png');
+    await editor.dispatchEvent('dragover', { dataTransfer: editorTransfer });
+    await expect(page.getByText('Drop to import image')).toBeVisible({ timeout: 3000 });
+    await editor.dispatchEvent('drop', { dataTransfer: editorTransfer });
+    const coin = page.getByRole('button', { name: 'coin sprite', exact: true });
+    await expect(page.getByRole('status').filter({ hasText: 'Inserted coin sprite' })).toBeVisible();
+    await expect(coin).toHaveCount(0);
+    await page.getByRole('button', { name: 'Reset game', exact: true }).click();
+    await expect(coin).toBeVisible();
+    expect(await readFile(entry, 'utf8')).toMatch(/new URL\("\.\/_dino-assets\/coin-[a-f0-9]+\.png", import\.meta\.url\)/);
   } finally {
     if (server.exitCode === null) {
       server.kill();

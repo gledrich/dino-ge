@@ -168,7 +168,7 @@ const AssetPanel: React.FC = () => {
           event.currentTarget.value = '';
           if (files.length) window.dispatchEvent(new CustomEvent('playground-import-image', { detail: files }));
         }} />
-      <p className="asset-help">Import an image or drop it onto the canvas to place a sprite.</p>
+      <p className="asset-help">Drop an image file onto the canvas or editor.</p>
       {assets.length > 0 && (
         <p className="asset-help">
           {isEditing ? 'Drag to the canvas to place, or to the editor for code. Click to place. Shift+Enter positions with keys.'

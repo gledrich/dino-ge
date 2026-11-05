@@ -4,7 +4,7 @@ import { usePlayground } from '../context/PlaygroundContext';
 import Toolbar from './Toolbar';
 import Logo from './Logo';
 import { getAssetSource, getDefaultSceneObjectTag, getSceneArrowMovement, getSceneAssetPreviewType, getSceneSelectionBounds, getSceneSource, getSceneSpritePlacement, getSceneSpriteScale, isReplaceableSprite, nudgeSceneSelection, sceneAssetDragEvent, sceneAssetDragType, sceneKeyboardPlacementEvent, sceneObjectDefaults, sceneObjectDragType, sceneObjectKinds, scenePointerDragEvent, type SceneImageAsset, type SceneKeyboardPlacementRequest, type SceneObjectKind, type SceneObjectPlacement, type ScenePointerDrag, type ScenePoint } from '../utils/scene-objects';
-import { maxSpriteImageBytes, spriteImageTypes, storeSpriteImage } from '../utils/helpers';
+import { getSpriteImageFileError, importSpriteImage } from '../utils/helpers';
 
 const shapePreviewDimensions: Record<SceneObjectKind, { width: number; height: number }> = {
   Rectangle: sceneObjectDefaults.Rectangle,
@@ -505,10 +505,9 @@ const Viewport: React.FC = () => {
   const placeImageFile = useCallback(async (files: File[], x?: number, y?: number) => {
     const reject = (message: string) => setPlacementStatus({ message, error: true });
     if (importingImage.current) return reject('Wait for the current image to finish importing.');
-    if (files.length !== 1) return reject('Choose one image at a time.');
+    const fileError = getSpriteImageFileError(files);
+    if (fileError) return reject(fileError);
     const [file] = files;
-    if (!spriteImageTypes.includes(file.type)) return reject('Choose a PNG, JPEG, GIF or WebP image.');
-    if (file.size > maxSpriteImageBytes) return reject('Sprite images can be up to 5 MiB.');
     const point = getPlacementPoint(x, y);
     const run = document.querySelector<HTMLElement>('script[data-playground-script]');
     if (!point || run?.dataset.playgroundScript !== currentScriptId) {
@@ -517,25 +516,16 @@ const Viewport: React.FC = () => {
     const scene = Engine.currentScene;
     importingImage.current = true;
     setPlacementStatus({ message: `Importing ${file.name}…`, pending: true });
-    const previewUrl = URL.createObjectURL(file);
     try {
-      const image = new Image();
-      image.src = previewUrl;
-      await image.decode();
-      if (!run.isConnected) return;
-      image.src = await storeSpriteImage(file, currentScriptId);
-      window.dispatchEvent(new CustomEvent('playground-workspace-images-changed', { detail: currentScriptId }));
-      await image.decode();
-      if (!run.isConnected) return;
+      const asset = await importSpriteImage(file, currentScriptId, () => run.isConnected);
+      if (!asset) return;
       if (scene !== Engine.currentScene) return reject('The active scene changed. Drop the image again to place it there.');
-      const tag = file.name.replace(/\.[^.]*$/, '').trim() || 'Imported';
-      if (addObject('Sprite', point, { tag, image })) enterSceneEditing();
+      if (addObject('Sprite', point, asset)) enterSceneEditing();
     } catch (error) {
       if (run.isConnected) {
-        reject(error instanceof Error && !(error instanceof DOMException) ? error.message : 'The image could not be opened.');
+        reject(error instanceof Error ? error.message : 'The image could not be opened.');
       }
     } finally {
-      URL.revokeObjectURL(previewUrl);
       importingImage.current = false;
     }
   }, [addObject, currentScriptId, enterSceneEditing, getPlacementPoint]);

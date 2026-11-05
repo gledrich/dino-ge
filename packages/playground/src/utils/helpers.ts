@@ -40,7 +40,7 @@ export async function listSpriteImages(id: string, signal: AbortSignal): Promise
   return response.json();
 }
 
-export async function storeSpriteImage(file: File, id: string): Promise<string> {
+async function storeSpriteImage(file: File, id: string): Promise<string> {
   const query = new URLSearchParams({ name: file.name });
   const response = await fetch(`${scriptEndpoint(id)}/assets?${query}`, {
     method: 'POST',
@@ -52,6 +52,35 @@ export async function storeSpriteImage(file: File, id: string): Promise<string> 
     throw new Error(result.error || 'Could not save the image to this workspace.');
   }
   return result.url;
+}
+
+export function getSpriteImageFileError(files: File[]): string | undefined {
+  if (files.length !== 1) return 'Choose one image at a time.';
+  const [file] = files;
+  if (!spriteImageTypes.includes(file.type)) return 'Choose a PNG, JPEG, GIF or WebP image.';
+  if (file.size > maxSpriteImageBytes) return 'Sprite images can be up to 5 MiB.';
+}
+
+export async function importSpriteImage(file: File, id: string, isCurrent: () => boolean) {
+  const previewUrl = URL.createObjectURL(file);
+  try {
+    const image = new Image();
+    image.src = previewUrl;
+    await image.decode();
+    if (!isCurrent()) return;
+    const url = await storeSpriteImage(file, id);
+    window.dispatchEvent(new CustomEvent('playground-workspace-images-changed', { detail: id }));
+    if (!isCurrent()) return;
+    image.src = url;
+    await image.decode();
+    if (!isCurrent()) return;
+    return { tag: file.name.replace(/\.[^.]*$/, '').trim() || 'Imported', image };
+  } catch (error) {
+    if (error instanceof DOMException) throw new Error('The image could not be opened.');
+    throw error;
+  } finally {
+    URL.revokeObjectURL(previewUrl);
+  }
 }
 
 export function readGameFolder(selection: FileList): GameFolder {

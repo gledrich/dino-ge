@@ -4,7 +4,7 @@ import { typescript, type editor } from 'monaco-editor';
 import * as Dino from 'dino-ge';
 import { usePlayground } from '../context/PlaygroundContext';
 import ProjectFilesDialog from './ProjectFilesDialog';
-import { createScript, getScript, getFilesList, readGameFolder, importGameFolder, type GameFolder } from '../utils/helpers';
+import { createScript, getCurrentScriptId, getScript, getFilesList, getSpriteImageFileError, readGameFolder, importGameFolder, importSpriteImage, type GameFolder } from '../utils/helpers';
 import { Edit, instrumentCode, getSourceMapping, getSceneObjectCreation, getSceneObjectDeletion, getSceneObjectDuplication, getSpriteImageReplacement, type CanvasPlacementTransaction } from '../utils/ast-utils';
 import { createSceneObject, duplicateSceneObject, getSceneSource, insertSceneObjectCode, isReplaceableSprite, restoreSceneTransform, sceneAssetDragEvent, sceneAssetDragType, sceneObjectCodeEvent, sceneObjectDragType, sceneObjectKinds, scenePointerDragEvent, type CanvasTransformChange, type SceneImageAsset, type SceneObjectPlacement, type ScenePointerDrag, type ScenePointerDragItem } from '../utils/scene-objects';
 import { useMonacoEditor } from '../hooks/useMonacoEditor';
@@ -38,10 +38,11 @@ const CodeEditor: React.FC<EditorProps> = ({ currentScriptId, onSave, onSelectSc
   const [importing, setImporting] = useState(false);
   const [importError, setImportError] = useState('');
   const [projectFilesOpen, setProjectFilesOpen] = useState(false);
-  const [isObjectOverEditor, setIsObjectOverEditor] = useState(false);
+  const [dropGuide, setDropGuide] = useState<'code' | 'image'>();
   const [dropFeedback, setDropFeedback] = useState<{ scriptId: string; message: string; error: boolean }>();
   const editorDropTarget = useRef<HTMLDivElement>(null);
   const draggedAsset = useRef<SceneImageAsset | null>(null);
+  const imageImportRun = useRef<HTMLElement | null>(null);
   const projectFilesButton = useRef<HTMLButtonElement>(null);
   const folderPicker = useRef<HTMLInputElement>(null);
   const loadedScriptId = useRef('');
@@ -56,10 +57,40 @@ const CodeEditor: React.FC<EditorProps> = ({ currentScriptId, onSave, onSelectSc
     return !!sourceId;
   }, [currentScriptId]);
 
+  const dropImageFile = async (files: File[]) => {
+    const reject = (message: string) => setDropFeedback({ scriptId: currentScriptId, message, error: true });
+    const fileError = getSpriteImageFileError(files);
+    if (fileError) return reject(fileError);
+    const run = document.querySelector<HTMLElement>('script[data-playground-script]');
+    if (loadedScriptId.current !== currentScriptId || run?.dataset.playgroundScript !== currentScriptId) {
+      return reject('Run the open Dino GE script before importing an image.');
+    }
+    if (imageImportRun.current === run) return reject('Wait for the current image to finish importing.');
+
+    const [file] = files;
+    const scene = Dino.Engine.currentScene;
+    const isCurrent = () => run.isConnected && getCurrentScriptId() === currentScriptId;
+    imageImportRun.current = run;
+    setDropFeedback({ scriptId: currentScriptId, message: `Importing ${file.name}…`, error: false });
+    try {
+      const asset = await importSpriteImage(file, currentScriptId, isCurrent);
+      if (!asset) return;
+      if (scene !== Dino.Engine.currentScene) {
+        setDropFeedback({ scriptId: currentScriptId, message: 'Image imported. Open Assets to insert it into the active scene.', error: false });
+        return;
+      }
+      dropObjectCode({ asset });
+    } catch (error) {
+      if (isCurrent()) reject(error instanceof Error ? error.message : 'The image could not be opened.');
+    } finally {
+      if (imageImportRun.current === run) imageImportRun.current = null;
+    }
+  };
+
   useEffect(() => {
     const endDrag = () => {
       draggedAsset.current = null;
-      setIsObjectOverEditor(false);
+      setDropGuide(undefined);
     };
     const clearDrop = () => {
       endDrag();
@@ -70,12 +101,12 @@ const CodeEditor: React.FC<EditorProps> = ({ currentScriptId, onSave, onSelectSc
       if (detail) {
         const target = document.elementFromPoint(detail.point.x, detail.point.y);
         if (target && editorDropTarget.current?.contains(target)) {
-          setIsObjectOverEditor(detail.phase === 'preview');
+          setDropGuide(detail.phase === 'preview' ? 'code' : undefined);
           if (detail.phase === 'drop') dropObjectCode(detail);
           return;
         }
       }
-      setIsObjectOverEditor(false);
+      setDropGuide(undefined);
     };
     const trackAssetDrag = (event: Event) => { draggedAsset.current = (event as CustomEvent<SceneImageAsset | null>).detail; };
     window.addEventListener(sceneAssetDragEvent, trackAssetDrag);
@@ -737,30 +768,37 @@ const CodeEditor: React.FC<EditorProps> = ({ currentScriptId, onSave, onSelectSc
       <div className="editor-textbox" ref={editorDropTarget}
         onDragOverCapture={event => {
           const { types } = event.dataTransfer;
-          if (!types.includes(sceneObjectDragType) && !(draggedAsset.current && types.includes(sceneAssetDragType))) return;
+          const isFile = types.includes('Files');
+          if (!isFile && !types.includes(sceneObjectDragType) && !(draggedAsset.current && types.includes(sceneAssetDragType))) return;
           event.preventDefault();
           event.stopPropagation();
           event.dataTransfer.dropEffect = 'copy';
-          setIsObjectOverEditor(true);
+          setDropGuide(isFile ? 'image' : 'code');
         }}
         onDragLeave={event => {
           if (!(event.relatedTarget instanceof Node) || !event.currentTarget.contains(event.relatedTarget)) {
-            setIsObjectOverEditor(false);
+            setDropGuide(undefined);
           }
         }}
         onDropCapture={event => {
-          setIsObjectOverEditor(false);
+          setDropGuide(undefined);
           const { dataTransfer } = event;
-          if (!dataTransfer.types.includes(sceneObjectDragType) && !dataTransfer.types.includes(sceneAssetDragType)) return;
+          const isFile = dataTransfer.types.includes('Files');
+          if (!isFile && !dataTransfer.types.includes(sceneObjectDragType) && !dataTransfer.types.includes(sceneAssetDragType)) return;
           event.preventDefault();
           event.stopPropagation();
+          if (isFile) {
+            void dropImageFile(Array.from(dataTransfer.files));
+            return;
+          }
           const kind = sceneObjectKinds.find(item => item === dataTransfer.getData(sceneObjectDragType));
           const asset = draggedAsset.current;
           const item = kind ? { kind } : asset && asset.tag === dataTransfer.getData(sceneAssetDragType) ? { asset } : undefined;
           if (item && dropObjectCode(item)) monacoEditorRef.current?.focus();
         }}>
-        {isObjectOverEditor && <div className="editor-drop-guide" aria-hidden="true">
-          <span><i className="fa-solid fa-code" /> Drop to insert code</span>
+        {dropGuide && <div className="editor-drop-guide" aria-hidden="true">
+          <span><i className={`fa-solid ${dropGuide === 'image' ? 'fa-image' : 'fa-code'}`} />
+            {dropGuide === 'image' ? 'Drop to import image' : 'Drop to insert code'}</span>
         </div>}
         <Editor
           height="100%"
