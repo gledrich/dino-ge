@@ -1,6 +1,8 @@
 import type GameObject from './GameObject.js';
+import type Camera from './Camera.js';
 import ShapeComponent from '../components/ShapeComponent.js';
 import LineComponent from '../components/LineComponent.js';
+import VisibilityComponent from '../components/VisibilityComponent.js';
 
 /** Round a world coordinate to the nearest grid line. A zero step leaves it unchanged. */
 export function snapToGrid(coordinate: number, step: number): number {
@@ -80,11 +82,26 @@ function getAxisAlignment(min: number, max: number, targetMin: number, targetMax
   return closest;
 }
 
-/** Match edges to edges and centres to centres independently on each world axis. */
-export function getViewportAlignment(moving: ViewportBounds, targets: Iterable<ViewportBounds>, tolerance: number) {
+/** Find the closest matching edges and centres among the visible objects. */
+export function getViewportAlignment(moving: ViewportBounds, objects: Iterable<GameObject>, camera: Camera,
+  viewport: { width: number; height: number }, excluded?: GameObject) {
+  if (!Number.isFinite(camera.zoom) || camera.zoom <= 0) return;
+  const view = camera.getViewportBounds(viewport.width, viewport.height);
+  const tolerance = 6 / camera.zoom;
+  const excludedTransform = excluded?.transform;
   let x: ReturnType<typeof getAxisAlignment>;
   let y: ReturnType<typeof getAxisAlignment>;
-  for (const target of targets) {
+  for (const object of objects) {
+    if (object === excluded || !object.bounds || object.getComponent(VisibilityComponent)?.visible === false) continue;
+    if (excludedTransform) {
+      let parent = object.transform.parent;
+      while (parent && parent !== excludedTransform) parent = parent.parent;
+      if (parent) continue; // Descendants move with the excluded object.
+    }
+    const target = getViewportBounds(getViewportGeometry(object));
+    const visible = target.right > view.x && target.left < view.x + view.width &&
+      target.bottom > view.y && target.top < view.y + view.height;
+    if (!visible) continue;
     const nextX = getAxisAlignment(moving.left, moving.right, target.left, target.right, tolerance);
     const nextY = getAxisAlignment(moving.top, moving.bottom, target.top, target.bottom, tolerance);
     if (nextX && (!x || Math.abs(nextX.delta) < Math.abs(x.delta))) x = nextX;

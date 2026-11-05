@@ -265,27 +265,14 @@ export default class Input {
 
   private static getDragAlignment(object: GameObject, x: number, y: number) {
     const canvas = document.getElementById('canvas') as HTMLCanvasElement | null;
-    const { zoom } = Engine.camera;
-    if (!canvas || !Number.isFinite(zoom) || zoom <= 0) return;
-    const view = Engine.camera.getViewportBounds(canvas.width, canvas.height);
+    if (!canvas) return;
     const objects = Engine.currentScene?.objects ?? Engine.objects;
-    const transform = object.transform;
     const geometry = getViewportGeometry(object);
     const moving = getViewportBounds(geometry);
     const dx = x - geometry.origin.x;
     const dy = y - geometry.origin.y;
-    const targets: Array<ReturnType<typeof getViewportBounds>> = [];
-    for (const candidate of objects) {
-      if (candidate === object || !candidate.bounds || candidate.getComponent(VisibilityComponent)?.visible === false) continue;
-      let parent = candidate.transform.parent;
-      while (parent && parent !== transform) parent = parent.parent;
-      if (parent) continue; // A descendant moves with the selection.
-      const bounds = getViewportBounds(getViewportGeometry(candidate));
-      if (bounds.right > view.x && bounds.left < view.x + view.width &&
-          bounds.bottom > view.y && bounds.top < view.y + view.height) targets.push(bounds);
-    }
     return getViewportAlignment({ left: moving.left + dx, right: moving.right + dx,
-      top: moving.top + dy, bottom: moving.bottom + dy }, targets, 6 / zoom);
+      top: moving.top + dy, bottom: moving.bottom + dy }, objects, Engine.camera, canvas, object);
   }
 
   private static moveObjectDrag(gesture: Extract<ObjectGesture, { kind: 'drag' }>) {

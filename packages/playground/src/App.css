@@ -171,6 +171,21 @@
   pointer-events: none;
 }
 
+.scene-drop-alignment-x,
+.scene-drop-alignment-y { position: absolute; }
+
+.scene-drop-alignment-x {
+  inset-block: 0;
+  width: 1px;
+  background: repeating-linear-gradient(to bottom, #16755e 0 4px, transparent 4px 8px);
+}
+
+.scene-drop-alignment-y {
+  inset-inline: 0;
+  height: 1px;
+  background: repeating-linear-gradient(to right, #16755e 0 4px, transparent 4px 8px);
+}
+
 .scene-drop-outline {
   position: absolute;
   box-sizing: border-box;

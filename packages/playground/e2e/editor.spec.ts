@@ -1952,6 +1952,65 @@ new Engine({ onLoad() {
   })).toContain('new Vector2(470, 243)');
 });
 
+for (const item of [
+  { name: 'Add rectangle', preview: 'Rectangle', placed: 'New rectangle', from: [436, 231], to: [440, 235] },
+  { name: 'Add gem as sprite', preview: 'gem', placed: 'gem sprite', from: [469, 241], to: [472, 243] },
+]) {
+  test(`aligns ${item.placed} during a drop and writes the previewed position to code`, async ({ page }) => {
+    await page.route('**/files', route => route.fulfill({ json: ['script'] }));
+    await page.route('**/gem.svg', route => route.fulfill({
+      contentType: 'image/svg+xml',
+      body: '<svg xmlns="http://www.w3.org/2000/svg" width="48" height="32"><rect width="48" height="32" fill="orange"/></svg>',
+    }));
+    await page.route('**/api/scripts/script', route => route.fulfill({ json: `
+import { Engine, Loader, Rectangle, Vector2 } from 'dino-ge';
+new Engine({ async onLoad() {
+  Loader.queueImage('gem', '/gem.svg');
+  await Loader.loadAll();
+  new Rectangle({ tag: 'Anchor', position: new Vector2(520, 235), width: 80, height: 48 });
+  new Rectangle({ tag: 'Hidden', position: new Vector2(518, 234), width: 80, height: 48, visible: false });
+  new Rectangle({ tag: 'Offscreen', position: new Vector2(516, 4000), width: 80, height: 48 });
+  Engine.camera.position.set(32, 24);
+  Engine.camera.zoom = 1.25;
+}, update() {} }, { containerId: 'playground-canvas-container' });` }));
+    await page.goto('/');
+    await expect(page.getByRole('button', { name: 'Anchor', exact: true })).toBeVisible();
+    await page.getByRole('button', { name: 'Edit scene', exact: true }).click();
+    await page.getByRole('button', { name: 'Align to objects', exact: true }).click();
+    if (item.preview === 'gem') await page.getByRole('button', { name: 'Assets', exact: true }).click();
+
+    const canvas = page.locator('#canvas');
+    const box = (await canvas.boundingBox())!;
+    const size = await canvas.evaluate((element: HTMLCanvasElement) => ({ width: element.width, height: element.height }));
+    const x = (world: number) => (world - 32) * 1.25 * box.width / size.width;
+    const y = (world: number) => (world - 24) * 1.25 * box.height / size.height;
+    const target = { x: x(item.from[0]), y: y(item.from[1]) };
+    const source = page.getByRole('button', { name: item.name, exact: true });
+    const transfer = await page.evaluateHandle(() => new DataTransfer());
+    await source.dispatchEvent('dragstart', { dataTransfer: transfer });
+    await canvas.dispatchEvent('dragover', { dataTransfer: transfer, clientX: box.x + target.x, clientY: box.y + target.y });
+    const preview = page.locator('.scene-drop-preview');
+    await expect(preview).toContainText(`${item.preview} · X ${item.to[0]} · Y ${item.to[1]}`, { timeout: 3000 });
+    const vertical = await preview.locator('.scene-drop-alignment-x').boundingBox();
+    const horizontal = await preview.locator('.scene-drop-alignment-y').boundingBox();
+    expect(vertical?.x).toBeCloseTo(box.x + x(520), 0);
+    expect(horizontal?.y).toBeCloseTo(box.y + y(item.preview === 'gem' ? 259 : 235), 0);
+    await canvas.dispatchEvent('dragleave', { dataTransfer: transfer });
+    await expect(preview).toHaveCount(0);
+    await expect(page.getByRole('button', { name: item.placed, exact: true })).toHaveCount(0);
+
+    await source.dragTo(canvas, { targetPosition: target });
+    await expect(page.getByRole('button', { name: item.placed, exact: true })).toHaveAttribute('aria-pressed', 'true');
+    await expect(page.getByRole('spinbutton', { name: 'X', exact: true })).toHaveValue(`${item.to[0]}.00`);
+    await expect(page.getByRole('spinbutton', { name: 'Y', exact: true })).toHaveValue(`${item.to[1]}.00`);
+    await expect(preview).toHaveCount(0);
+    await expect.poll(() => page.evaluate(() => {
+      const { monaco } = window as typeof window & { monaco: Monaco };
+      return monaco.editor.getEditors()[0].getValue();
+    })).toContain(`new DinoPlaceVector2(${item.to[0]}, ${item.to[1]})`);
+  });
+}
+
 test('snaps rotated resize corners and circle diameters with live feedback', async ({ page }) => {
   await page.route('**/files', route => route.fulfill({ json: ['script'] }));
   await page.route('**/api/scripts/script', route => route.fulfill({ json: `

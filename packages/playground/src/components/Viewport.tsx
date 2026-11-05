@@ -1,12 +1,12 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { Engine, Input, SpriteComponent, snapToGrid, type ObjectManipulationPreview } from 'dino-ge';
+import { Engine, Input, SpriteComponent, getViewportAlignment, snapToGrid, type ObjectManipulationPreview } from 'dino-ge';
 import { usePlayground } from '../context/PlaygroundContext';
 import Toolbar from './Toolbar';
 import Logo from './Logo';
 import { getAssetSource, getSceneArrowMovement, getSceneAssetPreviewType, getSceneSelectionBounds, getSceneSource, getSceneSpriteScale, isReplaceableSprite, nudgeSceneSelection, sceneAssetDragType, sceneKeyboardPlacementEvent, sceneObjectDefaults, sceneObjectDragType, sceneObjectKinds, scenePointerDragEvent, type SceneImageAsset, type SceneKeyboardPlacementRequest, type SceneObjectKind, type SceneObjectPlacement, type ScenePointerDrag, type ScenePoint } from '../utils/scene-objects';
 import { maxSpriteImageBytes, spriteImageTypes, storeSpriteImage } from '../utils/helpers';
 
-const shapePreviewDimensions: Partial<Record<SceneObjectKind, { width: number; height: number }>> = {
+const shapePreviewDimensions: Record<SceneObjectKind, { width: number; height: number }> = {
   Rectangle: sceneObjectDefaults.Rectangle,
   Circle: { width: sceneObjectDefaults.Circle.radius * 2, height: sceneObjectDefaults.Circle.radius * 2 },
   Line: { width: sceneObjectDefaults.Line.length, height: sceneObjectDefaults.Line.strokeWidth },
@@ -42,13 +42,35 @@ function projectCanvasPoint({ x, y }: ScenePoint, { bounds, position, scaleX, sc
     top: bounds.top + (y - position.y) * scaleY };
 }
 
-function getCanvasPlacement(canvas: HTMLCanvasElement, step: number, clientX?: number, clientY?: number) {
+type ProjectedPlacement = ReturnType<typeof projectCanvasPoint> & {
+  alignment?: ReturnType<typeof getViewportAlignment>;
+};
+
+function getDropDimensions({ kind, asset }: DropPreviewItem) {
+  if (asset) {
+    const scale = getSceneSpriteScale(asset.image);
+    return { width: asset.image.naturalWidth * scale, height: asset.image.naturalHeight * scale };
+  }
+  return kind && shapePreviewDimensions[kind];
+}
+
+function getCanvasPlacement(canvas: HTMLCanvasElement, step: number, clientX?: number, clientY?: number,
+  alignItem?: DropPreviewItem): ProjectedPlacement | undefined {
   const projection = getCanvasProjection(canvas);
   if (!projection) return;
   const { bounds, position, scaleX, scaleY } = projection;
   const x = snapToGrid(((clientX ?? bounds.left + bounds.width / 2) - bounds.left) / scaleX + position.x, step);
   const y = snapToGrid(((clientY ?? bounds.top + bounds.height / 2) - bounds.top) / scaleY + position.y, step);
-  return projectCanvasPoint({ x, y }, projection);
+  const dimensions = alignItem && getDropDimensions(alignItem);
+  if (!dimensions) return projectCanvasPoint({ x, y }, projection);
+
+  // A Line's origin is on the stroke centre, while other Library objects start at the top left.
+  const top = alignItem?.kind === 'Line' ? y - dimensions.height / 2 : y;
+  const footprint = { left: x, right: x + dimensions.width, top, bottom: top + dimensions.height };
+  const objects = Engine.currentScene?.objects ?? Engine.objects;
+  const alignment = getViewportAlignment(footprint, objects, Engine.camera, canvas);
+  const snapped = { x: x + (alignment?.x?.delta ?? 0), y: y + (alignment?.y?.delta ?? 0) };
+  return { ...projectCanvasPoint(snapped, projection), alignment };
 }
 
 function keepPointOnCanvas(point: ScenePoint, { bounds, position, scaleX, scaleY }: CanvasProjection, step: number) {
@@ -167,6 +189,7 @@ const Viewport: React.FC = () => {
   const [dropGuide, setDropGuide] = useState<{
     x: number; y: number; left: number; top: number; kind?: SceneObjectKind;
     width?: number; height?: number;
+    alignmentLeft?: number; alignmentTop?: number;
     asset?: { tag: string; src: string };
     importingImage?: boolean;
   }>();
@@ -238,10 +261,15 @@ const Viewport: React.FC = () => {
     };
   }, [isEditingScene]);
 
-  const getPlacementPoint = useCallback((clientX?: number, clientY?: number) => {
+  const getPointerPlacement = useCallback((canvas: HTMLCanvasElement, clientX?: number, clientY?: number, item?: DropPreviewItem) => {
+    const align = isEditingScene && isAlignmentSnapping && clientX !== undefined && clientY !== undefined;
+    return getCanvasPlacement(canvas, placementStep, clientX, clientY, align ? item : undefined);
+  }, [isEditingScene, isAlignmentSnapping, placementStep]);
+
+  const getPlacementPoint = useCallback((clientX?: number, clientY?: number, item?: DropPreviewItem) => {
     const canvas = viewportContainerRef.current?.querySelector<HTMLCanvasElement>('canvas#canvas');
-    return canvas ? getCanvasPlacement(canvas, placementStep, clientX, clientY) : undefined;
-  }, [placementStep]);
+    return canvas ? getPointerPlacement(canvas, clientX, clientY, item) : undefined;
+  }, [getPointerPlacement]);
 
   const addObject = useCallback((kind: SceneObjectKind | 'Sprite', point?: ScenePoint, asset?: SceneImageAsset) => {
     const rejectPlacement = (message: string) => {
@@ -288,7 +316,7 @@ const Viewport: React.FC = () => {
   }, [setIsDebug, setIsInspectorVisible, setIsPaused]);
 
   const placeLibraryObject = useCallback((kind: SceneObjectKind, x?: number, y?: number) => {
-    const placed = addObject(kind, getPlacementPoint(x, y));
+    const placed = addObject(kind, getPlacementPoint(x, y, { kind }));
     if (placed) enterSceneEditing();
     return placed;
   }, [addObject, enterSceneEditing, getPlacementPoint]);
@@ -300,20 +328,21 @@ const Viewport: React.FC = () => {
     savedCamera.current = { canvas, scene, x: position.x, y: position.y, zoom };
   }, []);
 
-  const showDropGuide = useCallback((point: ReturnType<typeof getCanvasPlacement>,
-    { kind, asset, importingImage }: DropPreviewItem) => {
+  const showDropGuide = useCallback((point: ProjectedPlacement | undefined, item: DropPreviewItem) => {
     const rect = viewportContainerRef.current?.getBoundingClientRect();
     if (!point || !rect) {
       setDropGuide(undefined);
       return;
     }
-    const dimensions = kind && shapePreviewDimensions[kind];
-    const spriteScale = asset ? getSceneSpriteScale(asset.image) : 1;
-    const width = asset ? asset.image.naturalWidth * spriteScale : dimensions?.width;
-    const height = asset ? asset.image.naturalHeight * spriteScale : dimensions?.height;
-    setDropGuide({ x: point.x, y: point.y, left: point.left - rect.left, top: point.top - rect.top, kind,
-      width: width && width * point.scaleX, height: height && height * point.scaleY,
-      importingImage,
+    const { kind, asset, importingImage } = item;
+    const dimensions = getDropDimensions(item);
+    const { alignment, scaleX, scaleY } = point;
+    const left = point.left - rect.left;
+    const top = point.top - rect.top;
+    setDropGuide({ x: point.x, y: point.y, left, top, kind, importingImage,
+      width: dimensions && dimensions.width * scaleX, height: dimensions && dimensions.height * scaleY,
+      alignmentLeft: alignment?.x && left + (alignment.x.coordinate - point.x) * scaleX,
+      alignmentTop: alignment?.y && top + (alignment.y.coordinate - point.y) * scaleY,
       asset: asset && { tag: asset.tag, src: asset.image.src } });
   }, []);
 
@@ -330,7 +359,7 @@ const Viewport: React.FC = () => {
   }, []);
 
   const showPointerDropGuide = useCallback((canvas: HTMLCanvasElement, point: ScenePoint, item: DropPreviewItem) => {
-    showDropGuide(getCanvasPlacement(canvas, placementStep, point.x, point.y), item);
+    showDropGuide(getPointerPlacement(canvas, point.x, point.y, item), item);
     if (!isEditingScene || item.importingImage || (!item.kind && !item.asset)) return;
     if (dropPan.current) {
       dropPan.current.point = point;
@@ -357,11 +386,11 @@ const Viewport: React.FC = () => {
       rememberCamera(canvas);
       drag.origin ??= { x: position.x, y: position.y };
       position.set(position.x + delta.x, position.y + delta.y);
-      showDropGuide(getCanvasPlacement(canvas, placementStep, point.x, point.y), item);
+      showDropGuide(getPointerPlacement(canvas, point.x, point.y, item), item);
     };
     dropPan.current = drag;
     drag.frame = requestAnimationFrame(panAtEdge);
-  }, [finishDropPreview, isEditingScene, placementStep, rememberCamera, showDropGuide]);
+  }, [finishDropPreview, getPointerPlacement, isEditingScene, rememberCamera, showDropGuide]);
 
   useEffect(() => {
     const cancel = () => { if (dropPan.current) finishDropPreview(); };
@@ -457,7 +486,7 @@ const Viewport: React.FC = () => {
   };
 
   const placeLoadedImage = useCallback((asset: SceneImageAsset, x?: number, y?: number) => {
-    return addObject('Sprite', getPlacementPoint(x, y), asset);
+    return addObject('Sprite', getPlacementPoint(x, y, { asset }), asset);
   }, [addObject, getPlacementPoint]);
 
   useEffect(() => {
@@ -1011,7 +1040,7 @@ const Viewport: React.FC = () => {
                 {sceneGridSizes.map(size => <option key={size} value={size}>{size} px</option>)}
               </select>
               <button type="button" className="scene-control" aria-label="Align to objects"
-                aria-pressed={isAlignmentSnapping} title="Snap dragged objects to visible edges and centres"
+                aria-pressed={isAlignmentSnapping} title="Snap moves and drops to visible edges and centres"
                 onClick={() => setSnapMode(mode => mode === 'objects' ? 'off' : 'objects')}>Align</button>
             </div>
             {!keyboardPlacement && <span id="scene-keyboard-hint" className="scene-edit-hint">
@@ -1047,6 +1076,10 @@ const Viewport: React.FC = () => {
         </div>
       )}
       {dropGuide && <div className="scene-drop-preview" aria-hidden={keyboardPlacement ? undefined : true}>
+        {dropGuide.alignmentLeft !== undefined && <div className="scene-drop-alignment-x"
+          style={{ left: Math.round(dropGuide.alignmentLeft) }} aria-hidden="true" />}
+        {dropGuide.alignmentTop !== undefined && <div className="scene-drop-alignment-y"
+          style={{ top: Math.round(dropGuide.alignmentTop) }} aria-hidden="true" />}
         {dropGuide.width && dropGuide.height && <div className={dropGuide.kind === 'Line' ? 'scene-drop-line' : 'scene-drop-outline'} style={{
           left: dropGuide.left, top: dropGuide.top, width: dropGuide.width, height: dropGuide.height,
           borderRadius: dropGuide.kind === 'Circle' ? '50%' : undefined,
@@ -1056,7 +1089,7 @@ const Viewport: React.FC = () => {
         </div>}
         <div className="scene-drop-guide" style={{ left: dropGuide.left, top: dropGuide.top }} aria-hidden="true" />
         <div className="scene-drop-position" role={keyboardPlacement ? 'status' : undefined}>
-          {dropGuide.asset?.tag ?? dropGuide.kind ?? (dropGuide.importingImage ? 'Import image' : 'Drop position')} · X {dropGuide.x} · Y {dropGuide.y}
+          {dropGuide.asset?.tag ?? dropGuide.kind ?? (dropGuide.importingImage ? 'Import image' : 'Drop position')} · X {Number(dropGuide.x.toFixed(2))} · Y {Number(dropGuide.y.toFixed(2))}
         </div>
       </div>}
       {isEditingScene && manipulationReadout && (
