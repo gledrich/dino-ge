@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import AssetPanel from './AssetPanel';
-import { sceneObjectDragType, type SceneObjectKind } from '../utils/scene-objects';
+import { getDefaultSceneObjectTag, getSceneShapeOptionLines, sceneObjectDragType, type SceneObjectKind } from '../utils/scene-objects';
 import { useScenePlacementSource } from '../hooks/useScenePlacementSource';
 import '../styles/sidebar.css';
 
@@ -11,32 +11,20 @@ interface Snippet {
   kind?: SceneObjectKind;
 }
 
+function shapeSnippet(kind: SceneObjectKind, icon: string): Snippet {
+  const options = [
+    `tag: ${JSON.stringify(getDefaultSceneObjectTag(kind))}`,
+    'position: new Vector2(100, 100)',
+    ...getSceneShapeOptionLines(kind),
+  ];
+  return { icon, label: kind, kind, code: `new ${kind}({\n  ${options.join(',\n  ')}\n});` };
+}
+
 const snippets: Snippet[] = [
   { icon: 'fa-arrows-up-down-left-right', label: 'Vector2', code: 'new Vector2(0, 0)' },
-  { icon: 'fa-font', label: 'Text', kind: 'Text', code: `new Text({
-  tag: 'textObj',
-  text: 'Hello World',
-  fontSize: 30,
-  colour: 'white',
-  position: new Vector2(100, 100),
-  width: 200,
-  zIndex: 10
-});` },
-  { icon: 'fa-square', label: 'Rectangle', kind: 'Rectangle', code: `new Rectangle({
-  tag: 'rectObj',
-  position: new Vector2(100, 100),
-  width: 50,
-  height: 50,
-  colour: '#43aa8b',
-  zIndex: 5
-});` },
-  { icon: 'fa-circle', label: 'Circle', kind: 'Circle', code: `new Circle({
-  tag: 'circleObj',
-  position: new Vector2(100, 100),
-  radius: 25,
-  colour: '#F94144',
-  zIndex: 5
-});` },
+  shapeSnippet('Text', 'fa-font'),
+  shapeSnippet('Rectangle', 'fa-square'),
+  shapeSnippet('Circle', 'fa-circle'),
   { icon: 'fa-image', label: 'Sprite', code: `new Sprite({
   tag: 'spriteObj',
   img: 'dino',
@@ -47,13 +35,7 @@ const snippets: Snippet[] = [
   endCol: 4,
   zIndex: 5
 });` },
-  { icon: 'fa-minus', label: 'Line', kind: 'Line', code: `new Line({
-  tag: 'lineObj',
-  width: 2,
-  p1: new Vector2(0, 0),
-  p2: new Vector2(100, 100),
-  zIndex: 1
-});` },
+  shapeSnippet('Line', 'fa-minus'),
   { icon: 'fa-volleyball', label: 'Physics', code: `const ball = new Circle({
   tag: 'bouncy',
   position: new Vector2(200, 100),

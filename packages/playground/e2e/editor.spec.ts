@@ -1323,6 +1323,51 @@ new Engine({ onLoad() {} }, { containerId: 'playground-canvas-container' });` })
   await expect(editor).toContainText('new Rectangle');
 });
 
+test('runs Library shape snippets with the same defaults as canvas drops', async ({ page }) => {
+  let source = `
+import { Engine, Rectangle, Circle, Text, Line, Vector2 } from 'dino-ge';
+new Engine({ onLoad() {}, update() {} }, { containerId: 'playground-canvas-container' });`;
+  await page.route('**/files', route => route.fulfill({ json: ['script'] }));
+  await page.route('**/api/scripts/script', route => {
+    if (route.request().method() === 'PUT') {
+      source = route.request().postDataJSON().data;
+      return route.fulfill({ json: { success: true } });
+    }
+    return route.fulfill({ json: source });
+  });
+  await page.goto('/');
+  await expect(page.locator('.monaco-editor')).toContainText('new Engine');
+
+  const shapes = [
+    { kind: 'rectangle', fields: [['spinbutton', 'Width', '80.00'], ['spinbutton', 'Height', '48.00']] },
+    { kind: 'circle', fields: [['spinbutton', 'Radius', '28.00']] },
+    { kind: 'text', fields: [['textbox', 'Content', 'New text'], ['spinbutton', 'Width', '180.00']] },
+    { kind: 'line', fields: [['spinbutton', 'End X', '96.00'], ['spinbutton', 'End Y', '0.00'], ['spinbutton', 'Stroke width', '4.00']] },
+  ] as const;
+  for (const { kind } of shapes) {
+    await page.getByRole('button', { name: `Insert ${kind} code`, exact: true }).click();
+  }
+  await page.getByRole('button', { name: 'Reset game', exact: true }).click();
+  const explorer = page.getByRole('button', { name: 'New rectangle', exact: true });
+  await expect(explorer).toBeVisible({ timeout: 3000 });
+  await page.getByRole('button', { name: 'Edit scene', exact: true }).click();
+
+  const canvas = page.locator('#canvas');
+  for (const [index, { kind, fields }] of shapes.entries()) {
+    await page.getByRole('button', { name: `New ${kind}`, exact: true }).click();
+    for (const [role, name, value] of fields) {
+      await expect(page.getByRole(role, { name, exact: true })).toHaveValue(value);
+    }
+    await page.getByRole('button', { name: `Add ${kind}`, exact: true }).dragTo(canvas, {
+      targetPosition: { x: 250 + index * 100, y: 225 },
+    });
+    await expect(page.getByRole('button', { name: `New ${kind} 2`, exact: true })).toHaveAttribute('aria-pressed', 'true');
+    for (const [role, name, value] of fields) {
+      await expect(page.getByRole(role, { name, exact: true })).toHaveValue(value);
+    }
+  }
+});
+
 test('places a palette object at the drop point and restores it from the saved script', async ({ page }) => {
   let source = `import { Engine } from 'dino-ge';
 new Engine({ onLoad() {}, update() {} }, { containerId: 'playground-canvas-container' });`;

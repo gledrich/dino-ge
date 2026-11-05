@@ -198,6 +198,19 @@ export const sceneObjectDefaults = {
   Line: { length: 96, strokeWidth: 4 },
 };
 
+export function getDefaultSceneObjectTag(kind: SceneObjectKind | 'Sprite') {
+  return `New ${kind.toLowerCase()}`;
+}
+
+/** Source options shared by the Library snippet and the canvas-generated constructor. */
+export function getSceneShapeOptionLines(kind: SceneObjectKind, vector = 'Vector2') {
+  if (kind === 'Line') {
+    const { length, strokeWidth } = sceneObjectDefaults.Line;
+    return [`p1: new ${vector}(0, 0)`, `p2: new ${vector}(${length}, 0)`, `width: ${strokeWidth}`, 'visible: true'];
+  }
+  return Object.entries(sceneObjectDefaults[kind]).map(([key, value]) => `${key}: ${JSON.stringify(value)}`);
+}
+
 interface PlacementOptions {
   tag: string;
   x: number;

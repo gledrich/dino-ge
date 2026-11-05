@@ -1,6 +1,6 @@
 import * as acorn from 'acorn';
 import { Vector2 } from 'dino-ge';
-import { sceneObjectDefaults, sceneObjectKinds, sceneSourceKey, type CanvasTransformChange, type SceneObjectPlacement, type ScenePoint } from './scene-objects';
+import { getSceneShapeOptionLines, sceneObjectKinds, sceneSourceKey, type CanvasTransformChange, type SceneObjectPlacement, type ScenePoint } from './scene-objects';
 
 export interface PropertyLocation {
   nodeStart: number;
@@ -482,10 +482,7 @@ export function getSceneObjectCreation(source: string, placement: SceneObjectPla
   for (let i = 2; source.includes(tag); i++) tag = `${placement.tag} ${i}`;
   const options = placement.kind === 'Sprite'
     ? `img: ${spriteImageExpression(placement.asset.source)}, rows: 1, cols: 1, scale: new ${vector}(${placement.asset.scale}, ${placement.asset.scale})`
-    : placement.kind === 'Line'
-      ? `p1: new ${vector}(0, 0), p2: new ${vector}(${sceneObjectDefaults.Line.length}, 0), width: ${sceneObjectDefaults.Line.strokeWidth}, visible: true`
-      : Object.entries(sceneObjectDefaults[placement.kind])
-      .map(([key, value]) => `${key}: ${JSON.stringify(value)}`).join(', ');
+    : getSceneShapeOptionLines(placement.kind, vector).join(', ');
   const registration = placement.kind === 'Sprite' ? '.play()' : '';
   const statement = `new ${constructor}({ tag: ${JSON.stringify(tag)}, position: new ${vector}(${placement.x}, ${placement.y}), ${options} })${registration};`;
   const edits: Edit[] = [];
