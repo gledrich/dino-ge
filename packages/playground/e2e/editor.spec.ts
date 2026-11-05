@@ -638,6 +638,85 @@ new Engine({ onLoad() {}, update() {} }, { containerId: 'playground-canvas-conta
   await expect(stroke).toHaveValue('12.00');
 });
 
+test('drags a rotated line’s endpoints independently and saves them with undo', async ({ page }) => {
+  let script = `
+import { Engine, Line, Vector2 as Vec } from 'dino-ge';
+new Engine({ onLoad() {
+  new Line({ tag: 'Ramp', p1: new Vec(240, -80), p2: new Vec(336, -80), rotation: Math.PI / 2, width: 4 });
+}, update() {} }, { containerId: 'playground-canvas-container' });`;
+  await page.route('**/files', route => route.fulfill({ json: ['script'] }));
+  await page.route('**/api/scripts/script', route => {
+    if (route.request().method() === 'PUT') {
+      script = route.request().postDataJSON().data;
+      return route.fulfill({ json: { success: true } });
+    }
+    return route.fulfill({ json: script });
+  });
+  await page.goto('/');
+  await expect(page.getByRole('button', { name: 'Ramp', exact: true })).toBeVisible();
+  await page.getByRole('button', { name: 'Edit scene', exact: true }).click();
+  await page.getByRole('button', { name: 'Ramp', exact: true }).click();
+  await page.getByRole('button', { name: 'Snap to grid' }).click();
+  const canvas = page.locator('#canvas');
+  await canvas.evaluate((element: HTMLCanvasElement) => {
+    element.style.width = `${element.width}px`;
+    element.style.height = `${element.height}px`;
+  });
+  const box = (await canvas.boundingBox())!;
+  const startX = page.getByRole('spinbutton', { name: 'Start X', exact: true });
+  const endX = page.getByRole('spinbutton', { name: 'End X', exact: true });
+  const readout = page.getByRole('group', { name: 'Current scene gesture' });
+
+  await page.mouse.move(box.x + 320, box.y + 256);
+  await page.mouse.down();
+  await page.mouse.move(box.x + 290, box.y + 286, { steps: 5 });
+  await expect(readout).toHaveText('Line end · Local X 368 · Y -48');
+  await expect(endX).toHaveValue('368.00');
+  await page.keyboard.press('Escape');
+  await page.mouse.up();
+  await expect(endX).toHaveValue('336.00');
+  await expect(readout).toHaveCount(0);
+
+  await page.mouse.move(box.x + 320, box.y + 256);
+  await page.mouse.down();
+  await page.mouse.move(box.x + 290, box.y + 286, { steps: 5 });
+  await page.mouse.up();
+  await page.mouse.move(box.x + 320, box.y + 160);
+  await page.mouse.down();
+  await page.mouse.move(box.x + 350, box.y + 178, { steps: 5 });
+  await expect(readout).toHaveText('Line start · Local X 256 · Y -112');
+  await page.mouse.up();
+  await expect(startX).toHaveValue('256.00');
+  await expect(endX).toHaveValue('368.00');
+  await expect(page.getByRole('spinbutton', { name: 'X', exact: true })).toHaveValue('240.00');
+  await page.getByRole('button', { name: 'Apply placement to code' }).click();
+  await expect(page.getByRole('status').filter({ hasText: 'Applied to code' })).toBeVisible();
+
+  const source = () => page.evaluate(() => {
+    const { monaco } = window as typeof window & { monaco: Monaco };
+    return monaco.editor.getEditors()[0].getValue();
+  });
+  await expect.poll(source).toContain('p1: new Vec(256, -112), position: new Vec(240, -80)');
+  await expect.poll(source).toContain('p2: new Vec(368, -48)');
+  await page.getByRole('button', { name: 'Undo code edit' }).click();
+  await expect(startX).toHaveValue('240.00');
+  await expect(endX).toHaveValue('336.00');
+  await expect.poll(source).not.toContain('position: new Vec');
+  await page.getByRole('button', { name: 'Redo code edit' }).click();
+  await expect(startX).toHaveValue('256.00');
+  await expect(endX).toHaveValue('368.00');
+
+  const saved = page.waitForResponse(response => response.request().method() === 'PUT' &&
+    response.url().endsWith('/api/scripts/script'));
+  await page.getByRole('button', { name: 'Save script', exact: true }).click();
+  await saved;
+  await page.reload();
+  await page.getByRole('button', { name: 'Ramp', exact: true }).click();
+  await expect(startX).toHaveValue('256.00');
+  await expect(endX).toHaveValue('368.00');
+  await expect(page.getByRole('spinbutton', { name: 'X', exact: true })).toHaveValue('240.00');
+});
+
 test('previews a text drop and restores the content edited in the Inspector', async ({ page }) => {
   let source = `import { Engine } from 'dino-ge';
 new Engine({ onLoad() {}, update() {} }, { containerId: 'playground-canvas-container' });`;

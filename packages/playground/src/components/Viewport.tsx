@@ -104,6 +104,8 @@ const Viewport: React.FC = () => {
       } else if (kind === 'rotate') {
         const degrees = Math.round(value.x * (180 / Math.PI) * 100) / 100;
         setManipulationReadout(`Rotate · ${degrees}°`);
+      } else if (kind === 'p1' || kind === 'p2') {
+        setManipulationReadout(`Line ${kind === 'p1' ? 'start' : 'end'} · Local X ${x} · Y ${y}`);
       } else if (object.getComponent(SpriteComponent)) {
         setManipulationReadout(`Resize · Scale X ${x} · Y ${y}`);
       } else {

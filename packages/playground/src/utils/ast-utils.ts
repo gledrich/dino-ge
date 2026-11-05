@@ -1,6 +1,6 @@
 import * as acorn from 'acorn';
 import { Vector2 } from 'dino-ge';
-import { sceneObjectDefaults, sceneObjectKinds, sceneSourceKey, type SceneObjectPlacement } from './scene-objects';
+import { sceneObjectDefaults, sceneObjectKinds, sceneSourceKey, type SceneObjectPlacement, type ScenePoint } from './scene-objects';
 
 export interface PropertyLocation {
   nodeStart: number;
@@ -10,6 +10,7 @@ export interface PropertyLocation {
   numeric: boolean;
   // For special types like Vector2
   args?: Array<{ start: number, end: number, numeric: boolean }>;
+  vectorConstructor?: string;
   // For nested objects
   properties?: Record<string, PropertyLocation>;
 }
@@ -22,6 +23,7 @@ export interface ObjectSourceMapping {
   // Boundaries of the ObjectExpression { ... }
   contentStart: number;
   contentEnd: number;
+  hasDynamicProperties: boolean;
   properties: Record<string, PropertyLocation>;
 }
 
@@ -42,7 +44,7 @@ export const getSourceMapping = () => sourceMappingRegistry;
 /**
  * Recursively maps properties of an ObjectExpression.
  */
-const mapProperties = (objExpr: any, imports: Map<string, string>): Record<string, PropertyLocation> => {
+const mapProperties = (objExpr: any, imports: Map<string, string>, code: string): Record<string, PropertyLocation> => {
   const mapping: Record<string, PropertyLocation> = {};
   if (!objExpr || objExpr.type !== 'ObjectExpression') return mapping;
 
@@ -64,6 +66,7 @@ const mapProperties = (objExpr: any, imports: Map<string, string>): Record<strin
       if (prop.value.type === 'NewExpression' && 
           (prop.value.callee.name === 'Vector2' || imports.get(prop.value.callee.name) === 'Vector2' ||
             prop.value.callee.property?.name === 'Vector2')) {
+        propLoc.vectorConstructor = code.slice(prop.value.callee.start, prop.value.callee.end);
         propLoc.args = prop.value.arguments.map((arg: any) => ({
           start: arg.start,
           end: arg.end,
@@ -73,7 +76,7 @@ const mapProperties = (objExpr: any, imports: Map<string, string>): Record<strin
 
       // Handle nested objects
       if (prop.value.type === 'ObjectExpression') {
-        propLoc.properties = mapProperties(prop.value, imports);
+        propLoc.properties = mapProperties(prop.value, imports, code);
       }
 
       mapping[prop.key.name] = propLoc;
@@ -217,7 +220,9 @@ export const instrumentCode = (code: string, trackEditorSource = true, scriptId?
           end: node.end,
           contentStart: args[0].start + 1, // After {
           contentEnd: args[0].end - 1,    // Before }
-          properties: mapProperties(args[0], imports),
+          hasDynamicProperties: props.some((prop: any) => prop.type !== 'Property' || prop.computed ||
+            (prop.key.type === 'Literal' && prop.key.value === 'position')),
+          properties: mapProperties(args[0], imports, code),
         };
 
         // Inject __sourceId into the object literal in the instrumented version
@@ -509,9 +514,20 @@ export function getSceneObjectCreation(source: string, placement: SceneObjectPla
   return { edits, tag, sourceId: `${constructor}-${tag}-0` };
 }
 
-/**
- * Calculates the surgical edit required to update a property value in the source code.
- */
+/** Preserve an implicit line origin when editing its start point. */
+export function getLineOriginEdit(sourceId: string, { x, y }: ScenePoint): Edit | null {
+  const mapping = sourceMappingRegistry[sourceId];
+  const start = mapping?.properties.p1;
+  if (mapping?.type !== 'Line' || mapping.hasDynamicProperties || mapping.properties.position || !start?.vectorConstructor ||
+      !Number.isFinite(x) || !Number.isFinite(y)) return null;
+  return {
+    start: start.nodeEnd,
+    end: start.nodeEnd,
+    newText: `, position: new ${start.vectorConstructor}(${x}, ${y})`,
+  };
+}
+
+/** Calculates the surgical edit required to update a property value in the source code. */
 export const getSurgicalEdit = (
   sourceId: string, 
   propertyPath: string, 

@@ -85,10 +85,13 @@ export const resolveComponentPath = (obj: InspectableObject, pathStr: string): {
 const InspectorRow: React.FC<{
   def: PropertyRowDef;
   selectedObject: InspectableObject;
-}> = ({ def, selectedObject }) => {
+  deferSave?: boolean;
+}> = ({ def, selectedObject, deferSave }) => {
   const inputRef = useRef<HTMLInputElement>(null);
   const inputId = useId();
   const isRotation = def.propertyPath === 'rotation';
+  const [property, axis] = def.propertyPath.split('.');
+  const endpoint = property === 'p1' || property === 'p2' ? property : undefined;
   const [prevSelectedObject, setPrevSelectedObject] = React.useState(selectedObject);
   const [lastSyncedValue, setLastSyncedValue] = React.useState<any>(() => {
     const resolved = resolveComponentPath(selectedObject, def.propertyPath);
@@ -113,17 +116,19 @@ const InspectorRow: React.FC<{
     };
     const onPlacementHistory = (event: Event) => {
       const { object, state } = (event as CustomEvent<{ object: Dino.GameObject; state: SceneTransformState }>).detail;
-      if (isRotation && object === selectedObject && state.rotation !== undefined) setLastSyncedValue(state.rotation);
+      if (object !== selectedObject) return;
+      if (isRotation && state.rotation !== undefined) setLastSyncedValue(state.rotation);
+      if (endpoint && state[endpoint] && (axis === 'x' || axis === 'y')) setLastSyncedValue(state[endpoint][axis]);
     };
     window.addEventListener('playground-update-code', handleUpdate);
     window.addEventListener('playground-script-selected', handleUpdate);
-    if (isRotation) window.addEventListener('playground-placement-history', onPlacementHistory);
+    if (isRotation || endpoint) window.addEventListener('playground-placement-history', onPlacementHistory);
     return () => {
       window.removeEventListener('playground-update-code', handleUpdate);
       window.removeEventListener('playground-script-selected', handleUpdate);
-      if (isRotation) window.removeEventListener('playground-placement-history', onPlacementHistory);
+      if (isRotation || endpoint) window.removeEventListener('playground-placement-history', onPlacementHistory);
     };
-  }, [selectedObject, def.propertyPath, isRotation]);
+  }, [selectedObject, def.propertyPath, isRotation, endpoint, axis]);
 
   // Sync runtime value to the input box and check for modifications
   useEffect(() => {
@@ -229,12 +234,12 @@ const InspectorRow: React.FC<{
           ref={inputRef}
           onChange={handleChange}
         />
-        <button type="button"
+        {!deferSave && <button type="button"
           className="save-prop-icon"
           onClick={handleSync}
           aria-label={`Save ${def.label} to code`}
           title="Save this property to code"
-        ><i className="fa-solid fa-floppy-disk" aria-hidden="true" /></button>
+        ><i className="fa-solid fa-floppy-disk" aria-hidden="true" /></button>}
       </div>
     </div>
   );

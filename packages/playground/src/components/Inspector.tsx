@@ -1,13 +1,13 @@
 import React, { useEffect, useState, useCallback, useRef } from 'react';
 import * as Dino from 'dino-ge';
 import InspectorRow, { InspectableObject, PropertyRowDef, resolveComponentPath } from './InspectorRow';
-import { getSurgicalEdit, getSourceMapping, Edit } from '../utils/ast-utils';
+import { getLineOriginEdit, getSurgicalEdit, getSourceMapping, Edit } from '../utils/ast-utils';
 import { usePlayground } from '../context/PlaygroundContext';
 import type { ScenePoint, SceneTransformState } from '../utils/scene-objects';
 import '../styles/inspector.css';
 
 const { Engine } = Dino;
-type Manipulation = 'drag' | 'resize' | 'rotate';
+type Manipulation = Dino.ObjectManipulationPreview['kind'];
 
 interface InspectorProps {
   visible: boolean;
@@ -49,7 +49,7 @@ const SECTIONS: Record<string, { rows: PropertyRowDef[], component: any, descrip
   },
   Line: {
     component: Dino.LineComponent,
-    description: 'Endpoints are relative to the line’s transform.',
+    description: 'Drag the square handles in Edit scene. The coordinates below are relative to the line’s origin.',
     rows: [
       { label: 'Start X', type: 'number', propertyPath: 'p1.x' },
       { label: 'Start Y', type: 'number', propertyPath: 'p1.y' },
@@ -137,6 +137,8 @@ const Inspector: React.FC<InspectorProps> = ({ visible }) => {
       if (state.position) changes.delete('drag');
       if (state.scale || state.size) changes.delete('resize');
       if (state.rotation !== undefined) changes.delete('rotate');
+      if (state.p1) changes.delete('p1');
+      if (state.p2) changes.delete('p2');
       if (changes.size) pendingPlacement.current.set(object, changes);
       else pendingPlacement.current.delete(object);
       if (Engine.selectedObject === object) {
@@ -187,6 +189,8 @@ const Inspector: React.FC<InspectorProps> = ({ visible }) => {
     const paths: string[] = [];
     if (placement.has('drag')) paths.push('position.x', 'position.y');
     if (placement.has('rotate')) paths.push('rotation');
+    const endpoints = (['p1', 'p2'] as const).filter(endpoint => placement.has(endpoint));
+    for (const endpoint of endpoints) paths.push(`${endpoint}.x`, `${endpoint}.y`);
     if (placement.has('resize')) {
       if (mapping?.type === 'Sprite') paths.push('scale.x', 'scale.y');
       else if (mapping?.type === 'Circle') paths.push('radius');
@@ -215,8 +219,24 @@ const Inspector: React.FC<InspectorProps> = ({ visible }) => {
       setPlacementStatus('Use literal transform options in the script to apply this edit.');
       return;
     }
+    if (placement.has('p1') && !properties?.position) {
+      const origin = getLineOriginEdit(sourceId, selectedObject.transform.position);
+      if (!origin) {
+        setPlacementStatus('Give the line an explicit position in the script before applying this edit.');
+        return;
+      }
+      edits.push(origin);
+    }
     const before: SceneTransformState = { position: placement.get('drag'), rotation: placement.get('rotate')?.x };
     const after: SceneTransformState = {};
+    if (selectedObject instanceof Dino.Line) {
+      for (const endpoint of endpoints) {
+        before[endpoint] = placement.get(endpoint);
+        after[endpoint] = endpoint === 'p1'
+          ? { x: selectedObject.x1, y: selectedObject.y1 }
+          : { x: selectedObject.x2, y: selectedObject.y2 };
+      }
+    }
     if (before.position) {
       const { x, y } = selectedObject.transform.position;
       after.position = { x, y };
@@ -239,7 +259,7 @@ const Inspector: React.FC<InspectorProps> = ({ visible }) => {
       setPlacementStatus('The open script could not be updated.');
       return;
     }
-    if (after.rotation !== undefined) {
+    if (after.rotation !== undefined || endpoints.length) {
       window.dispatchEvent(new CustomEvent('playground-placement-history', { detail: { object: selectedObject, state: after } }));
     }
     pendingPlacement.current.delete(selectedObject);
@@ -371,6 +391,8 @@ const Inspector: React.FC<InspectorProps> = ({ visible }) => {
                         key={def.propertyPath} 
                         def={def} 
                         selectedObject={selectedObject} 
+                        deferSave={(def.propertyPath.startsWith('p1.') && placement?.has('p1')) ||
+                          (def.propertyPath.startsWith('p2.') && placement?.has('p2'))}
                       />
                     ))}
                   </div>

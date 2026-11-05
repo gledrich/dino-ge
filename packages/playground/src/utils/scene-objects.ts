@@ -30,6 +30,8 @@ export interface SceneTransformState {
   rotation?: number;
   scale?: ScenePoint;
   size?: ScenePoint;
+  p1?: ScenePoint;
+  p2?: ScenePoint;
 }
 
 function gridNudge(coordinate: number, steps: number, cellSize: number): number {
@@ -85,6 +87,10 @@ export function restoreSceneTransform(object: Dino.GameObject, state: SceneTrans
   if (state.position) object.transform.position.set(state.position.x, state.position.y);
   if (state.rotation !== undefined) object.transform.rotation = state.rotation;
   if (state.scale) object.transform.scale.set(state.scale.x, state.scale.y);
+  if (object instanceof Dino.Line) {
+    if (state.p1) object.setEndpoint('p1', state.p1.x, state.p1.y);
+    if (state.p2) object.setEndpoint('p2', state.p2.x, state.p2.y);
+  }
   if (!state.size) return;
   const shape = object.getComponent(Dino.ShapeComponent);
   if (shape?.type === 'circle') {
