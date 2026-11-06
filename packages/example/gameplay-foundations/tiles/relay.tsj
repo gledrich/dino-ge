@@ -8,5 +8,29 @@
   "tileheight": 32,
   "image": "../relay.svg",
   "imagewidth": 64,
-  "imageheight": 32
+  "imageheight": 32,
+  "tiles": [
+    {
+      "id": 0,
+      "objectgroup": {
+        "type": "objectgroup",
+        "objects": [
+          {
+            "id": 1,
+            "name": "Relay housing",
+            "x": 8,
+            "y": 8,
+            "polygon": [
+              { "x": 3, "y": 0 },
+              { "x": 13, "y": 0 },
+              { "x": 16, "y": 8 },
+              { "x": 13, "y": 16 },
+              { "x": 3, "y": 16 },
+              { "x": 0, "y": 8 }
+            ]
+          }
+        ]
+      }
+    }
+  ]
 }

@@ -1,3 +1,4 @@
+import { normaliseColliderFixture, type ColliderFixture } from '../components/ColliderComponent.js';
 import type Tilemap from './Tilemap.js';
 import type { TilemapProps } from './Tilemap.js';
 import ResourceLoader from '../core/Loader.js';
@@ -25,6 +26,8 @@ export interface TiledTileset extends TiledTilesetReference {
   properties: readonly TiledProperty[];
   /** Metadata indexed by zero-based atlas ID, as stored in Tilemap.data. */
   tileProperties: ReadonlyMap<number, readonly TiledProperty[]>;
+  /** Authored shapes in tile-local pixels, available when readTileCollision is enabled. */
+  tileCollision?: ReadonlyMap<number, readonly ColliderFixture[]>;
 }
 
 interface TiledLayerBase {
@@ -76,6 +79,8 @@ export interface TiledImportOptions {
   /** Base draw order. Each successive layer uses the next z-index. */
   zIndex?: number;
   imageSmoothing?: boolean;
+  /** Parse and validate collision shapes authored in each tileset's tile definitions. */
+  readTileCollision?: boolean;
   /** Return a parsed external JSON tileset for the exact source string in the map. */
   resolveExternalTileset?: (source: string) => unknown;
   /** Return a loaded HTMLImageElement large enough for the atlas, or its ResourceLoader tag. */
@@ -146,6 +151,63 @@ function readProperties(value: unknown, context: string): TiledProperty[] {
   });
 }
 
+function readTileCollision(value: unknown, context: string): readonly ColliderFixture[] {
+  if (!isRecord(value) || (value.type !== undefined && value.type !== 'objectgroup') ||
+      !Array.isArray(value.objects)) invalid(`invalid collision object group in ${context}`);
+  const { offsetx = 0, offsety = 0 } = value;
+  if (!isFiniteNumber(offsetx) || !isFiniteNumber(offsety)) invalid(`invalid collision offset in ${context}`);
+
+  return Object.freeze(Array.from(value.objects, (object: unknown, index): ColliderFixture => {
+    if (!isRecord(object)) return invalid(`invalid collision object at index ${index} in ${context}`);
+    const objectContext = `${context}, collision object ${isPositiveInteger(object.id) ? object.id : index + 1}`;
+    const { x = 0, y = 0, rotation = 0, ellipse = false, polygon, width, height } = object;
+    if (!isFiniteNumber(x) || !isFiniteNumber(y) || !isFiniteNumber(rotation) || typeof ellipse !== 'boolean') {
+      return invalid(`invalid geometry in ${objectContext}`);
+    }
+    if (object.point || object.capsule || object.polyline !== undefined || object.text !== undefined ||
+        object.template !== undefined || object.gid !== undefined || (ellipse && polygon !== undefined)) {
+      return invalid(`unsupported shape in ${objectContext}`);
+    }
+
+    const radians = (rotation % 360) * Math.PI / 180;
+    const cos = Math.cos(radians);
+    const sin = Math.sin(radians);
+    const point = (px: number, py: number) => ({
+      x: x + offsetx + px * cos - py * sin,
+      y: y + offsety + px * sin + py * cos,
+    });
+
+    let fixture: ColliderFixture;
+    if (polygon !== undefined) {
+      if (!Array.isArray(polygon)) return invalid(`invalid polygon in ${objectContext}`);
+      const vertices = Array.from(polygon, (vertex: unknown) => {
+        if (!isRecord(vertex) || !isFiniteNumber(vertex.x) || !isFiniteNumber(vertex.y)) {
+          return invalid(`invalid polygon vertex in ${objectContext}`);
+        }
+        return point(vertex.x, vertex.y);
+      });
+      fixture = { kind: 'polygon', vertices };
+    } else {
+      if (!isFiniteNumber(width) || !isFiniteNumber(height) || width <= 0 || height <= 0) {
+        return invalid(`invalid dimensions in ${objectContext}`);
+      }
+      if (ellipse) {
+        if (width !== height) return invalid(`non-circular ellipse in ${objectContext}`);
+        fixture = { kind: 'circle', ...point(width / 2, height / 2), radius: width / 2 };
+      } else if (radians === 0) {
+        fixture = { kind: 'rectangle', ...point(0, 0), width, height };
+      } else {
+        fixture = { kind: 'polygon', vertices: [point(0, 0), point(width, 0), point(width, height), point(0, height)] };
+      }
+    }
+    try {
+      return normaliseColliderFixture(fixture);
+    } catch (error) {
+      return invalid(`invalid shape in ${objectContext}: ${error instanceof Error ? error.message : String(error)}`);
+    }
+  }));
+}
+
 function readTileset(entry: unknown, tileSize: number, options: TiledImportOptions): TiledTileset {
   if (!isRecord(entry) || !isPositiveInteger(entry.firstgid) || entry.firstgid > maxGid) {
     invalid('invalid tileset firstgid');
@@ -169,15 +231,21 @@ function readTileset(entry: unknown, tileSize: number, options: TiledImportOptio
   if (typeof name !== 'string' || !Array.isArray(tiles)) invalid(`invalid tileset ${source ?? firstGid}`);
   const context = `tileset ${source ?? firstGid}`;
   const tileProperties = new Map<number, readonly TiledProperty[]>();
+  const tileCollision = options.readTileCollision ? new Map<number, readonly ColliderFixture[]>() : undefined;
   for (const tile of tiles) {
     if (!isRecord(tile) || !isInteger(tile.id) || tile.id < 0 ||
         tile.id >= tileCount || tileProperties.has(tile.id)) {
       invalid(`invalid local tile ID in ${context}`);
     }
-    tileProperties.set(tile.id, readProperties(tile.properties, `${context}, tile ${tile.id}`));
+    const tileContext = `${context}, tile ${tile.id}`;
+    tileProperties.set(tile.id, readProperties(tile.properties, tileContext));
+    if (tileCollision && tile.objectgroup !== undefined) {
+      const fixtures = readTileCollision(tile.objectgroup, tileContext);
+      if (fixtures.length) tileCollision.set(tile.id, fixtures);
+    }
   }
   const reference = source === undefined ? { firstGid, name, image } : { firstGid, name, image, source };
-  return { ...reference, columns, tileCount, tileProperties, properties: readProperties(descriptor.properties, context) };
+  return { ...reference, columns, tileCount, tileProperties, ...(tileCollision && { tileCollision }), properties: readProperties(descriptor.properties, context) };
 }
 
 function readLayerBase(layer: Record<string, unknown>, position: Vector2): TiledLayerBase {

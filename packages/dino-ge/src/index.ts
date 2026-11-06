@@ -43,6 +43,7 @@ export type { CollisionEventDetail, CollisionManifold } from './physics/Physics.
 export { default as Rectangle } from './objects/Rectangle.js';
 export { default as Text } from './objects/Text.js';
 export { default as Tilemap } from './objects/Tilemap.js';
+export { createTiledColliders } from './objects/TiledColliders.js';
 export type {
   TiledImportOptions, TiledMap, TiledLayer, TiledTileLayer, TiledObjectLayer, TiledObject, TiledProperty,
   TiledTileset, TiledTilesetReference,

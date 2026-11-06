@@ -42,6 +42,43 @@ uses an authored relay rectangle as the destination for a scripted delivery.
 Build dino-ge with `npm run build -w dino-ge`, start `npm run example`, then open
 `http://localhost:3001/gameplay-foundations.html`.
 
+## Build static bodies from tile collision shapes
+
+Use the Tiled Tile Collision Editor to draw fixtures on a tileset tile. Set
+`readTileCollision: true` when importing the map to read those shapes from
+embedded and external tilesets. The tileset's `tileCollision` map stores them in
+tile-local pixels under the same local IDs as `tilemap.data`.
+
+```js
+import { Tilemap, createTiledColliders } from 'dino-ge';
+
+const level = Tilemap.importTiled(mapJson, {
+  ...importOptions,
+  readTileCollision: true,
+});
+for (const layer of level.layers) {
+  if (layer.type === 'tilelayer' && layer.name === 'Ground') {
+    for (const body of createTiledColliders(layer)) scene.add(body);
+  }
+}
+```
+
+The helper creates detached static bodies from the layer's current tile data
+and world transforms. Each occupied cell with fixtures produces one body.
+Choose the layers to include and add the bodies to the scene. After editing
+tiles or moving the layer, remove the old bodies and build new ones to update
+the collisions.
+
+The importer accepts rectangles, circles drawn as equal-sided ellipses and
+strictly convex polygons. Authored rotations are applied in tile space.
+Unsupported shapes raise an import error with their tileset and tile ID
+when collision parsing is enabled.
+
+To try it locally, build dino-ge with `npm run build -w dino-ge`, start
+`npm run example` and open [Tiled tile collisions](http://localhost:3001/tiled-collision.html).
+Launch a probe through the relay housing and then along the same tile's top
+edge. Only the path through the authored polygon hits a collider.
+
 ## Bind movement by name
 
 Use `Input.setActions()` to map keys and gamepad controls to the same game

@@ -6,7 +6,8 @@ export type ColliderFixture =
   | Readonly<{ kind: 'circle'; x?: number; y?: number; radius: number }>
   | Readonly<{ kind: 'polygon'; vertices: readonly Readonly<{ x: number; y: number }>[] }>;
 
-function copyFixture(fixture: ColliderFixture): ColliderFixture {
+/** @internal Copies and validates one collider fixture. */
+export function normaliseColliderFixture(fixture: ColliderFixture): ColliderFixture {
   switch (fixture.kind) {
     case 'rectangle': {
       const { x = 0, y = 0, width, height } = fixture;
@@ -70,6 +71,6 @@ export default class ColliderComponent extends Component {
     if (!Array.isArray(fixtures) || !fixtures.length) {
       throw new RangeError('A collider needs at least one fixture.');
     }
-    this.fixtures = Object.freeze(Array.from(fixtures, copyFixture));
+    this.fixtures = Object.freeze(Array.from(fixtures, normaliseColliderFixture));
   }
 }

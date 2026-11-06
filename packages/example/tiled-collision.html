@@ -1,0 +1,31 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Tiled tile collisions | Dino GE</title>
+  <style>
+    body { margin: 0; background: #111d22; color: #e7eee8; font: 1rem/1.55 system-ui, sans-serif; }
+    main { max-width: 38rem; margin: 2rem auto; padding: 0 .75rem; }
+    h1 { line-height: 1.1; }
+    #room { width: 288px; height: 128px; margin: 1.25rem 0 .75rem; outline: 1px solid #628780; }
+    canvas { display: block; }
+    button { margin: .25rem .5rem .25rem 0; padding: .4rem .65rem; font: inherit; }
+    :focus-visible { outline: 2px solid #ffd78a; outline-offset: 4px; }
+    a { color: #acebc3; }
+  </style>
+  <script type="importmap">{"imports":{"dino-ge":"/built/index.js"}}</script>
+  <script type="module" src="/tiled-collision.js"></script>
+</head>
+<body>
+  <main>
+    <h1>Tiled tile collisions</h1>
+    <p>Launch a probe at the relay on the right. A polygon drawn in the tileset blocks the path through its housing. The probe can pass through the top of the same tile.</p>
+    <div id="room" role="img" aria-label="Layered tile room with a relay at the right end"></div>
+    <button id="housing" type="button" disabled>Launch through the housing</button>
+    <button id="edge" type="button" disabled>Launch along the edge</button>
+    <p role="status">Loading relay room…</p>
+    <p><a href="/">Back to Amber Ruins</a></p>
+  </main>
+</body>
+</html>
