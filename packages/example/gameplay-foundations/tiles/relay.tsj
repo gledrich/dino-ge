@@ -1,0 +1,12 @@
+{
+  "type": "tileset",
+  "version": "1.10",
+  "name": "Relay",
+  "columns": 2,
+  "tilecount": 2,
+  "tilewidth": 32,
+  "tileheight": 32,
+  "image": "../relay.svg",
+  "imagewidth": 64,
+  "imageheight": 32
+}

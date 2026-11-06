@@ -61,6 +61,12 @@ The [example workspace](./packages/example/amber-ruins/README.md) describes
 the assets and the engine APIs the game uses. The original Dino Survival demo
 is still available at `/survival.html`.
 
+Open [Gameplay Foundations](http://localhost:3001/gameplay-foundations.html)
+on the same server to see a layered Tiled room, a named sprite clip and a
+scripted delivery. Select **Replay delivery** to run the sequence again.
+The [example notes](./packages/example/gameplay-foundations/README.md) explain
+how the three APIs work together.
+
 _Note: The engine handles initialization; create your game instance directly in your entry file._
 
 ## Documentation

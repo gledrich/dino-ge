@@ -37,6 +37,62 @@ npm install dino-ge@beta
   labels, panels, images, keyboard- and pointer-activated buttons, and
   progress bars. The `onDispose` callback can release game resources on reset.
 
+### Layered Tiled maps
+
+Use `Tilemap.importTiled` for finite orthogonal Tiled JSON maps with multiple
+tile and object layers. Preload the tileset images and any external JSON
+tileset descriptors before importing.
+
+```typescript
+import { Tilemap, Vector2 } from 'dino-ge';
+
+const level = Tilemap.importTiled(mapJson, {
+  position: new Vector2(0, 0),
+  resolveExternalTileset: source => tilesetJsonBySource.get(source),
+  resolveImage: ({ firstGid }) => imageByFirstGid.get(firstGid)!,
+});
+```
+
+The result keeps the layer order and exposes imported point and rectangle
+objects. Use their authored properties to place game objects such as spawn
+points or triggers. Tile layers expose the runtime tilemaps and tileset
+properties for game-specific collision rules.
+
+### Sprite clips and object actions
+
+Pass named clips in a sprite's `animations` option. Each frame takes a
+zero-based sheet index or a source rectangle and a duration in milliseconds.
+
+```typescript
+import { Actions, Sprite, Vector2 } from 'dino-ge';
+
+const player = new Sprite({
+  tag: 'player',
+  img: 'player-sheet',
+  rows: 2,
+  cols: 4,
+  animations: {
+    walk: { frames: [{ frame: 2, durationMs: 80 }, { frame: 5, durationMs: 120 }] },
+  },
+});
+player.playAnimation('walk');
+
+player.actions.enqueue(
+  Actions.moveTo(new Vector2(120, 64), 0.5),
+  Actions.wait(0.25),
+  Actions.fadeTo(0.4, 0.2),
+  Actions.call(object => object.emit('arrived')),
+);
+```
+
+Clips can loop, play once or play forwards and backwards. Action durations are
+in seconds, and movement uses the object's local coordinates. Both advance
+while the object is in the active scene and the engine is running. Call
+`player.actions.clear()` to cancel a sequence and keep the current pose.
+
+The [Gameplay Foundations example](../example/gameplay-foundations/README.md)
+shows layered Tiled import, sprite clips and action queues working together.
+
 ## Quick Start
 
 ```typescript

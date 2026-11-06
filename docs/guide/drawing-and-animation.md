@@ -31,4 +31,23 @@ The pillar is a `Rectangle` with a higher `zIndex` than the explorer. The scene 
 
 Try lowering the pillar's `zIndex` below the explorer's and watch which object draws in front. The sprite sheet comes from Amber Ruins.
 
+## Name a clip and script a sequence
+
+Pass a record of named `animations` when constructing a `Sprite`. Each clip
+lists zero-based sheet frames or atlas rectangles, with a duration in
+milliseconds for each frame. Call `sprite.playAnimation('walk')` to select the
+clip. Use `pauseAnimation()` to hold its current frame, or pass
+`{ restart: true }` to play it from the beginning.
+
+Each game object also has an `actions` queue. Enqueue moves, waits, fades and
+callbacks in order. Movement uses the object's local coordinates and timed
+actions take seconds. Named clips and queues advance on engine time, so pausing
+the engine freezes both.
+
+In the local Gameplay Foundations example, select **Replay delivery** to see
+the explorer play a named walk clip, move to the relay, wait and fade. A final
+callback updates the delivery status. Build dino-ge with
+`npm run build -w dino-ge`, start `npm run example`, then open
+`http://localhost:3001/gameplay-foundations.html`.
+
 [Loader](../api/classes/core_Loader.ResourceLoader.html) · [Sprite](../api/classes/objects_Sprite.Sprite.html) · [Text](../api/classes/objects_Text.Text.html) · [Rectangle](../api/classes/objects_Rectangle.Rectangle.html) · [Circle](../api/classes/objects_Circle.Circle.html) · [Line](../api/classes/objects_Line.Line.html)

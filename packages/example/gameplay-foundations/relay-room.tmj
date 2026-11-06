@@ -1,0 +1,68 @@
+{
+  "type": "map",
+  "version": "1.10",
+  "orientation": "orthogonal",
+  "renderorder": "right-down",
+  "infinite": false,
+  "width": 9,
+  "height": 4,
+  "tilewidth": 32,
+  "tileheight": 32,
+  "nextlayerid": 4,
+  "nextobjectid": 3,
+  "layers": [
+    {
+      "id": 1,
+      "name": "Ground",
+      "type": "tilelayer",
+      "width": 9,
+      "height": 4,
+      "data": [
+        1, 1, 1, 1, 1, 1, 1, 1, 1,
+        1, 2, 2, 2, 2, 2, 2, 3, 1,
+        1, 2, 2, 2, 2, 2, 2, 2, 1,
+        1, 1, 1, 1, 1, 1, 1, 1, 1
+      ]
+    },
+    {
+      "id": 2,
+      "name": "Beacons",
+      "type": "tilelayer",
+      "width": 9,
+      "height": 4,
+      "opacity": 0.7,
+      "data": [
+        0, 0, 0, 0, 0, 0, 0, 0, 0,
+        0, 0, 0, 0, 0, 0, 0, 4, 0,
+        0, 0, 0, 0, 0, 0, 0, 0, 0,
+        0, 0, 0, 0, 0, 0, 0, 0, 0
+      ]
+    },
+    {
+      "id": 3,
+      "name": "Markers",
+      "type": "objectgroup",
+      "objects": [
+        { "id": 1, "name": "Courier start", "type": "Spawn", "point": true, "x": 48, "y": 64 },
+        {
+          "id": 2, "name": "Relay", "type": "Trigger", "x": 224, "y": 48, "width": 32, "height": 32,
+          "properties": [{ "name": "message", "type": "string", "value": "Delivery complete." }]
+        }
+      ]
+    }
+  ],
+  "tilesets": [
+    {
+      "firstgid": 1,
+      "name": "Floor",
+      "columns": 2,
+      "tilecount": 2,
+      "tilewidth": 32,
+      "tileheight": 32,
+      "image": "floor.svg",
+      "imagewidth": 64,
+      "imageheight": 32
+    },
+    { "firstgid": 3, "source": "tiles/relay.tsj" }
+  ]
+}
