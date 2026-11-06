@@ -13,8 +13,7 @@ async function step(page: Page, key: string, count = 1) {
 }
 
 test.beforeEach(async ({ page }) => {
-  await page.clock.install();
-  await observeCanvasUI(page);
+  await observeCanvasUI(page, { pauseClock: true });
   await page.addInitScript(() => {
     const observed = window as typeof window & {
       startedSounds: boolean[];

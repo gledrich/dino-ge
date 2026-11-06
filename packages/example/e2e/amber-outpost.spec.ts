@@ -15,8 +15,7 @@ async function interact(page: Page) {
 }
 
 test.beforeEach(async ({ page }) => {
-  await page.clock.install();
-  await observeCanvasUI(page);
+  await observeCanvasUI(page, { pauseClock: true });
   await page.goto('/');
 });
 
@@ -41,6 +40,8 @@ test('Lanternreach draws all four explorer poses during a step', async ({ page }
 });
 
 test('restoring the bridge opens the Skywell and the lit beacon survives a reload', async ({ page }) => {
+  // This full chapter walkthrough makes many browser round trips on CI.
+  test.slow();
   await page.evaluate(() => {
     const drawImage = CanvasRenderingContext2D.prototype.drawImage;
     CanvasRenderingContext2D.prototype.drawImage = function (image, ...args) {

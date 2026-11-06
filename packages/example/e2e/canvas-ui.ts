@@ -1,6 +1,15 @@
 import { expect, type Page } from '@playwright/test';
 
-export async function observeCanvasUI(page: Page) {
+const pausedClockPages = new WeakSet<Page>();
+
+export async function observeCanvasUI(page: Page, { pauseClock = false } = {}) {
+  if (pauseClock) {
+    // Keep keyboard input and animation sampling independent of browser/CI speed.
+    const time = new Date('2026-01-01T00:00:00Z');
+    await page.clock.install({ time });
+    await page.clock.pauseAt(new Date(time.getTime() + 60_000));
+    pausedClockPages.add(page);
+  }
   await page.addInitScript(() => {
     const observed = window as typeof window & { canvasLabels: Record<string, { x: number; y: number }> };
     observed.canvasLabels = {};
@@ -25,7 +34,11 @@ async function canvasLabels(page: Page) {
 }
 
 export async function expectCanvasText(page: Page, text: string) {
-  await expect.poll(async () => Object.keys(await canvasLabels(page))).toContain(text);
+  await expect.poll(async () => {
+    // Give asynchronous startup and clicks a frame to render on the paused clock.
+    if (pausedClockPages.has(page)) await page.clock.runFor(16);
+    return Object.keys(await canvasLabels(page));
+  }).toContain(text);
 }
 
 export async function clickCanvasText(page: Page, text: string) {
