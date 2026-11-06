@@ -1,4 +1,4 @@
-import Sprite from './Sprite.js';
+import Sprite, { type SpriteProps } from './Sprite.js';
 import Vector2 from '../math/Vector2.js';
 import VisibilityComponent from '../components/VisibilityComponent.js';
 import PhysicsComponent from '../components/PhysicsComponent.js';
@@ -328,5 +328,186 @@ describe('Sprite', () => {
     });
     const pc = obj.getComponent(PhysicsComponent);
     expect(pc).toBeDefined();
+  });
+});
+
+describe('named sprite animations', () => {
+  const rect = { x: 43, y: 2, width: 13, height: 17 };
+  const animations = {
+    walk: { frames: [
+      { frame: 7, durationMs: 80 },
+      { frame: rect, durationMs: 160 },
+      { frame: 2, durationMs: 100 },
+    ] },
+    idle: { frames: [{ frame: 4, durationMs: 100 }] },
+  };
+
+  function createSprite(
+    clips: SpriteProps['animations'] = animations, displaySize?: SpriteProps['displaySize'],
+  ) {
+    const img = { width: 100, height: 80, complete: true } as HTMLImageElement;
+    const props = { tag: 'animated', img, rows: 2, cols: 5, animations: clips, displaySize };
+    const sprite = new Sprite(props);
+    const component = sprite.getComponent(SpriteComponent)!;
+    const drawImage = jest.fn();
+    const ctx = {
+      save: jest.fn(), restore: jest.fn(), translate: jest.fn(),
+      scale: jest.fn(), drawImage,
+    } as unknown as CanvasRenderingContext2D;
+    const crop = () => {
+      component.draw(ctx);
+      return drawImage.mock.lastCall?.slice(1);
+    };
+    return { sprite, component, crop };
+  }
+
+  it('renders arbitrary grid and atlas frames with stable display dimensions', () => {
+    const { sprite, component, crop } = createSprite();
+    sprite.playAnimation('walk');
+    expect(crop()).toEqual([40, 40, 20, 40, 0, 0, 20, 40]);
+    component.advanceAnimation(0.08);
+    expect(crop()).toEqual([43, 2, 13, 17, 0, 0, 20, 40]);
+    expect(sprite.bounds).toMatchObject({ width: 20, height: 40 });
+    component.advanceAnimation(0.27);
+    expect(crop()).toEqual([40, 40, 20, 40, 0, 0, 20, 40]);
+  });
+
+  it('holds the final frame for its full duration and completes once', () => {
+    const { sprite, component, crop } = createSprite();
+    const onComplete = jest.fn();
+    sprite.playAnimation('walk', { mode: 'once', onComplete });
+    component.advanceAnimation(0.3);
+    expect(crop()).toEqual([40, 0, 20, 40, 0, 0, 20, 40]);
+    expect(onComplete).not.toHaveBeenCalled();
+    component.advanceAnimation(0.04);
+    component.advanceAnimation(1);
+    expect(onComplete).toHaveBeenCalledTimes(1);
+    expect(crop()).toEqual([40, 0, 20, 40, 0, 0, 20, 40]);
+    expect(sprite.registered).toBe(true);
+  });
+
+  it('reverses without duplicating ping-pong endpoints', () => {
+    const { sprite, component } = createSprite();
+    sprite.playAnimation('walk', { mode: 'pingPong' });
+    expect(sprite.currentAnimationFrame).toBe(0);
+    for (const [delta, frame] of [[0.08, 1], [0.16, 2], [0.1, 1], [0.16, 0]]) {
+      component.advanceAnimation(delta);
+      expect(sprite.currentAnimationFrame).toBe(frame);
+    }
+  });
+
+  it('resumes an idempotent request and allows explicit restart and switching', () => {
+    const { sprite, component } = createSprite();
+    const play = (name: string, options?: { restart: boolean }) =>
+      sprite.playAnimation(name, options);
+    play('walk');
+    component.advanceAnimation(0.05);
+    sprite.pauseAnimation();
+    component.advanceAnimation(1);
+    play('walk');
+    component.advanceAnimation(0.03);
+    expect(sprite.currentAnimationFrame).toBe(1);
+    play('walk', { restart: true });
+    expect(sprite.currentAnimationFrame).toBe(0);
+    play('idle');
+    expect(sprite.currentAnimation).toBe('idle');
+    expect(() => play('absent')).toThrow();
+    expect(sprite.currentAnimation).toBe('idle');
+  });
+
+  it('does not replay a completed one-shot clip until explicitly restarted', () => {
+    const { sprite, component } = createSprite();
+    const onComplete = jest.fn();
+    sprite.playAnimation('walk', { mode: 'once', onComplete });
+    component.advanceAnimation(0.34);
+    sprite.playAnimation('walk', { mode: 'once', onComplete });
+    component.advanceAnimation(0.34);
+    expect(onComplete).toHaveBeenCalledTimes(1);
+    expect(sprite.currentAnimationFrame).toBe(2);
+    sprite.playAnimation('walk', { restart: true, onComplete });
+    expect(sprite.currentAnimationFrame).toBe(0);
+    component.advanceAnimation(0.34);
+    expect(onComplete).toHaveBeenCalledTimes(2);
+  });
+
+  it('crosses a 200ms frame boundary after twelve sixtieth-second steps', () => {
+    const { sprite, component } = createSprite({
+      walk: { frames: [{ frame: 0, durationMs: 200 }, { frame: 1, durationMs: 200 }] },
+    });
+    sprite.playAnimation('walk');
+    for (let step = 0; step < 12; step++) component.advanceAnimation(1 / 60);
+    expect(sprite.currentAnimationFrame).toBe(1);
+  });
+
+  it('keeps the selected mode when explicitly restarting the same clip', () => {
+    const { sprite, component } = createSprite();
+    sprite.playAnimation('walk', { mode: 'once' });
+    sprite.playAnimation('walk', { restart: true });
+    component.advanceAnimation(0.5);
+    expect(sprite.currentAnimationFrame).toBe(2);
+    expect(sprite.animationPlaying).toBe(false);
+  });
+
+  it('holds a stopped pose until playing again or choosing a manual frame', () => {
+    const { sprite, component, crop } = createSprite();
+    sprite.playAnimation('walk');
+    component.advanceAnimation(0.08);
+    sprite.stopAnimation();
+    component.advanceAnimation(1);
+    expect(sprite.currentAnimationFrame).toBe(1);
+    expect(sprite.animationPlaying).toBe(false);
+    sprite.playAnimation('walk');
+    expect(sprite.currentAnimationFrame).toBe(0);
+    sprite.currentFrame = 3;
+    expect(sprite.currentAnimation).toBeUndefined();
+    expect(crop()).toEqual([60, 0, 20, 40, 0, 0, 20, 40]);
+  });
+
+  it('can register again after legacy stop removes it', () => {
+    jest.clearAllMocks();
+    const { sprite } = createSprite();
+    sprite.playAnimation('walk');
+    sprite.stop();
+    sprite.playAnimation('walk');
+    expect(Engine.registerObject).toHaveBeenCalledTimes(2);
+  });
+
+  it('registers a named sprite again after its active scene removes it', () => {
+    jest.clearAllMocks();
+    const activeObjects = new Set<Sprite>();
+    const engine = Engine as unknown as { objects?: Set<Sprite> };
+    engine.objects = activeObjects;
+    const { sprite } = createSprite();
+    try {
+      sprite.playAnimation('walk');
+      activeObjects.add(sprite);
+      sprite.playAnimation('walk');
+      expect(Engine.registerObject).toHaveBeenCalledTimes(1);
+      activeObjects.delete(sprite);
+      sprite.playAnimation('walk');
+      expect(Engine.registerObject).toHaveBeenCalledTimes(2);
+    } finally {
+      delete engine.objects;
+    }
+  });
+
+  it('takes a copy of atlas source frames and uses explicit display bounds', () => {
+    const source = { x: 1, y: 2, width: 5, height: 7 };
+    const { sprite, crop } = createSprite({
+      idle: { frames: [{ frame: source, durationMs: 100 }] },
+    }, { width: 12, height: 15 });
+    source.x = 40;
+    sprite.playAnimation('idle');
+    expect(crop()).toEqual([1, 2, 5, 7, 0, 0, 12, 15]);
+    expect(sprite.bounds).toMatchObject({ width: 12, height: 15 });
+  });
+
+  it.each([
+    { frames: [] },
+    { frames: [{ frame: 10, durationMs: 100 }] },
+    { frames: [{ frame: 1, durationMs: 0 }] },
+    { frames: [{ frame: { x: 0, y: -1, width: 10, height: 10 }, durationMs: 10 }] },
+  ])('rejects invalid clip data', (clip) => {
+    expect(() => createSprite({ invalid: clip })).toThrow();
   });
 });

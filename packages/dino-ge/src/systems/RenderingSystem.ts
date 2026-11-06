@@ -100,8 +100,9 @@ export default class RenderingSystem extends System {
     const editSelection = debug && Engine.paused ? Engine.selectedObject : null;
     let selectedGeometry: ReturnType<typeof getViewportGeometry> | undefined;
     state.sortedObjects.forEach((object) => {
+      const visibility = object.getComponent(VisibilityComponent);
       if (object instanceof ParticleEmitter) {
-        object.drawParticles(this.ctx, bounds);
+        this.drawWithOpacity(visibility?.opacity ?? 1, () => object.drawParticles(this.ctx, bounds));
         return;
       }
 
@@ -112,11 +113,9 @@ export default class RenderingSystem extends System {
       if (left < bounds.x + bounds.width && right > bounds.x && top < bounds.y + bounds.height && bottom > bounds.y) {
         // Find any RenderComponent on the entity
         const renderable = object.getComponent(RenderComponent);
-        const visibility = object.getComponent(VisibilityComponent);
-        const isVisible = visibility ? visibility.visible : true;
 
-        if (renderable && isVisible) {
-          renderable.draw(this.ctx);
+        if (renderable && visibility?.visible !== false) {
+          this.drawWithOpacity(visibility?.opacity ?? 1, () => renderable.draw(this.ctx));
         }
 
         if (object === editSelection) {
@@ -130,6 +129,21 @@ export default class RenderingSystem extends System {
     // Keep the selection handles above foreground objects in the editor.
     if (editSelection && selectedGeometry) this.drawDebugOverlay(editSelection, selectedGeometry);
     this.ctx.restore();
+  }
+
+  private drawWithOpacity(opacity: number, draw: () => void): void {
+    if (opacity === 1) {
+      draw();
+      return;
+    }
+
+    const originalAlpha = this.ctx.globalAlpha;
+    this.ctx.globalAlpha = originalAlpha * opacity;
+    try {
+      draw();
+    } finally {
+      this.ctx.globalAlpha = originalAlpha;
+    }
   }
 
   private drawDebugOverlay(object: GameObject, geometry: ReturnType<typeof getViewportGeometry>): void {

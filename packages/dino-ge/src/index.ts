@@ -2,6 +2,7 @@ export { default as Engine, type EngineRuntimeError } from './core/Engine.js';
 export type { SceneTransitionOptions } from './core/SceneEffects.js';
 export { default as Scene } from './core/Scene.js';
 export { default as GameObject } from './core/GameObject.js';
+export { default as Actions, ActionQueue, type Action } from './core/Actions.js';
 export { default as Group } from './core/Group.js';
 export { default as Component } from './core/Component.js';
 export { default as PhysicsComponent } from './components/PhysicsComponent.js';
@@ -19,7 +20,10 @@ export { default as LineComponent } from './components/LineComponent.js';
 export { default as System } from './core/System.js';
 export { default as PhysicsSystem } from './systems/PhysicsSystem.js';
 export { default as RenderingSystem } from './systems/RenderingSystem.js';
-export { default as Sprite } from './objects/Sprite.js';
+export { default as Sprite, type SpriteProps } from './objects/Sprite.js';
+export type {
+  SpriteAnimationClip, SpriteAnimationFrame, SpriteAnimationMode, SpriteAnimationOptions, SpriteFrameRect,
+} from './objects/SpriteAnimation.js';
 export { default as Vector2 } from './math/Vector2.js';
 export { default as Camera } from './core/Camera.js';
 export { default as Canvas } from './core/Canvas.js';

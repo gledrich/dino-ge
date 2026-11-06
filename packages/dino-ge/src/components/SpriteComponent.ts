@@ -1,4 +1,5 @@
 import RenderComponent from './RenderComponent.js';
+import { SpriteAnimationPlayer, type SpriteAnimationClip, type SpriteAnimationOptions } from '../objects/SpriteAnimation.js';
 
 /**
  * Component that holds data for rendering an animated sprite.
@@ -28,8 +29,13 @@ export default class SpriteComponent extends RenderComponent {
   playing: boolean = false;
   
   #lastFrameUpdate: number = Date.now();
+  private readonly animations?: SpriteAnimationPlayer;
 
-  constructor(img: HTMLImageElement, rows: number, cols: number, startCol: number, endCol: number) {
+  constructor(
+    img: HTMLImageElement, rows: number, cols: number, startCol: number, endCol: number,
+    animations?: Readonly<Record<string, SpriteAnimationClip>>,
+    private readonly displaySize?: Readonly<{ width: number; height: number }>,
+  ) {
     super();
     this.img = img;
     this.rows = rows;
@@ -37,6 +43,7 @@ export default class SpriteComponent extends RenderComponent {
     this.startCol = startCol;
     this.endCol = endCol;
     this.currentFrame = startCol;
+    if (animations) this.animations = new SpriteAnimationPlayer(animations, rows, cols);
 
     const setDimensions = () => {
       this.frameWidth = this.img.width / this.cols;
@@ -50,6 +57,36 @@ export default class SpriteComponent extends RenderComponent {
     }
   }
 
+  /** @internal */
+  get displayWidth(): number { return this.displaySize?.width ?? this.frameWidth; }
+  /** @internal */
+  get displayHeight(): number { return this.displaySize?.height ?? this.frameHeight; }
+  /** @internal */
+  get currentAnimation(): string | undefined { return this.animations?.name; }
+  /** @internal */
+  get currentAnimationFrame(): number | undefined { return this.animations?.index; }
+  /** @internal */
+  get animationPlaying(): boolean { return this.animations?.playing ?? false; }
+
+  /** @internal */
+  playAnimation(name: string, options: SpriteAnimationOptions): void {
+    if (!this.animations) throw new RangeError(`Unknown sprite animation: ${name}`);
+    this.animations.play(name, options);
+    this.playing = false;
+  }
+
+  /** @internal */
+  pauseAnimation(): void { this.animations?.pause(); }
+  /** @internal */
+  stopAnimation(): void { this.animations?.stop(); }
+  /** @internal */
+  clearAnimation(): void { this.animations?.clear(); }
+
+  /** Advances named clips from the engine update loop, in seconds. @internal */
+  advanceAnimation(deltaSeconds: number): void {
+    this.animations?.advance(deltaSeconds);
+  }
+
   /**
    * Draws the current frame of the sprite.
    * @param ctx The canvas 2D rendering context.
@@ -57,74 +94,40 @@ export default class SpriteComponent extends RenderComponent {
   draw(ctx: CanvasRenderingContext2D) {
     if (!this.frameWidth || !this.frameHeight || !this.gameObject) return;
 
-    const now = Date.now();
-    if (this.playing && now - this.#lastFrameUpdate > this.frameDuration) {
-      this.currentFrame += 1;
-      this.#lastFrameUpdate = now;
+    const namedFrame = this.animations?.frame;
+    if (namedFrame === undefined) {
+      const now = Date.now();
+      if (this.playing && now - this.#lastFrameUpdate > this.frameDuration) {
+        this.currentFrame += 1;
+        this.#lastFrameUpdate = now;
+      }
+
+      if (this.currentFrame < this.startCol || this.currentFrame >= this.endCol) {
+        this.currentFrame = this.startCol;
+      }
     }
 
-    const {
-      img,
-      cols,
-      frameWidth,
-      frameHeight,
-      startCol,
-      endCol,
-    } = this;
-
+    const { img, cols, frameWidth, frameHeight, displayWidth, displayHeight } = this;
+    const frame = namedFrame ?? this.currentFrame;
+    const source = typeof frame === 'number'
+      ? { x: (frame % cols) * frameWidth, y: Math.floor(frame / cols) * frameHeight, width: frameWidth, height: frameHeight }
+      : frame;
     const { worldPosition, worldRotation, worldScale } = this.gameObject.transform;
 
     ctx.imageSmoothingEnabled = true;
     ctx.imageSmoothingQuality = 'high';
 
-    const maxFrame = endCol - 1;
-
-    if (this.currentFrame < startCol) {
-      this.currentFrame = startCol;
-    }
-
-    if (this.currentFrame > maxFrame) {
-      this.currentFrame = startCol;
-    }
-
-    // Update rows and columns
-    const column = this.currentFrame % cols;
-    const row = Math.floor(this.currentFrame / cols);
-
     ctx.save();
-    
-    // Apply world transform
     ctx.translate(worldPosition.x, worldPosition.y);
     if (worldRotation !== 0) ctx.rotate(worldRotation);
     ctx.scale(worldScale.x, worldScale.y);
 
     if (this.flip) {
-      ctx.translate(frameWidth, 0);
+      ctx.translate(displayWidth, 0);
       ctx.scale(-1, 1);
-      ctx.drawImage(
-        img,
-        column * frameWidth,
-        row * frameHeight,
-        frameWidth,
-        frameHeight,
-        0,
-        0,
-        frameWidth,
-        frameHeight
-      );
-    } else {
-      ctx.drawImage(
-        img,
-        column * frameWidth,
-        row * frameHeight,
-        frameWidth,
-        frameHeight,
-        0, // Drawing at 0,0 relative to transform
-        0,
-        frameWidth,
-        frameHeight
-      );
     }
+
+    ctx.drawImage(img, source.x, source.y, source.width, source.height, 0, 0, displayWidth, displayHeight);
     ctx.restore();
   }
 }

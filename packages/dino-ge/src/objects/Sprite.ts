@@ -6,6 +6,7 @@ import SpriteComponent from '../components/SpriteComponent.js';
 import BoundsComponent from '../components/BoundsComponent.js';
 import VisibilityComponent from '../components/VisibilityComponent.js';
 import PhysicsComponent from '../components/PhysicsComponent.js';
+import type { SpriteAnimationClip, SpriteAnimationOptions } from './SpriteAnimation.js';
 
 /**
  * Configuration for creating a Sprite object.
@@ -21,10 +22,14 @@ export interface SpriteProps {
   rows: number;
   /** Number of columns in the spritesheet. */
   cols: number;
-  /** Starting column index for the animation (0-based). */
+  /** First zero-based frame in the legacy range. */
   startCol?: number;
-  /** Ending column index for the animation (0-based). */
+  /** Exclusive end of the legacy frame range. */
   endCol?: number;
+  /** Named clips using grid cells or rectangles from this sprite's image. */
+  animations?: Readonly<Record<string, SpriteAnimationClip>>;
+  /** Fixed local display size in pixels. Defaults to the size of one grid cell. */
+  displaySize?: Readonly<{ width: number; height: number }>;
   /** Initial position in world space. */
   position?: Vector2;
   /** Initial rotation in radians. */
@@ -83,25 +88,26 @@ export default class Sprite extends GameObject {
     this._updateBounds();
   }
 
-  /** The starting column for the current animation loop. */
+  /** First frame in the legacy animation loop. */
   get startCol(): number { return this._spriteComponent.startCol; }
   set startCol(val: number) { this._spriteComponent.startCol = val; }
 
-  /** The ending column for the current animation loop. */
+  /** Exclusive end of the legacy animation loop. */
   get endCol(): number { return this._spriteComponent.endCol; }
   set endCol(val: number) { this._spriteComponent.endCol = val; }
 
-  /** The pixel width of a single animation frame (calculated automatically). */
+  /** The pixel width of one source grid cell. */
   get frameWidth(): number { return this._spriteComponent.frameWidth; }
-  /** Pixel height of a single animation frame (calculated automatically). */
+  /** The pixel height of one source grid cell. */
   public get frameHeight(): number { return this._spriteComponent.frameHeight; }
 
   /** Whether the sprite is currently registered with the engine. */
   public registered: boolean = false;
 
-  /** The current frame index being displayed. */
+  /** The legacy frame index. Assigning it clears the selected named clip. */
   public get currentFrame(): number { return this._spriteComponent.currentFrame; }
   public set currentFrame(val: number) { 
+    this._spriteComponent.clearAnimation();
     this._spriteComponent.currentFrame = val; 
     this._updateBounds();
   }
@@ -110,7 +116,7 @@ export default class Sprite extends GameObject {
   public get flip(): boolean { return this._spriteComponent.flip; }
   public set flip(val: boolean) { this._spriteComponent.flip = val; }
 
-  /** Duration of each animation frame in milliseconds. */
+  /** Duration of each legacy animation frame in milliseconds. */
   public get frameDuration(): number { return this._spriteComponent.frameDuration; }
   public set frameDuration(val: number) { this._spriteComponent.frameDuration = val; }
 
@@ -147,12 +153,20 @@ export default class Sprite extends GameObject {
       img = props.img;
     }
 
+    const displaySize = props.displaySize && { ...props.displaySize };
+    if (displaySize && (![displaySize.width, displaySize.height].every(Number.isFinite)
+      || displaySize.width <= 0 || displaySize.height <= 0)) {
+      throw new RangeError('Sprite display size must have positive finite dimensions');
+    }
+
     this._spriteComponent = new SpriteComponent(
       img,
       props.rows,
       props.cols,
       props.startCol ?? 0,
-      props.endCol ?? props.cols - 1
+      props.endCol ?? props.cols - 1,
+      props.animations,
+      displaySize
     );
     this.addComponent(this._spriteComponent);
 
@@ -198,27 +212,57 @@ export default class Sprite extends GameObject {
    */
   private _updateBounds() {
     if (this.bounds) {
-      this.bounds.width = this.frameWidth;
-      this.bounds.height = this.frameHeight;
+      this.bounds.width = this._spriteComponent.displayWidth;
+      this.bounds.height = this._spriteComponent.displayHeight;
     }
   }
 
+  /** The selected named clip, including clips paused or holding their final pose. */
+  public get currentAnimation(): string | undefined { return this._spriteComponent.currentAnimation; }
+
+  /** The zero-based offset of the displayed frame within the selected clip. */
+  public get currentAnimationFrame(): number | undefined { return this._spriteComponent.currentAnimationFrame; }
+
+  /** Whether a named clip is advancing. */
+  public get animationPlaying(): boolean { return this._spriteComponent.animationPlaying; }
+
   /**
-   * Registers the sprite with the engine and starts its animation loop.
+   * Starts a named clip on game time and registers the sprite if needed.
+   * Repeating the same request keeps its progress, resumes a paused clip, or holds a completed pose.
+   * Changing clips or modes, or setting restart, starts from the first frame.
    */
+  public playAnimation(name: string, options: SpriteAnimationOptions = {}): void {
+    this._spriteComponent.playAnimation(name, options);
+    const activeObjects = Engine.currentScene?.objects ?? Engine.objects;
+    if (activeObjects ? !activeObjects.has(this) : !this.registered) Engine.registerObject(this);
+    this.registered = true;
+  }
+
+  /** Pauses the named clip while keeping the sprite registered and visible. */
+  public pauseAnimation(): void { this._spriteComponent.pauseAnimation(); }
+
+  /** Stops the named clip and holds its pose. The next play starts from the first frame. */
+  public stopAnimation(): void { this._spriteComponent.stopAnimation(); }
+
+  /** Registers the sprite and starts its legacy grid range. */
   play() {
+    this._spriteComponent.clearAnimation();
     this._spriteComponent.playing = true;
+    this._register();
+  }
+
+  private _register(): void {
     if (!this.registered) {
       Engine.registerObject(this);
       this.registered = true;
     }
   }
 
-  /**
-   * Stops the sprite's animation and removes it from the engine.
-   */
+  /** Stops sprite playback and removes it from the engine. */
   stop() {
+    this._spriteComponent.stopAnimation();
     this._spriteComponent.playing = false;
     Engine.destroyObject(this);
+    this.registered = false;
   }
 }

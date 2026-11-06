@@ -93,6 +93,26 @@ describe('RenderingSystem', () => {
     expect(render.draw).not.toHaveBeenCalled();
   });
 
+  it('multiplies opacity for one object without changing the next draw', () => {
+    const system = new RenderingSystem(mockCtx);
+    const first = new MockGameObject('faded', 0);
+    const second = new MockGameObject('opaque', 1);
+    const visibility = new VisibilityComponent();
+    visibility.opacity = 0.5;
+    first.addComponent(visibility);
+    const drawnAlpha: number[] = [];
+    for (const object of [first, second]) {
+      const render = new MockRenderComponent();
+      render.draw.mockImplementation(ctx => drawnAlpha.push(ctx.globalAlpha));
+      object.addComponent(render);
+    }
+
+    mockCtx.globalAlpha = 0.8;
+    system.update(new Set([first, second]));
+
+    expect(drawnAlpha).toEqual([0.4, 0.8]);
+  });
+
   it('performs frustum culling', () => {
     const system = new RenderingSystem(mockCtx);
     

@@ -1,3 +1,4 @@
+import { ActionQueue } from './Actions.js';
 import Registry from './Registry.js';
 import Component from './Component.js';
 import TransformComponent from '../components/TransformComponent.js';
@@ -20,6 +21,8 @@ export interface AbstractConstructor<T> {
 export default abstract class GameObject {
   /** Unique identifier for the game object. */
   public readonly id: string = Math.random().toString(36).substring(2, 9);
+  /** Actions advanced for this object as active game time elapses. */
+  public readonly actions = new ActionQueue(this);
   private _components: Map<string, Component> = new Map();
 
   /**

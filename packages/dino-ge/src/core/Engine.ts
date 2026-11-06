@@ -13,6 +13,7 @@ import type { CollisionManifold } from '../physics/Physics.js';
 import { notifySceneObjectsChanged, type EngineState } from './EngineState.js';
 import Registry from './Registry.js';
 import PhysicsComponent from '../components/PhysicsComponent.js';
+import SpriteComponent from '../components/SpriteComponent.js';
 import { ObjectSet } from './ObjectSet.js';
 
 /**
@@ -566,6 +567,9 @@ export default class Engine {
     }
 
     try {
+      const playbackScene = Engine.currentScene;
+      const playbackObjects = playbackScene?.objects ?? Engine.objects;
+      const frameObjects = Engine.paused ? [] : Array.from(playbackObjects);
       if (!Engine.paused) {
         this.effects.advance(this._secondsPassed, scene => Engine.activateScene(scene));
       }
@@ -580,6 +584,7 @@ export default class Engine {
 
         // Drop pending whole steps so resuming does not replay them.
         if (Engine.paused) this._accumulator %= this._fixedDelta;
+        this._advanceObjectPlayback(playbackScene, playbackObjects, frameObjects);
         if (!Engine.paused && !this._destroyed) Engine.currentScene?.update();
         if (!Engine.paused && !this._destroyed) this.callbacks.update?.();
       }
@@ -591,6 +596,20 @@ export default class Engine {
     }
 
     if (!this._destroyed) window.requestAnimationFrame(this._update.bind(this));
+  }
+
+  private _advanceObjectPlayback(scene: Scene | null, objects: ReadonlySet<GameObject>, frameObjects: readonly GameObject[]): void {
+    // The elapsed time belongs to the objects active before effects and fixed updates ran.
+    const worldIsActive = () => !this._destroyed && !Engine.paused && Engine.currentScene === scene &&
+      (scene?.objects ?? Engine.objects) === objects;
+    for (const object of frameObjects) {
+      if (!worldIsActive()) break;
+      if (!objects.has(object)) continue;
+
+      object.getComponent(SpriteComponent)?.advanceAnimation?.(this._secondsPassed);
+      const canContinue = () => worldIsActive() && objects.has(object);
+      if (canContinue()) object.actions?.advance(this._secondsPassed, canContinue);
+    }
   }
 
   private _fixedUpdate() {

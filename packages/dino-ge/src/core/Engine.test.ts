@@ -3,6 +3,7 @@ import { type EngineState } from './EngineState.js';
 import { ObjectSet } from './ObjectSet.js';
 import Scene from './Scene.js';
 import GameObject from './GameObject.js';
+import Actions from './Actions.js';
 import Vector2 from '../math/Vector2.js';
 import PhysicsComponent from '../components/PhysicsComponent.js';
 import BoundsComponent from '../components/BoundsComponent.js';
@@ -10,6 +11,7 @@ import RenderingSystem from '../systems/RenderingSystem.js';
 import System from './System.js';
 import { ParticleEmitter } from '../index.js';
 import Rectangle from '../objects/Rectangle.js';
+import Sprite from '../objects/Sprite.js';
 
 class MockScene extends Scene {
   onLoad = jest.fn();
@@ -297,6 +299,105 @@ describe('Engine', () => {
     (mockCtx.arc as jest.Mock).mockClear();
     jest.advanceTimersByTime(32);
     expect(mockCtx.arc).not.toHaveBeenCalled();
+    game.terminate();
+  });
+
+  it('advances actions only in active game time and stops a queue when a callback switches scenes', () => {
+    const game = new Engine(callbacks);
+    jest.advanceTimersByTime(32);
+    const previous = new MockScene();
+    const next = new MockScene();
+    Engine.currentScene = previous;
+    const actor = new MockGameObject('actor', 0);
+    const afterSwitch = jest.fn();
+    previous.add(actor);
+    actor.actions.enqueue(
+      Actions.moveTo(new Vector2(100, 0), 0.1),
+      Actions.call(() => { Engine.currentScene = next; }),
+      Actions.call(afterSwitch),
+    );
+
+    jest.advanceTimersByTime(32);
+    const positionBeforePause = actor.transform.position.x;
+    expect(positionBeforePause).toBeGreaterThan(0);
+    Engine.paused = true;
+    jest.advanceTimersByTime(160);
+    expect(actor.transform.position.x).toBe(positionBeforePause);
+
+    Engine.paused = false;
+    jest.advanceTimersByTime(128);
+    expect(actor.transform.position.x).toBe(100);
+    expect(Engine.currentScene).toBe(next);
+    expect(afterSwitch).not.toHaveBeenCalled();
+
+    Engine.currentScene = previous;
+    jest.advanceTimersByTime(32);
+    expect(afterSwitch).toHaveBeenCalledTimes(1);
+    game.terminate();
+  });
+
+  it('advances named sprite clips while hidden and freezes them while paused', () => {
+    const game = new Engine(callbacks);
+    jest.advanceTimersByTime(32);
+    const image = new Image(20, 10);
+    const sprite = new Sprite({
+      tag: 'hidden',
+      img: image,
+      rows: 1,
+      cols: 2,
+      visible: false,
+      animations: {
+        blink: { frames: [{ frame: 0, durationMs: 25 }, { frame: 1, durationMs: 100 }] },
+      },
+    });
+    sprite.playAnimation('blink');
+
+    Engine.paused = true;
+    jest.advanceTimersByTime(160);
+    expect(sprite.currentAnimationFrame).toBe(0);
+
+    Engine.paused = false;
+    jest.advanceTimersByTime(48);
+    expect(sprite.currentAnimationFrame).toBe(1);
+    game.terminate();
+  });
+
+  it('stops actions when a callback replaces the active object collection', () => {
+    const game = new Engine(callbacks);
+    const scene = new MockScene();
+    Engine.currentScene = scene;
+    const actor = new MockGameObject('old object', 0);
+    const remaining = jest.fn();
+    scene.add(actor);
+    actor.actions.enqueue(
+      Actions.call(() => { scene.objects = new Set(); }),
+      Actions.call(remaining),
+    );
+
+    jest.advanceTimersByTime(32);
+    expect(remaining).not.toHaveBeenCalled();
+    game.terminate();
+  });
+
+  it('starts destination actions without consuming time from before the scene transition', () => {
+    const frame = jest.spyOn(window, 'requestAnimationFrame').mockReturnValue(1);
+    const game = new Engine(callbacks);
+    const next = new MockScene();
+    const actor = new MockGameObject('destination', 0);
+    next.onLoad.mockImplementation(() => {
+      next.add(actor);
+      actor.actions.enqueue(Actions.moveTo(new Vector2(100, 0), 0.05));
+    });
+
+    jest.advanceTimersByTime(0);
+    frame.mock.lastCall![0](16);
+    game.transitionTo(next, { type: 'fade', duration: 0.1 });
+    frame.mock.lastCall![0](96);
+    expect(Engine.currentScene).toBe(next);
+    expect(actor.transform.position.x).toBe(0);
+
+    frame.mock.lastCall![0](116);
+    expect(actor.transform.position.x).toBeCloseTo(40);
     game.terminate();
   });
 
