@@ -1,19 +1,33 @@
 import System from '../core/System.js';
 import GameObject from '../core/GameObject.js';
+import type Scene from '../core/Scene.js';
 import EventBusComponent from '../components/EventBusComponent.js';
 import PhysicsComponent from '../components/PhysicsComponent.js';
 import BoundsComponent from '../components/BoundsComponent.js';
-import Physics from '../physics/Physics.js';
+import Physics, { type CollisionManifold } from '../physics/Physics.js';
 import ShapeComponent from '../components/ShapeComponent.js';
 import type Circle from '../objects/Circle.js';
 import Quadtree, { type CollisionEntry } from '../physics/Quadtree.js';
 import { getEngineState } from '../core/EngineState.js';
+
+type Contacts = Map<GameObject, Map<GameObject, CollisionManifold>>;
 
 /**
  * A system that processes entities with PhysicsComponents.
  * Handles movement, velocity, acceleration, and automatic collision resolution.
  */
 export default class PhysicsSystem extends System {
+  private contacts: Contacts = new Map();
+  private entities?: Set<GameObject>;
+  private scene?: Scene | null;
+
+  /** Clears contact history without emitting events in the outgoing scene. @internal */
+  public resetContacts(): void {
+    this.contacts = new Map();
+    this.entities = undefined;
+    this.scene = undefined;
+  }
+
   /**
    * Updates the position of entities and resolves collisions.
    * @param entities All game objects.
@@ -21,6 +35,21 @@ export default class PhysicsSystem extends System {
    */
   public override fixedUpdate(entities: Set<GameObject>, fixedDelta: number): void {
     const state = getEngineState();
+    const scene = state?.currentScene;
+    const activeObjects = scene?.objects ?? state?.objects;
+    if (this.entities !== entities || this.scene !== scene) {
+      this.resetContacts();
+      this.entities = entities;
+      this.scene = scene;
+    }
+
+    const previous = this.contacts;
+    const contacts: Contacts = new Map();
+    const worldIsActive = () => this.contacts === previous && getEngineState() === state &&
+      state?.currentScene === scene && (scene?.objects ?? state?.objects) === activeObjects;
+    const emit = (type: string, object: GameObject, other: GameObject, manifold: CollisionManifold) => {
+      if (worldIsActive() && entities.has(object)) object.emit(type, { other, manifold });
+    };
     const collidables: GameObject[] = [];
     const cachedOrder = state?.sortedObjects;
     let processingList: Iterable<GameObject>;
@@ -77,14 +106,31 @@ export default class PhysicsSystem extends System {
         let changed = false;
         for (const second of candidates) {
           const other = collidables[second];
-          if (!entities.has(other)) continue;
-          const canRunHandlers = [object, other].some(body =>
-            body.emit !== GameObject.prototype.emit || body.hasComponent(EventBusComponent));
-          if (!Physics.checkCollision(object, other)) continue;
-
+          if (!worldIsActive()) return;
+          if (!entities.has(other) || !other.bounds || !object.bounds) continue;
           const a = object.getComponent(PhysicsComponent);
           const b = other.getComponent(PhysicsComponent);
-          if (!canRunHandlers && (a?.isSensor || b?.isSensor || (a?.isStatic && b?.isStatic))) continue;
+          if (!a || !b) continue;
+          const canRunHandlers = [object, other].some(body =>
+            body.emit !== GameObject.prototype.emit || body.hasComponent(EventBusComponent));
+          const manifold = Physics.resolveContact(object, other);
+          if (!manifold) continue;
+
+          object.emit('collision', { other, manifold });
+          // Legacy delivery is synchronous for both participants of an accepted pair.
+          if (worldIsActive()) other.emit('collision', { other: object, manifold });
+          if (!worldIsActive()) return;
+          if (entities.has(object) && entities.has(other)) {
+            let pairs = contacts.get(object);
+            if (!pairs) contacts.set(object, pairs = new Map());
+            pairs.set(other, manifold);
+            const type = previous.get(object)?.has(other) || previous.get(other)?.has(object)
+              ? 'collisionStay' : 'collisionStart';
+            emit(type, object, other, manifold);
+            emit(type, other, object, manifold);
+          }
+          if (!worldIsActive()) return;
+          if (!canRunHandlers && (a.isSensor || b.isSensor || (a.isStatic && b.isStatic))) continue;
 
           // User handlers can move unrelated objects. Without handlers, only
           // the participants and their transform descendants can have moved.
@@ -102,6 +148,15 @@ export default class PhysicsSystem extends System {
         if (!changed) break;
       }
     }
+
+    for (const [object, pairs] of previous) {
+      for (const [other, manifold] of pairs) {
+        if (contacts.get(object)?.has(other) || contacts.get(other)?.has(object)) continue;
+        emit('collisionEnd', object, other, manifold);
+        emit('collisionEnd', other, object, manifold);
+      }
+    }
+    if (worldIsActive()) this.contacts = contacts;
   }
 
   private buildIndex(collidables: GameObject[], entities: Set<GameObject>) {

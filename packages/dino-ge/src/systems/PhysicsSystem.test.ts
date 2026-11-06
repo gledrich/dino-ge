@@ -5,6 +5,7 @@ import Vector2 from '../math/Vector2.js';
 import BoundsComponent from '../components/BoundsComponent.js';
 import Physics from '../physics/Physics.js';
 import Engine from '../core/Engine.js';
+import Scene from '../core/Scene.js';
 import Circle from '../objects/Circle.js';
 import { type EngineState } from '../core/EngineState.js';
 
@@ -138,7 +139,7 @@ describe('PhysicsSystem', () => {
     obj2.addComponent(new PhysicsComponent());
     obj2.addComponent(new BoundsComponent(10, 10));
 
-    const checkCollisionSpy = jest.spyOn(Physics, 'checkCollision');
+    const checkCollisionSpy = jest.spyOn(Physics, 'resolveContact');
     const entities = new Set<GameObject>([obj1, obj2]);
     
     system.fixedUpdate(entities, 0.1);
@@ -157,7 +158,7 @@ describe('PhysicsSystem', () => {
     obj2.addComponent(new PhysicsComponent());
     obj2.addComponent(new BoundsComponent(10, 10));
 
-    const checkCollisionSpy = jest.spyOn(Physics, 'checkCollision');
+    const checkCollisionSpy = jest.spyOn(Physics, 'resolveContact');
     const entities = new Set<GameObject>([obj1, obj2]);
     
     system.fixedUpdate(entities, 0.1);
@@ -178,7 +179,7 @@ describe('PhysicsSystem', () => {
 
   it('avoids narrow-phase work for separated bodies', () => {
     const objects = Array.from({ length: 400 }, (_, index) => body(index % 20 * 25, Math.floor(index / 20) * 25));
-    const check = jest.spyOn(Physics, 'checkCollision');
+    const check = jest.spyOn(Physics, 'resolveContact');
     try {
       new PhysicsSystem().fixedUpdate(new Set(objects), 0);
       expect(check).not.toHaveBeenCalled();
@@ -257,6 +258,147 @@ describe('PhysicsSystem', () => {
 
     new PhysicsSystem().fixedUpdate(objects, 0);
     expect(onRemovedCollision).not.toHaveBeenCalled();
+  });
+
+  it('emits one start, repeat stays and one end per unordered pair', () => {
+    const system = new PhysicsSystem();
+    const first = body(0);
+    const second = body(5);
+    const entities = new Set([first, second]);
+    const seen: string[] = [];
+    for (const type of ['collision', 'collisionStart', 'collisionStay', 'collisionEnd']) {
+      first.on(type, event => {
+        expect(event.detail.other).toBe(second);
+        expect(event.detail.manifold.depth).toBe(5);
+        seen.push(type);
+      });
+      second.on(type, event => {
+        expect(event.detail.other).toBe(first);
+        seen.push(`other:${type}`);
+      });
+    }
+
+    system.fixedUpdate(entities, 0);
+    entities.delete(first);
+    entities.add(first); // Change pair order without changing the active collection.
+    system.fixedUpdate(entities, 0);
+    second.transform.position.x = 20;
+    system.fixedUpdate(entities, 0);
+    system.fixedUpdate(entities, 0);
+
+    expect(seen).toEqual([
+      'collision', 'other:collision', 'collisionStart', 'other:collisionStart',
+      'other:collision', 'collision', 'other:collisionStay', 'collisionStay',
+      'other:collisionEnd', 'collisionEnd',
+    ]);
+    expect(first.transform.position.x).toBe(0);
+    expect(second.transform.position.x).toBe(20);
+  });
+
+  it('requires both masks to accept the contact and ends a contact when a mask changes', () => {
+    const system = new PhysicsSystem();
+    const first = body(0);
+    const second = body(5);
+    const firstPhysics = first.getComponent(PhysicsComponent)!;
+    const secondPhysics = second.getComponent(PhysicsComponent)!;
+    firstPhysics.collisionCategory = 0x2;
+    firstPhysics.collisionMask = 0x80000000;
+    secondPhysics.collisionCategory = 0x80000000;
+    secondPhysics.collisionMask = 0x4;
+    const entities = new Set([first, second]);
+    const legacy = jest.fn();
+    const start = jest.fn();
+    const end = jest.fn();
+    first.on('collision', legacy);
+    first.on('collisionStart', start);
+    first.on('collisionEnd', end);
+
+    system.fixedUpdate(entities, 0);
+    expect(legacy).not.toHaveBeenCalled();
+    expect(start).not.toHaveBeenCalled();
+    secondPhysics.collisionMask = 0x2;
+    system.fixedUpdate(entities, 0);
+    expect(legacy).toHaveBeenCalledTimes(1);
+    expect(start).toHaveBeenCalledTimes(1);
+    firstPhysics.collisionMask = 0;
+    system.fixedUpdate(entities, 0);
+    expect(legacy).toHaveBeenCalledTimes(1);
+    expect(end).toHaveBeenCalledTimes(1);
+  });
+
+  it('finishes the accepted legacy pair and only sends end to the survivor', () => {
+    const system = new PhysicsSystem();
+    const first = body(0);
+    const second = body(5);
+    const entities = new Set([first, second]);
+    const removedEnd = jest.fn();
+    const survivorEnd = jest.fn();
+    first.on('collisionEnd', survivorEnd);
+    second.on('collisionEnd', removedEnd);
+    system.fixedUpdate(entities, 0);
+
+    first.on('collision', () => entities.delete(second));
+    const removedCollision = jest.fn();
+    second.on('collision', removedCollision);
+    system.fixedUpdate(entities, 0);
+    expect(removedCollision).toHaveBeenCalledTimes(1);
+    expect(removedEnd).not.toHaveBeenCalled();
+    expect(survivorEnd).toHaveBeenCalledTimes(1);
+    expect(survivorEnd.mock.lastCall?.[0].detail.other).toBe(second);
+  });
+
+  it('emits contacts when used without an initialised engine', () => {
+    const first = body(0);
+    const second = body(5);
+    const start = jest.fn();
+    first.on('collisionStart', start);
+    const global = globalThis as unknown as { __DINO_ENGINE_STATE__?: EngineState };
+    const previous = global.__DINO_ENGINE_STATE__;
+    delete global.__DINO_ENGINE_STATE__;
+
+    try {
+      new PhysicsSystem().fixedUpdate(new Set([first, second]), 0);
+      expect(start).toHaveBeenCalledTimes(1);
+    } finally {
+      global.__DINO_ENGINE_STATE__ = previous;
+    }
+  });
+
+  it('starts fresh contacts after switching active collections', () => {
+    const system = new PhysicsSystem();
+    const first = body(0);
+    const second = body(5);
+    const start = jest.fn();
+    const stay = jest.fn();
+    const end = jest.fn();
+    first.on('collisionStart', start);
+    first.on('collisionStay', stay);
+    first.on('collisionEnd', end);
+
+    system.fixedUpdate(new Set([first, second]), 0);
+    system.fixedUpdate(new Set([first, second]), 0);
+
+    expect(start).toHaveBeenCalledTimes(2);
+    expect(stay).not.toHaveBeenCalled();
+    expect(end).not.toHaveBeenCalled();
+  });
+
+  it('stops notifying the old world if a collision handler switches scenes', () => {
+    class TestScene extends Scene {}
+    const initial = new TestScene();
+    const destination = new TestScene();
+    const first = body(0);
+    const second = body(5);
+    const stale = jest.fn();
+    initial.add(first);
+    initial.add(second);
+    Engine.currentScene = initial;
+    first.on('collision', () => { Engine.currentScene = destination; });
+    first.on('collisionStart', stale);
+    second.on('collision', stale);
+
+    new PhysicsSystem().fixedUpdate(initial.objects, 0);
+    expect(stale).not.toHaveBeenCalled();
   });
 
   it('does not move static objects', () => {

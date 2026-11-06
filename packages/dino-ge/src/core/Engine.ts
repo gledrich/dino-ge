@@ -328,11 +328,18 @@ export default class Engine {
   }
 
   private static activateScene(scene: Scene | null): void {
+    if (this._state.currentScene !== scene) this.resetPhysicsContacts();
     this._state.currentScene = scene;
     notifySceneObjectsChanged();
     if (scene) {
       this.camera.reset();
       scene.onLoad();
+    }
+  }
+
+  private static resetPhysicsContacts(): void {
+    for (const system of this._systems) {
+      if (system instanceof PhysicsSystem) system.resetContacts();
     }
   }
 
@@ -513,6 +520,7 @@ export default class Engine {
   public terminate() {
     if (this._destroyed) return;
     this._destroyed = true;
+    Engine.resetPhysicsContacts();
     this.effects.cancel();
     this.screenUI?.dispose();
     this.timers.forEach(timer => window.clearTimeout(timer));

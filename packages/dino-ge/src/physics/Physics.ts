@@ -3,7 +3,7 @@ import GameObject from '../core/GameObject.js';
 import Circle from '../objects/Circle.js';
 import PhysicsComponent from '../components/PhysicsComponent.js';
 import ShapeComponent from '../components/ShapeComponent.js';
-import Engine from '../core/Engine.js';
+import { getEngineState } from '../core/EngineState.js';
 
 /**
  * Holds data about a collision between two objects.
@@ -17,6 +17,13 @@ export interface CollisionManifold {
   normal: Vector2;
   /** Penetration depth in world space. */
   depth: number;
+}
+
+/** Detail for a collision event on either participant. */
+export interface CollisionEventDetail {
+  other: GameObject;
+  /** The detected manifold, or the last detected manifold for a collisionEnd. */
+  manifold: CollisionManifold;
 }
 
 /**
@@ -169,24 +176,41 @@ export default class Physics {
   }
 
   /**
-   * Checks if two game objects are colliding and resolves it.
+   * Detects and resolves a contact when both collision masks allow it.
+   * Emits the legacy collision event on both bodies. Lifecycle events are
+   * tracked by PhysicsSystem across fixed updates.
    * @param obj1 First object.
    * @param obj2 Second object.
    * @returns True if the objects were colliding.
    */
   static checkCollision(obj1: GameObject, obj2: GameObject): boolean {
-    const manifold = this.getCollisionManifold(obj1, obj2);
+    const manifold = this.resolveContact(obj1, obj2);
     if (!manifold) return false;
 
-    if (Engine.debug) {
-      Engine.debugCollisions.push({ manifold, timestamp: Date.now() });
-      if (Engine.debugCollisions.length > 50) {
-        Engine.debugCollisions.shift();
+    obj1.emit('collision', { other: obj2, manifold });
+    obj2.emit('collision', { other: obj1, manifold });
+    return true;
+  }
+
+  /** Detects and resolves an allowed contact. The caller owns event dispatch. @internal */
+  static resolveContact(obj1: GameObject, obj2: GameObject): CollisionManifold | null {
+    const phys1 = obj1.getComponent(PhysicsComponent);
+    const phys2 = obj2.getComponent(PhysicsComponent);
+    if (!((phys1?.collisionMask ?? 0xffffffff) & (phys2?.collisionCategory ?? 0x1)) ||
+        !((phys2?.collisionMask ?? 0xffffffff) & (phys1?.collisionCategory ?? 0x1))) {
+      return null;
+    }
+    const manifold = this.getCollisionManifold(obj1, obj2);
+    if (!manifold) return null;
+
+    const state = getEngineState();
+    if (state?.debug) {
+      state.debugCollisions.push({ manifold, timestamp: Date.now() });
+      if (state.debugCollisions.length > 50) {
+        state.debugCollisions.shift();
       }
     }
 
-    const phys1 = obj1.getComponent(PhysicsComponent);
-    const phys2 = obj2.getComponent(PhysicsComponent);
     const obj1Static = phys1?.isStatic ?? true;
     const obj2Static = phys2?.isStatic ?? true;
     const isSensor = (phys1?.isSensor ?? false) || (phys2?.isSensor ?? false);
@@ -195,11 +219,7 @@ export default class Physics {
       this.resolveCollision(manifold, phys1, phys2);
     }
 
-    // Emit collision events on both objects
-    obj1.emit('collision', { other: obj2, manifold });
-    obj2.emit('collision', { other: obj1, manifold });
-
-    return true;
+    return manifold;
   }
 
   private static resolveCollision(manifold: CollisionManifold, phys1?: PhysicsComponent, phys2?: PhysicsComponent) {

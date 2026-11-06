@@ -439,6 +439,51 @@ describe('Engine', () => {
     game.terminate();
   });
 
+  it('starts new contact lifecycles after leaving and returning to a scene between fixed steps', () => {
+    const frame = jest.spyOn(window, 'requestAnimationFrame').mockReturnValue(1);
+    const scene = new MockScene();
+    const otherScene = new MockScene();
+    const sensor = new Rectangle({ position: new Vector2(0, 0), width: 20, height: 20, physics: { isSensor: true } });
+    const target = new Rectangle({ position: new Vector2(5, 0), width: 20, height: 20, physics: {} });
+    const start = jest.fn();
+    const stay = jest.fn();
+    sensor.on('collisionStart', start);
+    sensor.on('collisionStay', stay);
+    scene.add(sensor);
+    scene.add(target);
+    const game = new Engine({ onLoad: () => { Engine.currentScene = scene; } });
+
+    jest.advanceTimersByTime(0);
+    frame.mock.lastCall![0](16);
+    frame.mock.lastCall![0](36);
+    expect(start).toHaveBeenCalledTimes(1);
+
+    Engine.currentScene = otherScene;
+    Engine.currentScene = scene;
+    frame.mock.lastCall![0](54);
+    expect(start).toHaveBeenCalledTimes(2);
+    expect(stay).not.toHaveBeenCalled();
+    game.terminate();
+  });
+
+  it('stops contact notifications when a collision callback terminates the engine', () => {
+    const frame = jest.spyOn(window, 'requestAnimationFrame').mockReturnValue(1);
+    const scene = new MockScene();
+    const sensor = new Rectangle({ position: new Vector2(0, 0), width: 20, height: 20, physics: { isSensor: true } });
+    const target = new Rectangle({ position: new Vector2(5, 0), width: 20, height: 20, physics: {} });
+    const start = jest.fn();
+    sensor.on('collisionStart', start);
+    scene.add(sensor);
+    scene.add(target);
+    const game = new Engine({ onLoad: () => { Engine.currentScene = scene; } });
+    sensor.on('collision', () => game.terminate());
+
+    jest.advanceTimersByTime(0);
+    frame.mock.lastCall![0](16);
+    frame.mock.lastCall![0](36);
+    expect(start).not.toHaveBeenCalled();
+  });
+
   it('checks destination collisions on the first fixed step after a scene change', () => {
     const frame = jest.spyOn(window, 'requestAnimationFrame').mockReturnValue(1);
     const previous = new MockScene();

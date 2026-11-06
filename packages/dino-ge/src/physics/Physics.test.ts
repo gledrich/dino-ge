@@ -38,6 +38,29 @@ describe('Physics', () => {
     });
   });
 
+  it('applies filters to manual collision checks without changing geometry queries', () => {
+    const first = new Rectangle({ position: new Vector2(0, 0), width: 10, height: 10 });
+    const second = new Rectangle({ position: new Vector2(5, 0), width: 10, height: 10 });
+    const body = new PhysicsComponent();
+    first.addComponent(body);
+    body.collisionMask = 0;
+    const collision = jest.fn();
+    const start = jest.fn();
+    first.on('collision', collision);
+    first.on('collisionStart', start);
+
+    expect(Physics.getCollisionManifold(first, second)?.depth).toBe(5);
+    expect(Physics.checkCollision(first, second)).toBe(false);
+    expect(first.transform.position.x).toBe(0);
+    expect(collision).not.toHaveBeenCalled();
+
+    body.collisionMask = 0x1;
+    expect(Physics.checkCollision(first, second)).toBe(true);
+    expect(first.transform.position.x).toBeLessThan(0);
+    expect(collision).toHaveBeenCalledTimes(1);
+    expect(start).not.toHaveBeenCalled();
+  });
+
   describe('checkCollision - Circle vs Circle', () => {
     it('returns true when circles overlap', () => {
       const c1 = new Circle({

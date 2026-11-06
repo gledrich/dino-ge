@@ -19,4 +19,8 @@ export default class PhysicsComponent extends Component {
   friction: number = 0.2;
   /** Whether the object should detect collisions but not respond to them physically. */
   isSensor: boolean = false;
+  /** Category bits this body belongs to. Defaults to category 1. */
+  collisionCategory: number = 0x1;
+  /** Category bits this body can collide with. Defaults to all categories. */
+  collisionMask: number = 0xffffffff;
 }

@@ -34,7 +34,7 @@ export { getViewportAlignment, getViewportBounds, getViewportGeometry, snapToGri
 export { default as Line } from './objects/Line.js';
 export { default as Loader } from './core/Loader.js';
 export { default as Physics } from './physics/Physics.js';
-export { type CollisionManifold } from './physics/Physics.js';
+export type { CollisionEventDetail, CollisionManifold } from './physics/Physics.js';
 export { default as Rectangle } from './objects/Rectangle.js';
 export { default as Text } from './objects/Text.js';
 export { default as Tilemap } from './objects/Tilemap.js';

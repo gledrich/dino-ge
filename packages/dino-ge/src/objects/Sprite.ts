@@ -49,6 +49,8 @@ export interface SpriteProps {
     restitution?: number;
     friction?: number;
     isSensor?: boolean;
+    collisionCategory?: number;
+    collisionMask?: number;
   };
 }
 
@@ -201,6 +203,8 @@ export default class Sprite extends GameObject {
       if (props.physics.restitution !== undefined) pc.restitution = props.physics.restitution;
       if (props.physics.friction !== undefined) pc.friction = props.physics.friction;
       if (props.physics.isSensor !== undefined) pc.isSensor = props.physics.isSensor;
+      if (props.physics.collisionCategory !== undefined) pc.collisionCategory = props.physics.collisionCategory;
+      if (props.physics.collisionMask !== undefined) pc.collisionMask = props.physics.collisionMask;
       this.addComponent(pc);
     }
   }

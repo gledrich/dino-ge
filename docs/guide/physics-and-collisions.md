@@ -26,4 +26,30 @@ Listen with `ball.on('collision', ({ detail }) => { ... })`. Use `detail.other` 
 
 Amber Ruins decides whether movement is legal by inspecting a map cell. This demo is based on the repo's Bouncy example and uses overlapping shapes, so the game can react to contacts anywhere in the world.
 
+## Filter and track contacts
+
+Give each body a category and a mask. A pair can collide when each mask includes at least one bit from the other body's category. The default category is `0x1` and the default mask accepts all 32 bits. A mask of zero excludes all contacts.
+
+```js
+const ROVER = 0x1;
+const PAD = 0x2;
+const GATE = 0x4;
+
+roverPhysics.collisionCategory = ROVER;
+roverPhysics.collisionMask = PAD | GATE;
+padPhysics.collisionCategory = PAD;
+padPhysics.collisionMask = ROVER;
+padPhysics.isSensor = true;
+```
+
+Use `collisionStart` for the first detected step of an overlap, `collisionStay` for later steps, and `collisionEnd` when the pair separates or stops matching. All three provide `detail.other` and `detail.manifold`. On end, the manifold is the pair's last detected contact. Sensors emit these events without changing either body's motion. The legacy `collision` event still fires on every accepted overlap.
+
+```js
+rover.on('collisionStart', ({ detail }) => {
+  if (detail.other === pad) lightUp();
+});
+```
+
+The physics system tracks contacts in the active scene. A direct `Physics.checkCollision(a, b)` applies filters and emits the legacy event without tracking a lifecycle. To try the new events, build dino-ge with `npm run build -w dino-ge`, start `npm run example`, and open [Collision filters](http://localhost:3001/collision-filters.html).
+
 [PhysicsComponent](../api/classes/components_PhysicsComponent.PhysicsComponent.html) · [PhysicsSystem](../api/classes/systems_PhysicsSystem.PhysicsSystem.html) · [CollisionManifold](../api/interfaces/physics_Physics.CollisionManifold.html)

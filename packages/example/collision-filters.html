@@ -1,0 +1,41 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Collision filters | Dino GE</title>
+  <style>
+    body { margin: 0; background: #111d22; color: #e7eee8; font: 1rem/1.55 system-ui, sans-serif; }
+    main { max-width: 38rem; margin: 2rem auto; padding: 0 .75rem; }
+    h1 { line-height: 1.1; }
+    #track { width: 288px; height: 112px; margin: 1.25rem 0 .75rem; outline: 1px solid #628780; }
+    canvas { display: block; }
+    button { padding: .4rem .8rem; margin-right: .75rem; font: inherit; }
+    :focus-visible { outline: 2px solid #ffd78a; outline-offset: 4px; }
+    table { border-collapse: collapse; font-variant-numeric: tabular-nums; }
+    th, td { padding: .2rem .75rem; border-bottom: 1px solid #42675c; }
+    td { text-align: right; }
+    a { color: #acebc3; }
+  </style>
+  <script type="importmap">{"imports":{"dino-ge":"/built/index.js"}}</script>
+  <script type="module" src="/collision-filters.js"></script>
+</head>
+<body>
+  <main>
+    <h1>Collision filters</h1>
+    <p>Send the gold rover through the green sensor pad. It bounces off the blue gate when the filter allows contact. Clear the checkbox and run again to pass straight through.</p>
+    <div id="track" role="img" aria-label="Rover track with a sensor pad and a gate"></div>
+    <button id="run" type="button" disabled>Run pass</button>
+    <label><input id="gate-contact" type="checkbox" checked> Collide with the gate</label>
+    <p role="status">Loading track…</p>
+    <table aria-label="Contacts during the pass">
+      <thead><tr><th scope="col">Body</th><th scope="col">Start</th><th scope="col">Stay</th><th scope="col">End</th></tr></thead>
+      <tbody>
+        <tr id="pad"><th scope="row">Sensor pad</th><td>0</td><td>0</td><td>0</td></tr>
+        <tr id="gate"><th scope="row">Gate</th><td>0</td><td>0</td><td>0</td></tr>
+      </tbody>
+    </table>
+    <p><a href="/">Back to Amber Ruins</a></p>
+  </main>
+</body>
+</html>
