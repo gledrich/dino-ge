@@ -39,7 +39,7 @@ Create the scene, then set `Engine.currentScene` in the engine's `onLoad()` call
 - Engine and scene `update()` run on unpaused frames. Use elapsed time for frame-based movement so that speed stays consistent across displays.
 - Engine `fixedUpdate()` runs at the simulation rate, currently 60 steps per second. The demo moves two pixels per step, or about 120 pixels per second.
 - `drawUI(ui)` draws the interface after the world. Use it to display state rather than to advance the simulation.
-- `Engine.paused` freezes gameplay updates. Call `game.terminate()` when replacing a running game and release your own resources in `onDispose()`.
+- `Engine.paused` freezes gameplay updates. If you pause from a fixed update, the current step finishes and any remaining gameplay updates for that frame are skipped. Call `game.terminate()` when replacing a running game and release your own resources in `onDispose()`.
 
 Try doubling the movement per step. The explorer travels twice as fast even though you haven't changed the draw rate.
 

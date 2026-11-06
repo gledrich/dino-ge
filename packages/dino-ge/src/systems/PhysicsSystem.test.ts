@@ -187,6 +187,20 @@ describe('PhysicsSystem', () => {
     }
   });
 
+  it('keeps existing collision order while including bodies added before the next draw', () => {
+    const left = body(0, 0);
+    const middle = body(2, 0);
+    const added = body(4, 0);
+    const contacts: GameObject[] = [];
+    left.on('collision', event => contacts.push(event.detail.other));
+    Engine.sortedObjects = [left, middle];
+    Engine.zOrderDirty = true;
+
+    new PhysicsSystem().fixedUpdate(new Set([added, middle, left]), 0);
+
+    expect(contacts).toEqual([middle, added]);
+  });
+
   it('includes tangent scaled circles at a quadtree split', () => {
     const left = new Circle({ position: new Vector2(-20, -10), radius: 5 });
     const right = new Circle({ position: new Vector2(0, -10), radius: 5 });

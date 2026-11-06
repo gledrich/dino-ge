@@ -38,6 +38,7 @@ type ObjectGesture = {
  */
 export default class Input {
   private static mousePosition: Vector2 = new Vector2(0, 0);
+  private static lastPointer?: Pick<MouseEvent, 'clientX' | 'clientY'>;
   private static clickListeners: Set<(pos: Vector2) => void> = new Set();
   private static keys: Set<string> = new Set();
   private static isinitialised = false;
@@ -131,6 +132,19 @@ export default class Input {
   }
 
   private static updateMousePosition(event: MouseEvent, canvas: HTMLCanvasElement | null) {
+    this.lastPointer = { clientX: event.clientX, clientY: event.clientY };
+    this.projectMousePosition(this.lastPointer, canvas);
+  }
+
+  /** @internal Reproject the last pointer position after the canvas resizes. */
+  static refreshMousePosition(canvas: HTMLCanvasElement): void {
+    if (this.lastPointer) this.projectMousePosition(this.lastPointer, canvas);
+  }
+
+  private static projectMousePosition(
+    event: Pick<MouseEvent, 'clientX' | 'clientY'>,
+    canvas: HTMLCanvasElement | null,
+  ): void {
     const rect = typeof canvas?.getBoundingClientRect === 'function' ? canvas.getBoundingClientRect() : undefined;
     if (!canvas || !rect) {
       this.mousePosition.set(event.clientX, event.clientY);

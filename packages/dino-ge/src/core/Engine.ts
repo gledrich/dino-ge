@@ -464,6 +464,7 @@ export default class Engine {
     this._canvas.onResize = () => {
       this.width = this._canvas.canvas.width;
       this.height = this._canvas.canvas.height;
+      Input.refreshMousePosition(this._canvas.canvas);
       if (Engine.currentScene?.onResize) {
         Engine.currentScene.onResize(this.width, this.height);
       }
@@ -572,21 +573,24 @@ export default class Engine {
       if (!Engine.paused) {
         // Fixed update loop
         this._accumulator += this._secondsPassed;
-        while (this._accumulator >= this._fixedDelta) {
+        while (!Engine.paused && !this._destroyed && this._accumulator >= this._fixedDelta) {
           this._fixedUpdate();
           this._accumulator -= this._fixedDelta;
         }
 
-        Engine.currentScene?.update();
-        this.callbacks.update?.();
+        // Drop pending whole steps so resuming does not replay them.
+        if (Engine.paused) this._accumulator %= this._fixedDelta;
+        if (!Engine.paused && !this._destroyed) Engine.currentScene?.update();
+        if (!Engine.paused && !this._destroyed) this.callbacks.update?.();
       }
+      if (this._destroyed) return;
       this._draw();
     } catch (error) {
       this._reportRuntimeError({ phase: 'frame', error });
       throw error;
     }
 
-    window.requestAnimationFrame(this._update.bind(this));
+    if (!this._destroyed) window.requestAnimationFrame(this._update.bind(this));
   }
 
   private _fixedUpdate() {

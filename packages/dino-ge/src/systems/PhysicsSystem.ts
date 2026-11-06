@@ -22,11 +22,18 @@ export default class PhysicsSystem extends System {
   public override fixedUpdate(entities: Set<GameObject>, fixedDelta: number): void {
     const state = getEngineState();
     const collidables: GameObject[] = [];
-    const processingList = state?.sortedObjects?.length > 0 ? state.sortedObjects : Array.from(entities);
+    const cachedOrder = state?.sortedObjects;
+    let processingList: Iterable<GameObject>;
+    if (!cachedOrder?.length) {
+      processingList = Array.from(entities);
+    } else {
+      // Keep the previous pair order while admitting bodies that have not been drawn yet.
+      processingList = state.zOrderDirty ? new Set([...cachedOrder, ...entities]) : cachedOrder;
+    }
 
-    processingList.forEach((object) => {
+    for (const object of processingList) {
       // Skip if object is no longer in the set (might have been destroyed in this fixedUpdate loop)
-      if (!entities.has(object)) return;
+      if (!entities.has(object)) continue;
 
       const physics = object.getComponent(PhysicsComponent);
       if (physics) {
@@ -46,7 +53,7 @@ export default class PhysicsSystem extends System {
           collidables.push(object);
         }
       }
-    });
+    }
 
     let index = this.buildIndex(collidables, entities);
     for (let first = 0; first < collidables.length - 1; first++) {

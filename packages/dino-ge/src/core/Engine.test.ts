@@ -9,6 +9,7 @@ import BoundsComponent from '../components/BoundsComponent.js';
 import RenderingSystem from '../systems/RenderingSystem.js';
 import System from './System.js';
 import { ParticleEmitter } from '../index.js';
+import Rectangle from '../objects/Rectangle.js';
 
 class MockScene extends Scene {
   onLoad = jest.fn();
@@ -337,6 +338,53 @@ describe('Engine', () => {
     game.terminate();
   });
 
+  it('checks destination collisions on the first fixed step after a scene change', () => {
+    const frame = jest.spyOn(window, 'requestAnimationFrame').mockReturnValue(1);
+    const previous = new MockScene();
+    const next = new MockScene();
+    const left = new Rectangle({ position: new Vector2(0, 0), width: 20, height: 20, physics: {} });
+    const right = new Rectangle({ position: new Vector2(5, 0), width: 20, height: 20, physics: {} });
+    const contact = jest.fn();
+    left.on('collision', contact);
+    next.add(left);
+    next.add(right);
+    const game = new Engine({ onLoad: () => {
+      Engine.currentScene = previous;
+      previous.add(new MockGameObject('previous', 0));
+    } });
+    jest.advanceTimersByTime(0);
+    frame.mock.lastCall![0](16);
+    Engine.currentScene = next;
+    frame.mock.lastCall![0](36);
+    expect(contact).toHaveBeenCalledTimes(1);
+    expect(contact.mock.lastCall?.[0].detail.other).toBe(right);
+    game.terminate();
+  });
+
+  it('stops gameplay updates when a fixed update pauses the engine', () => {
+    const frame = jest.spyOn(window, 'requestAnimationFrame').mockReturnValue(1);
+    const fixedUpdate = jest.fn(() => { Engine.paused = true; });
+    const update = jest.fn();
+    const scene = new MockScene();
+    const game = new Engine({ onLoad: () => { Engine.currentScene = scene; }, fixedUpdate, update });
+    jest.advanceTimersByTime(0);
+    frame.mock.lastCall![0](16);
+    update.mockClear();
+    scene.update.mockClear();
+    frame.mock.lastCall![0](116);
+    expect(fixedUpdate).toHaveBeenCalledTimes(1);
+    expect(scene.update).not.toHaveBeenCalled();
+    expect(update).not.toHaveBeenCalled();
+
+    frame.mock.lastCall![0](216);
+    Engine.paused = false;
+    frame.mock.lastCall![0](224);
+    expect(fixedUpdate).toHaveBeenCalledTimes(1);
+    expect(scene.update).toHaveBeenCalledTimes(1);
+    expect(update).toHaveBeenCalledTimes(1);
+    game.terminate();
+  });
+
   it('cancels a pending transition on immediate scene assignment', () => {
     const game = new Engine(callbacks);
     const pending = new MockScene();
@@ -545,6 +593,31 @@ describe('Engine', () => {
     Engine.currentScene = scene;
     (canvasObj as unknown as { onResize: () => void }).onResize();
     expect(scene.onResize).toHaveBeenCalledWith(engine.width, engine.height);
+  });
+
+  it('updates the world coordinates of a stationary pointer when the game resizes', () => {
+    const container = document.createElement('div');
+    container.id = 'game';
+    Object.defineProperties(container, {
+      clientWidth: { configurable: true, value: 400 },
+      clientHeight: { configurable: true, value: 300 },
+    });
+    document.body.append(container);
+    const game = new Engine({}, { containerId: container.id });
+    const canvas = container.querySelector('canvas')!;
+    const bounds = jest.spyOn(canvas, 'getBoundingClientRect')
+      .mockReturnValue({ left: 20, top: 30, width: 400, height: 300 } as DOMRect);
+    Engine.camera.position.set(10, 20);
+    Engine.camera.zoom = 2;
+    document.dispatchEvent(new MouseEvent('mousemove', { clientX: 100, clientY: 120 }));
+    expect([game.mouseX, game.mouseY]).toEqual([50, 65]);
+
+    Object.defineProperty(container, 'clientWidth', { value: 500 });
+    bounds.mockReturnValue({ left: 40, top: 50, width: 500, height: 300 } as DOMRect);
+    window.dispatchEvent(new Event('resize'));
+    expect([game.width, game.height]).toEqual([500, 300]);
+    expect([game.mouseX, game.mouseY]).toEqual([40, 55]);
+    game.terminate();
   });
 
   it('terminates and cleans up resources', () => {
