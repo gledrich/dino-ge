@@ -36,6 +36,7 @@ jobs:
             echo "Unsupported release version: $version" >&2
             exit 1
           fi
+          echo "version=$version" >> "$GITHUB_OUTPUT"
 
       - name: Install dependencies
         run: npm ci
@@ -61,4 +62,13 @@ jobs:
         run: npm publish -w dino-ge-playground --access public --tag "$NPM_DIST_TAG"
         env:
           NPM_DIST_TAG: ${{ steps.release.outputs.dist_tag }}
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+
+      - name: Make the published beta the default install
+        if: steps.release.outputs.dist_tag == 'beta'
+        run: |
+          npm dist-tag add "dino-ge@$RELEASE_VERSION" latest
+          npm dist-tag add "dino-ge-playground@$RELEASE_VERSION" latest
+        env:
+          RELEASE_VERSION: ${{ steps.release.outputs.version }}
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
