@@ -23,7 +23,8 @@
     "website:preview": "node website/serve.mjs",
     "test:e2e:docker": "docker build --build-arg NODE_VERSION=$(cat .nvmrc) -t tsge-e2e -f docker/e2e.Dockerfile . && docker run --rm -e CI=true -v $(pwd)/packages/playground/playwright-report:/app/packages/playground/playwright-report -v $(pwd)/packages/playground/e2e:/app/packages/playground/e2e tsge-e2e",
     "test:e2e": "npx playwright test -c packages/playground/playwright.config.ts",
-    "test:example": "playwright test -c packages/example/playwright.config.ts"
+    "test:example": "playwright test -c packages/example/playwright.config.ts",
+    "docs:pages": "node docs/build-pages.mjs"
   },
   "author": "Rich <richgled25@gmail.com>",
   "license": "MIT",
@@ -38,6 +39,7 @@
     "globals": "^17.14.0",
     "jest": "^30.5.2",
     "jest-environment-jsdom": "^30.5.2",
+    "markdown-it": "^14.3.3",
     "react": "19.3.1",
     "react-dom": "19.3.1",
     "ts-jest": "^29.4.15",
