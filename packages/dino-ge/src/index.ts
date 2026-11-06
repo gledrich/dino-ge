@@ -29,7 +29,7 @@ export { default as Camera, type CameraBounds } from './core/Camera.js';
 export { default as Canvas } from './core/Canvas.js';
 export { default as ParticleEmitter, type ParticleBurst, type ParticleEmitterOptions } from './objects/ParticleEmitter.js';
 export { default as Circle } from './objects/Circle.js';
-export { default as Input, type ObjectManipulationPreview } from './core/Input.js';
+export { default as Input, type InputBinding, type ObjectManipulationPreview } from './core/Input.js';
 export { getViewportAlignment, getViewportBounds, getViewportGeometry, snapToGrid } from './core/ViewportGeometry.js';
 export { default as Line } from './objects/Line.js';
 export { default as Loader } from './core/Loader.js';

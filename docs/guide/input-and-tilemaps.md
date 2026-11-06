@@ -42,4 +42,24 @@ uses an authored relay rectangle as the destination for a scripted delivery.
 Build dino-ge with `npm run build -w dino-ge`, start `npm run example`, then open
 `http://localhost:3001/gameplay-foundations.html`.
 
+## Bind movement by name
+
+Use `Input.setActions()` to map keys and gamepad controls to the same game
+action. For horizontal movement, give the left key a negative value and bind
+the standard controller's left-stick x-axis.
+
+```js
+Input.setActions({
+  moveX: [{ key: 'ArrowLeft', scale: -1 }, { key: 'ArrowRight' }, { axis: 0 }],
+});
+```
+
+Read `Input.getActionValue('moveX')` during an update. Its value ranges from
+−1 to 1, with zero for idle or fully opposing inputs. Gamepad axes ignore
+values inside the dead zone, which defaults to 0.2. Use `Input.isActionDown()`
+when you only need to know whether the current action value is non-zero.
+Bindings are global to `Input` and persist until replaced. Calling
+`setActions()` again replaces the bindings, so game logic can keep
+using the same names when controls change.
+
 [Input](../api/classes/core_Input.Input.html) · [Tilemap](../api/classes/objects_Tilemap.Tilemap.html)

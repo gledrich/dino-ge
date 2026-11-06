@@ -8,6 +8,57 @@ import Line from '../objects/Line.js';
 import type GameObject from './GameObject.js';
 import { containsViewportPoint, getViewportAlignment, getViewportBounds, getViewportDrawOrder, getViewportGeometry, getViewportLineEndpoints, getViewportRotationHandle, projectOntoObjectAxes, snapToGrid } from './ViewportGeometry.js';
 
+/** A held input source for a named action. */
+export type InputBinding = {
+  /** Inverts the binding when set to -1. Defaults to 1. */
+  readonly scale?: -1 | 1;
+} & (
+  | { readonly key: string }
+  | ({
+    /** Index of a standard-mapped gamepad. Omit to use the first connected standard pad. */
+    readonly gamepad?: number;
+  } & (
+    | { readonly button: number }
+    | {
+      readonly axis: number;
+      /** Values at or below this absolute magnitude are neutral. Defaults to 0.2. */
+      readonly deadZone?: number;
+    }
+  ))
+);
+
+function isGamepadIndex(value: number): boolean {
+  return Number.isSafeInteger(value) && value >= 0;
+}
+
+function copyBinding(binding: InputBinding): InputBinding {
+  const copy = { ...binding };
+  const { scale } = copy;
+  if (scale !== undefined && scale !== -1 && scale !== 1) {
+    throw new RangeError('Input binding scale must be -1 or 1.');
+  }
+
+  if ('key' in copy) {
+    if (typeof copy.key !== 'string' || !copy.key || 'axis' in copy || 'button' in copy) {
+      throw new TypeError('Expected a single, non-empty input key.');
+    }
+    return copy;
+  }
+
+  if (copy.gamepad !== undefined && !isGamepadIndex(copy.gamepad)) {
+    throw new RangeError('Gamepad index must be a non-negative integer.');
+  }
+  if ('button' in copy && !('axis' in copy) && isGamepadIndex(copy.button)) return copy;
+  if ('axis' in copy && !('button' in copy) && isGamepadIndex(copy.axis)) {
+    const { deadZone } = copy;
+    if (deadZone !== undefined && (!Number.isFinite(deadZone) || deadZone < 0 || deadZone > 1)) {
+      throw new RangeError('Input axis dead zone must be between zero and one.');
+    }
+    return copy;
+  }
+  throw new RangeError('Expected a single gamepad button or axis with a non-negative integer index.');
+}
+
 /** Detail of an objectManipulationPreview event. A null detail ends the preview. */
 export interface ObjectManipulationPreview {
   object: GameObject;
@@ -41,6 +92,7 @@ export default class Input {
   private static lastPointer?: Pick<MouseEvent, 'clientX' | 'clientY'>;
   private static clickListeners: Set<(pos: Vector2) => void> = new Set();
   private static keys: Set<string> = new Set();
+  private static actions = new Map<string, readonly InputBinding[]>();
   private static isinitialised = false;
 
   private static gesture: ObjectGesture | null = null;
@@ -592,6 +644,62 @@ export default class Input {
    */
   static isKeyDown(key: string): boolean {
     return this.keys.has(key.toLowerCase());
+  }
+
+  /** Replaces the named bindings. Pass an empty object to clear them. */
+  static setActions(actions: Readonly<Record<string, readonly InputBinding[]>>): void {
+    const bindings = new Map<string, readonly InputBinding[]>();
+    for (const name of Object.keys(actions)) {
+      const action = actions[name];
+      if (!name.trim() || !Array.isArray(action)) {
+        throw new TypeError('Expected a named array of input bindings.');
+      }
+      bindings.set(name, Array.from(action, copyBinding));
+    }
+    this.actions = bindings;
+  }
+
+  /**
+   * Polls an action as a signed value between -1 and 1. Keys and pressed buttons
+   * contribute 1, and axes retain their magnitude outside the dead zone.
+   * Scale can invert a binding. The strongest positive and negative values add
+   * together, so alternatives in the same direction do not stack.
+   */
+  static getActionValue(name: string): number {
+    const bindings = this.actions.get(name);
+    if (!bindings) return 0;
+
+    const gamepads = new Map<number | undefined, Gamepad | null>();
+    let positive = 0;
+    let negative = 0;
+    for (const binding of bindings) {
+      let value: number;
+      if ('key' in binding) {
+        value = Number(this.isKeyDown(binding.key));
+      } else {
+        const index = binding.gamepad;
+        if (!gamepads.has(index)) gamepads.set(index, this.getGamepad(index));
+        const gamepad = gamepads.get(index);
+        if ('button' in binding) {
+          value = Number(gamepad?.buttons?.[binding.button]?.pressed === true);
+        } else {
+          const axis = gamepad?.axes?.[binding.axis] ?? 0;
+          value = Number.isFinite(axis) && Math.abs(axis) > (binding.deadZone ?? 0.2)
+            ? Math.max(-1, Math.min(1, axis))
+            : 0;
+        }
+      }
+
+      value *= binding.scale ?? 1;
+      positive = Math.max(positive, value);
+      negative = Math.min(negative, value);
+    }
+    return positive + negative;
+  }
+
+  /** Whether the action currently has a non-zero value. */
+  static isActionDown(name: string): boolean {
+    return this.getActionValue(name) !== 0;
   }
 
   /** Returns a connected standard-mapped pad, or the first one if no index is supplied. */

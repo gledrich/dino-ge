@@ -34,6 +34,7 @@ describe('Input', () => {
   let capturedListeners: Record<string, ((event: unknown) => void)> = {};
 
   beforeEach(() => {
+    Input.setActions({});
     // Reset private static state
     (Input as unknown as { keys: Set<string> }).keys.clear();
     (Input as unknown as { clickListeners: Set<unknown> }).clickListeners.clear();
@@ -67,6 +68,45 @@ describe('Input', () => {
     expect(Input.isKeyDown('w')).toBe(false);
   });
 
+  describe('named actions', () => {
+    it('combines held keyboard alternatives without stacking and cancels opposing keys', () => {
+      Input.setActions({ move: [{ key: 'a', scale: -1 }, { key: 'ArrowLeft', scale: -1 }, { key: 'd' }] });
+      Input.init();
+      expect(Input.getActionValue('unknown')).toBe(0);
+      expect(Input.isActionDown('move')).toBe(false);
+
+      capturedListeners['keydown']({ key: 'A' });
+      capturedListeners['keydown']({ key: 'ArrowLeft' });
+      expect(Input.getActionValue('move')).toBe(-1);
+      expect(Input.isActionDown('move')).toBe(true);
+      expect(Input.isKeyDown('a')).toBe(true);
+      capturedListeners['keydown']({ key: 'd' });
+      expect(Input.getActionValue('move')).toBe(0);
+      capturedListeners['keyup']({ key: 'd' });
+      expect(Input.getActionValue('move')).toBe(-1);
+
+      window.dispatchEvent(new Event('blur'));
+      expect(Input.getActionValue('move')).toBe(0);
+    });
+
+    it('snapshots the bindings and replaces the previous map atomically', () => {
+      Input.init();
+      const binding = { key: 'w' };
+      const bindings = [binding];
+      Input.setActions({ jump: bindings });
+      binding.key = 'x';
+      bindings.length = 0;
+      capturedListeners['keydown']({ key: 'w' });
+      expect(Input.isActionDown('jump')).toBe(true);
+
+      expect(() => Input.setActions({ move: [{ axis: 0, deadZone: NaN }] })).toThrow(RangeError);
+      expect(Input.isActionDown('jump')).toBe(true);
+      Input.setActions({});
+      expect(Input.isActionDown('jump')).toBe(false);
+      expect(Input.isKeyDown('w')).toBe(true);
+    });
+  });
+
   describe('gamepads', () => {
     const original = Object.getOwnPropertyDescriptor(navigator, 'getGamepads');
 
@@ -78,6 +118,24 @@ describe('Input', () => {
     const mockGamepads = (getGamepads: unknown) => {
       Object.defineProperty(navigator, 'getGamepads', { configurable: true, value: getGamepads });
     };
+
+    it('polls named buttons and signed axes from the selected standard gamepad', () => {
+      Input.setActions({
+        move: [{ axis: 0, gamepad: 2 }, { axis: 1, gamepad: 2, scale: -1, deadZone: 0.4 }],
+        interact: [{ button: 0 }],
+      });
+      const standard = { connected: true, mapping: 'standard', axes: [-0.75, 0.3], buttons: [{ pressed: true }] };
+      const pad = jest.fn().mockReturnValue([null, { ...standard, mapping: '' }, standard]);
+      mockGamepads(pad);
+
+      expect(Input.getActionValue('move')).toBe(-0.75);
+      expect(Input.isActionDown('interact')).toBe(true);
+      standard.axes = [0.2, -0.5];
+      expect(Input.getActionValue('move')).toBe(0.5);
+      standard.connected = false;
+      expect(Input.getActionValue('move')).toBe(0);
+      expect(Input.isActionDown('interact')).toBe(false);
+    });
 
     it('returns neutral input when the browser has no Gamepad API', () => {
       mockGamepads(undefined);
