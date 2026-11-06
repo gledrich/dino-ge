@@ -1,65 +1,28 @@
 # dino-ge-playground
 
-Interactive, live-editing playground and inspector for the [dino-ge](https://www.npmjs.com/package/dino-ge) game engine.
+Edit Dino GE scripts, inspect scene objects and try changes in the browser.
 
-![Dino GE Playground Preview](https://raw.githubusercontent.com/gledrich/dino-ge/main/packages/playground/assets/preview.png)
+**Beta preview.** APIs and workflows may change.
 
-**Beta preview.** APIs and workflows may change during the beta.
+## Install and run
 
-## Installation
+Use Node.js 24.22.1 or later on the 24.x line, or 26.13.0 or later on the 26.x line.
 
-Use Node.js 26.13.0 LTS or a patched release on the supported Node.js 24 LTS line
-starting at 24.22.1.
-
-```bash
+```sh
 npm install -g dino-ge-playground@beta
-```
-
-## Usage
-
-Run the playground in any directory where you'd like to develop game scripts:
-
-```bash
 dino-ge-playground
 ```
 
-Once running, access the editor and inspector at `http://localhost:3000`.
+Run the command from the directory where you want to work and open [the Playground](http://localhost:3000). The Playground stores projects and scripts in `scripts/` under that directory. An empty workspace starts with an editable copy of **Amber Ruins**.
 
-### Features
+## Use the workspace
 
-- **Monaco Code Editor:** Modify your game logic in real-time with an integrated Monaco editor (the engine behind VS Code).
-  ![Monaco Editor](https://raw.githubusercontent.com/gledrich/dino-ge/main/packages/playground/assets/editor.png)
-- **Property Inspector:** Toggle the UI to inspect and adjust game object properties in real-time.
-  ![Property Inspector](https://raw.githubusercontent.com/gledrich/dino-ge/main/packages/playground/assets/inspector.png)
-- **Debug Mode:** Visualize collision boxes, velocity vectors, and engine state.
-- **Hot Refresh:** Quickly apply changes to your code (`Ctrl + Enter` or click the refresh icon).
-- **Play/Pause Controls:** Pause the game and engine audio, then resume from the same point.
-- **Auto-Formatting:** Integrated Prettier support for clean, consistent code.
+On desktop, drag tabs between docks or use a tab's **Move** menu. The browser remembers the layout. Use **Reset dock layout** to restore the defaults. On narrow screens, drag the drawer handle to reveal more of the game. To place an object from the Library, drag its grip onto the exposed canvas.
 
-### Desktop workspace
+Save script changes with the editor's **Save** button. Use the toolbar to play, pause, reset the game or toggle debug overlays.
 
-Explorer starts on the left, Editor and Inspector share the right dock, and Console sits below the canvas. Drag tabs to reorder them or move them to another dock. You can also select a tab and use its **Move** menu. The Playground remembers your desktop arrangement in the browser. Choose **Reset dock layout** from the same menu to restore the defaults.
+## Import a game
 
-### Mobile workspace
+In the editor, choose **Import game folder**, select the folder and its JavaScript entry file, then choose **Import and run**. The Playground copies up to 512 files and 16 MiB per project into `scripts/`, preserving relative paths for modules and assets. It accepts browser-native JavaScript modules that can import `dino-ge`. If you use a bundler, build the game first and import the output folder.
 
-On narrow screens, Explorer, Editor, Inspector and Console share a drawer over the bottom of the game. Drag the handle to change how much of the game the drawer covers. The game keeps its full window size. In the Library, drag an object's grip up to the exposed canvas to place it.
-
-<img src="https://raw.githubusercontent.com/gledrich/dino-ge/main/packages/playground/assets/mobile.png" alt="The mobile Editor drawer over the lower part of Amber Ruins" width="390">
-
-### Script Storage
-
-The playground automatically creates and manages a `scripts/` directory in the folder where the command is executed. All your JavaScript game scripts are stored here.
-
-An empty workspace starts with an editable copy of **Amber Ruins**. An
-existing workspace opens its scripts as usual.
-
-To bring in another game, choose **Import game folder** in the editor, select
-the game's folder, then pick its JavaScript entry file and choose
-**Import and run**. Playground copies the folder into `scripts/` and
-preserves relative modules and assets. It accepts browser-native JavaScript
-modules that can import `dino-ge`, with up to 512 files and 16 MiB per game.
-If your game uses a bundler, build it first and import the output folder.
-
-## License
-
-MIT
+MIT licence.

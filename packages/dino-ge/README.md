@@ -1,181 +1,51 @@
 # dino-ge
 
-A lightweight, performant 2D game engine built from the ground up in TypeScript. `dino-ge` provides a robust, developer-friendly framework for building 2D web games. Friend of [dino-ge-playground](https://www.npmjs.com/package/dino-ge-playground).
+A TypeScript engine for 2D browser games with zero runtime dependencies. It provides scenes, physics, sprite animation and Tiled map import.
 
-**Beta preview.** APIs and workflows may change during the beta.
+**Beta preview.** APIs and workflows may change.
 
-## Features
+## Install
 
-- **Composition-based ECS:** Built around a flexible Entity Component System for modular game design.
-- **Hierarchical Transform System:** Supports complex parent-child relationships with nested position, rotation, and scaling.
-- **Pixel-Perfect Sprite Animation:** Efficiently handles spritesheets with automatic frame calculation and smooth playback.
-- **Robust 2D Physics:** Impulse-based resolution with support for AABB and Circle collision primitives.
-- **Customisable Camera:** Built-in support for following targets, world-to-viewport coordinate mapping, and smooth zooming.
-- **Playground Integration:** Seamlessly compatible with the Dino GE Playground for rapid prototyping and live editing.
-
-## Installation
-
-```bash
+```sh
 npm install dino-ge@beta
 ```
 
-## Beta game APIs
+## Draw your first scene
 
-- `Tilemap.fromTiled(map, { tileset, position })` imports a finite orthogonal Tiled
-  JSON map with one embedded tileset, square tiles and one unencoded tile layer.
-  Pass the loaded tileset image or its loader tag as `tileset`.
-- `Input.getGamepad()` returns the first connected standard gamepad, or `null`.
-  `Input.getGamepadAxes()` returns its left stick as a `Vector2` with a 0.2
-  dead zone on each axis. Both methods accept an optional gamepad index.
-- Call `await Sound.unlock()` from a user gesture. Use `Sound.load(url)` to
-  decode audio, `sound.play()` for effects, and
-  `sound.play({ loop: true, channel: 'music' })` for a music loop.
-  Playback returns a stop function. `Sound.setVolume(channel, level)` controls
-  the `master`, `music` or `effects` channel between zero and one.
-- Pass `drawUI(ui)` to `Engine` to draw a screen-space interface over the world.
-  The game supplies the state and actions. `ScreenUI` provides anchors,
-  labels, panels, images, keyboard- and pointer-activated buttons, and
-  progress bars. The `onDispose` callback can release game resources on reset.
+In a browser project with a bundler, add a container to your HTML:
 
-### Layered Tiled maps
-
-Use `Tilemap.importTiled` for finite orthogonal Tiled JSON maps with multiple
-tile and object layers. Preload the tileset images and any external JSON
-tileset descriptors before importing.
-
-```typescript
-import { Tilemap, Vector2 } from 'dino-ge';
-
-const level = Tilemap.importTiled(mapJson, {
-  position: new Vector2(0, 0),
-  resolveExternalTileset: source => tilesetJsonBySource.get(source),
-  resolveImage: ({ firstGid }) => imageByFirstGid.get(firstGid)!,
-});
+```html
+<div id="game" style="width: 100%; height: 240px"></div>
 ```
 
-The result keeps the layer order and exposes imported point and rectangle
-objects. Use their authored properties to place game objects such as spawn
-points or triggers. Tile layers expose the runtime tilemaps and tileset
-properties for game-specific collision rules.
-
-### Sprite clips and object actions
-
-Pass named clips in a sprite's `animations` option. Each frame takes a
-zero-based sheet index or a source rectangle and a duration in milliseconds.
-
-```typescript
-import { Actions, Sprite, Vector2 } from 'dino-ge';
-
-const player = new Sprite({
-  tag: 'player',
-  img: 'player-sheet',
-  rows: 2,
-  cols: 4,
-  animations: {
-    walk: { frames: [{ frame: 2, durationMs: 80 }, { frame: 5, durationMs: 120 }] },
-  },
-});
-player.playAnimation('walk');
-
-player.actions.enqueue(
-  Actions.moveTo(new Vector2(120, 64), 0.5),
-  Actions.wait(0.25),
-  Actions.fadeTo(0.4, 0.2),
-  Actions.call(object => object.emit('arrived')),
-);
-```
-
-Clips can loop, play once or play forwards and backwards. Action durations are
-in seconds, and movement uses the object's local coordinates. Both advance
-while the object is in the active scene and the engine is running. Call
-`player.actions.clear()` to cancel a sequence and keep the current pose.
-
-The [Gameplay Foundations example](../example/gameplay-foundations/README.md)
-shows layered Tiled import, sprite clips and action queues working together.
-
-## Quick Start
-
-```typescript
-import { Engine, Sprite, Vector2 } from 'dino-ge';
-
-class MyGame {
-  constructor() {
-    new Engine(
-      {
-        onLoad: () => this.onLoad(),
-        update: () => this.onUpdate()
-      },
-      {
-        title: 'My Game',
-        width: '100%',
-        height: '100%'
-      }
-    );
-  }
-
-  onLoad() {
-    const player = new Sprite({
-      tag: 'player',
-      img: 'player', // Asset tag from ResourceLoader
-      rows: 1,
-      cols: 4,
-      position: new Vector2(400, 300),
-      zIndex: 10,
-      scale: 3
-    });
-    player.play();
-  }
-
-  onUpdate() {
-    // Game logic here
-  }
-}
-```
-
-## Documentation
-
-Full API documentation and guides are available at [https://gledrich.github.io/dino-ge/index.html](https://gledrich.github.io/dino-ge/index.html).
-
-## License
-
-Dino GE is released under the MIT License.
-
-### Particle bursts
-
-Create a `ParticleEmitter` while a scene is active to keep its visual effects
-with that scene. Each burst starts at a world-space position and uses seconds
-for its lifetime. The emitter caps the number of live particles and advances
-them on the engine's fixed step.
+Load this code from your project's JavaScript or TypeScript entry point:
 
 ```ts
-const sparks = new ParticleEmitter({ capacity: 128, zIndex: 10 });
-sparks.burst(new Vector2(120, 80), {
-  count: 8,
-  velocity: index => new Vector2((index - 3.5) * 20, -80),
-  gravity: new Vector2(0, 160),
-  lifetime: 0.4,
-  startRadius: 4,
-  endRadius: 0,
-  colour: '#ffcf64',
-});
+import { Circle, Engine, Scene, Vector2 } from 'dino-ge';
+
+class Clearing extends Scene {
+  onLoad() {
+    this.add(new Circle({
+      position: new Vector2(80, 80),
+      radius: 16,
+      colour: '#ffc46f',
+    }));
+  }
+}
+
+new Engine({
+  onLoad() {
+    Engine.currentScene = new Clearing();
+  },
+}, { containerId: 'game', width: '100%', height: '100%' });
 ```
 
-### Collision broad phase
+## Learn more
 
-The default physics system uses a quadtree to find nearby world-space
-colliders before running shape-specific tests. Collisions retain their pair
-order, and later pairs see position changes made by earlier resolution and
-collision handlers. The Bouncy Physics example at `/bouncy.html` exercises
-the broad phase with a field of 216 static bumpers.
+- [Engine guide](../../docs/guide/index.md) covers scenes, physics, animation, input, tile maps, audio and effects.
+- [Gameplay Foundations](../example/gameplay-foundations/README.md) shows layered Tiled maps, named sprite clips and object actions working together.
+- [Dino GE Playground](https://www.npmjs.com/package/dino-ge-playground) lets you edit scripts and inspect scenes in the browser.
 
-### Scene transitions and effects
+Run `npm run docs` from the repository root to generate the API reference in `docs/api/`.
 
-Use `game.transitionTo(nextScene, { type: 'fade', duration: 0.4 })` to fade
-through black, or use `type: 'slide'` to slide the old world off screen and
-the next world in. The engine loads the next scene at the midpoint. Use
-`Engine.currentScene = nextScene` for an immediate switch.
-
-`game.shakeScreen(8, 0.25)` and `game.chromaticAberration(4, 0.18)` take a
-strength in screen pixels and a duration in seconds. Effects decay over
-their duration and freeze when paused. They affect the world before
-`drawUI`, so the camera coordinates and screen-space HUD stay stable.
+MIT licence.

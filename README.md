@@ -1,78 +1,34 @@
-# Dino GE: Dino Game Engine
+# Dino GE
 
-A lightweight, developer-friendly 2D game engine built with TypeScript, designed for building expressive web-based games.
+Dino GE is a TypeScript engine for 2D browser games with zero runtime dependencies. It provides scenes, physics, sprite animation and tile maps. The Playground lets you edit scripts and inspect scenes in the browser.
 
-See [dino-ge](./packages/dino-ge//README.md) and [dino-ge-playground](./packages/playground/README.md).
+**Beta preview.** APIs and workflows may change.
 
-**Beta preview.** APIs and workflows may change during the beta.
+## Run locally
 
-## Core Features
+Use the Node.js version in [`.nvmrc`](.nvmrc). From the repository root:
 
-- **Entity Component System (ECS):** Flexible, composition-based architecture using Entities (GameObjects), Components (Data), and Systems (Logic).
-- **Hierarchical Transform System:** Supports complex parent-child relationships with nested position, rotation, and scaling.
-- **Decoupled Systems:** Dedicated `PhysicsSystem` and `RenderingSystem` for modular game logic.
-- **Built-in Physics:** Impulse-based resolution with support for AABB and Circle collision primitives.
-- **Scene Management:** Easily switch between game states.
-- **Asset Loader:** Simplified loading for images and textures.
-- **TypeScript Native:** Full type safety out of the box.
-
-## Playground Features
-
-The Dino GE playground provides a robust environment to prototype and test game logic live:
-
-- **Live Code Editor:** Modify your game logic in the browser with an integrated code editor.
-- **Property Inspector:** Toggle the UI to inspect and adjust game object properties in real-time.
-- **Debug Mode:** Visualize collision boxes and engine state by clicking the bug icon.
-- **Hot Refresh:** Quickly apply changes to your code (`Ctrl + Enter` or click the refresh icon).
-- **Play/Pause Controls:** Easily manage the engine state during development.
-
-## Get Started
-
-### Installation
-
-Use Node.js 26.13.0 LTS from `.nvmrc` for local development.
-
-```bash
-git clone https://github.com/gledrich/dino-ge.git
-cd dino-ge
-npm install
-```
-
-### Run the Playground
-
-Explore the engine capabilities in the interactive playground:
-
-```bash
+```sh
+npm ci
+npm run build
 npm run playground
 ```
 
-Once running, access it at [http://localhost:3000](http://localhost:3000).
+Open [the Playground](http://localhost:3000). A new workspace starts with an editable copy of Amber Ruins.
 
-### Development
+To run the standalone examples, use `npm run example` after building:
 
-Run `npm run build -w dino-ge` and then `npm run example` to play **Amber Ruins**
-at [http://localhost:3001](http://localhost:3001). Explore the marsh and the
-Sunken Archive, restore Lanternreach’s bridge and relight the Skywell beacon.
-Use WASD, the arrow keys or a gamepad’s left stick to move, **E** to interact
-and **J** to open the journal. The chapter saves discoveries and restorations
-in your browser.
-
-The [example workspace](./packages/example/amber-ruins/README.md) describes
-the assets and the engine APIs the game uses. The original Dino Survival demo
-is still available at `/survival.html`.
-
-Open [Gameplay Foundations](http://localhost:3001/gameplay-foundations.html)
-on the same server to see a layered Tiled room, a named sprite clip and a
-scripted delivery. Select **Replay delivery** to run the sequence again.
-The [example notes](./packages/example/gameplay-foundations/README.md) explain
-how the three APIs work together.
-
-Open [Bounded Camera Follow](http://localhost:3001/camera-bounds.html) to try
-keyboard and controller action bindings and compare camera movement with and
-without world bounds.
-
-_Note: The engine handles initialization; create your game instance directly in your entry file._
+- [Amber Ruins](http://localhost:3001/) — an exploration game. See the [game notes](packages/example/amber-ruins/README.md) for controls and implementation details.
+- [Gameplay Foundations](http://localhost:3001/gameplay-foundations.html) — a short demo of Tiled maps, sprite animation and scripted sequences. See the [demo notes](packages/example/gameplay-foundations/README.md).
+- [Bounded Camera Follow](http://localhost:3001/camera-bounds.html) — compare camera bounds and try named keyboard and controller bindings.
+- [Dino Survival](http://localhost:3001/survival.html) and [Bouncy Physics](http://localhost:3001/bouncy.html) — smaller demos.
 
 ## Documentation
 
-Comprehensive API documentation is available [here](https://gledrich.github.io/dino-ge/index.html).
+- [Engine package](packages/dino-ge/README.md) — install the engine and build your first game.
+- [Playground package](packages/playground/README.md) — install the editor, manage scripts and import games.
+- [Engine guide](docs/guide/index.md) — learn the engine through runnable examples. Run `npm run docs` to generate the API reference.
+
+For development checks, run `npm run lint` and `npm test`.
+
+[MIT licence](LICENSE)
