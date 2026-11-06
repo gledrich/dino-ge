@@ -20,6 +20,26 @@ test.beforeEach(async ({ page }) => {
   await page.goto('/');
 });
 
+test('Lanternreach draws all four explorer poses during a step', async ({ page }) => {
+  await page.evaluate(() => {
+    const poses = new Set<string>();
+    Object.assign(window, { explorerPoses: poses });
+    const drawImage = CanvasRenderingContext2D.prototype.drawImage;
+    CanvasRenderingContext2D.prototype.drawImage = function (image, ...args) {
+      if (image instanceof HTMLImageElement && image.src.endsWith('/explorer-walk.png') && args.length === 8) {
+        poses.add(`${args[0]}:${args[1]}`);
+      }
+      Reflect.apply(drawImage, this, [image, ...args]);
+    };
+  });
+  await clickCanvasText(page, 'Begin chapter');
+  await walk(page, 'ArrowRight');
+  const poses = await page.evaluate(() => Array.from(
+    (window as typeof window & { explorerPoses: Set<string> }).explorerPoses,
+  ).sort());
+  test.expect(poses).toEqual(['0:0', '0:627', '627:0', '627:627']);
+});
+
 test('restoring the bridge opens the Skywell and the lit beacon survives a reload', async ({ page }) => {
   await clickCanvasText(page, 'Begin chapter');
   await expectCanvasText(page, 'Lanternreach');

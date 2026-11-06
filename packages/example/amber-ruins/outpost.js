@@ -60,8 +60,9 @@ function button(ui, id, text, x, y, width, onPress, primary = false) {
 
 function sprite(tag, image, cols, frame, size, x, y) {
   const sheet = Loader.getImage(image);
+  const rows = image === 'explorer' ? 2 : 1;
   const object = new Sprite({
-    tag, img: sheet, cols, rows: image === 'explorer' ? 2 : 1,
+    tag, img: sheet, cols, rows, endCol: cols * rows,
     scale: size / (sheet.width / cols),
     position: new Vector2(x, y),
   });
