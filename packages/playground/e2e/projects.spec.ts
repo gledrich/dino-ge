@@ -206,7 +206,7 @@ export const run = window.gameRuns;`);
     await page.getByRole('tab', { name: 'Editor' }).click();
     await page.getByRole('button', { name: 'Project files', exact: true }).click({ timeout: 3000 });
     const modules = page.getByRole('dialog', { name: 'Project files', exact: true });
-    await modules.getByLabel('JavaScript module').selectOption('src/logic.js');
+    await modules.getByLabel('Project file').selectOption('src/logic.js');
     const moduleEditor = modules.locator('.monaco-editor');
     await expect(moduleEditor).toContainText('Imported game');
     const updatedModule = "import { run } from './counter.js';\nexport const heading = 'Module edit ' + run;";
@@ -256,7 +256,7 @@ export const run = window.gameRuns;`);
     expect(latest.headers()['x-dino-module-revision']).not.toBe(revision);
 
     await page.getByRole('button', { name: 'Project files', exact: true }).click();
-    await expect(modules.getByLabel('JavaScript module')).toHaveValue('src/counter.js');
+    await expect(modules.getByLabel('Project file')).toHaveValue('src/counter.js');
     await expect(moduleEditor).toContainText(revisions[winner]);
     await moduleEditor.evaluate(element => {
       const { monaco } = window as typeof window & { monaco: Monaco };
@@ -382,7 +382,7 @@ export const makeExternal = () => new Rectangle({ tag: 'External platform', posi
   await page.getByRole('button', { name: 'Imported platform', exact: true }).click();
   await source.click({ timeout: 3000 });
   const dialog = page.getByRole('dialog', { name: 'Project files', exact: true });
-  await expect(dialog.getByLabel('JavaScript module')).toHaveValue(modulePath);
+  await expect(dialog.getByLabel('Project file')).toHaveValue(modulePath);
   await expect(dialog.locator('.monaco-editor')).toContainText('Imported platform');
   await expect.poll(() => dialog.locator('.monaco-editor').evaluate(element => {
     const { monaco } = window as typeof window & { monaco: Monaco };
@@ -397,7 +397,7 @@ export const makeExternal = () => new Rectangle({ tag: 'External platform', posi
   await page.getByRole('tab', { name: 'Inspector', exact: true }).click();
   await page.getByRole('button', { name: 'Deferred label', exact: true }).click();
   await source.click({ timeout: 3000 });
-  await expect(dialog.getByLabel('JavaScript module')).toHaveValue(modulePath);
+  await expect(dialog.getByLabel('Project file')).toHaveValue(modulePath);
   await expect(dialog.locator('.monaco-editor')).toContainText('Deferred label');
   await dialog.locator('.monaco-editor').evaluate(element => {
     const { monaco } = window as typeof window & { monaco: Monaco };
@@ -413,7 +413,7 @@ export const makeExternal = () => new Rectangle({ tag: 'External platform', posi
   await dialog.getByRole('button', { name: 'Close', exact: true }).click();
   await page.getByRole('tab', { name: 'Inspector', exact: true }).click();
   await source.click();
-  await expect(dialog.getByLabel('JavaScript module')).toHaveValue(modulePath);
+  await expect(dialog.getByLabel('Project file')).toHaveValue(modulePath);
   await expect(dialog.getByRole('status')).toHaveText('Reset the game to refresh the source location.');
 });
 
@@ -442,7 +442,7 @@ new Engine({ onLoad() { makePlatform(); } }, { containerId: 'playground-canvas-c
   await inspector.click();
   await page.getByRole('button', { name: 'View source', exact: true }).press('Enter');
   const dialog = page.getByRole('dialog', { name: 'Project files', exact: true });
-  await expect(dialog.getByLabel('JavaScript module')).toHaveValue(modulePath);
+  await expect(dialog.getByLabel('Project file')).toHaveValue(modulePath);
   await page.keyboard.press('Escape');
   await expect(dialog).toBeHidden();
   await expect(dock.getByRole('tab', { name: 'Editor' })).toBeFocused();

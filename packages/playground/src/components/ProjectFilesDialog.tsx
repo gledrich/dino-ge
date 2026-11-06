@@ -6,6 +6,8 @@ import { getProjectObjectLocation, markProjectModuleEdited, recordProjectPlaceme
 import { screenUIPreview, type ScreenUISource } from '../utils/screen-ui-preview';
 import { getScreenUIMoveEdits, trackScreenUIMoveDraft, type ApplyScreenUIMove } from '../utils/screen-ui-source';
 
+const jsonFile = /\.(?:json|tmj|tsj)$/;
+
 export default function ProjectFilesDialog({ scriptId, initialSource, screenUISource, screenUIMove, prepareDraft, onClose }: {
   scriptId: string; initialSource?: ProjectObjectSource; screenUISource?: ScreenUISource;
   screenUIMove?: ApplyScreenUIMove; prepareDraft?: ProjectObjectSourceRequest['prepareDraft']; onClose: () => void;
@@ -23,6 +25,7 @@ export default function ProjectFilesDialog({ scriptId, initialSource, screenUISo
   const [status, setStatus] = useState('');
   const [error, setError] = useState('');
   const [conflict, setConflict] = useState(false);
+  const isJson = jsonFile.test(path);
   const ready = loaded?.path === path && !!path;
   const dirty = ready && draft !== loaded?.value;
   const sourcePath = screenUISource?.path ?? initialSource?.path;
@@ -44,7 +47,8 @@ export default function ProjectFilesDialog({ scriptId, initialSource, screenUISo
       if (controller.signal.aborted) return;
       setModules(files);
       if (sourcePath && !files.includes(sourcePath)) setError('The selected source module is unavailable.');
-      setPath(sourcePath && files.includes(sourcePath) ? sourcePath : files[0] ?? '');
+      const firstModule = files.find(file => !jsonFile.test(file));
+      setPath(sourcePath && files.includes(sourcePath) ? sourcePath : firstModule ?? files[0] ?? '');
     }).catch(error => { if (!controller.signal.aborted) setError(error.message); });
     return () => controller.abort();
   }, [scriptId, sourcePath]);
@@ -75,6 +79,13 @@ export default function ProjectFilesDialog({ scriptId, initialSource, screenUISo
     setStatus('');
     try {
       const value = placementDraft?.value ?? draft;
+      if (isJson) {
+        try {
+          JSON.parse(value);
+        } catch {
+          throw new Error('Enter valid JSON before saving this file.');
+        }
+      }
       const revision = await saveProjectModule(scriptId, path, value, loaded.revision);
       const canContinue = initialSource && placementDraft
         ? recordProjectPlacementSave(initialSource, loaded.value, placementDraft) : false;
@@ -83,7 +94,8 @@ export default function ProjectFilesDialog({ scriptId, initialSource, screenUISo
       if (!canContinue) markProjectModuleEdited(scriptId, path);
       setLoaded({ path, value, revision });
       setDraft(value);
-      setStatus(canContinue ? 'Saved. You can keep editing the scene.' : 'Saved. Reset the game to run the updated module.');
+      setStatus(canContinue ? 'Saved. You can keep editing the scene.'
+        : isJson ? 'Saved. Reset the game to load the updated file.' : 'Saved. Reset the game to run the updated module.');
     } catch (error) {
       if (error instanceof ProjectModuleConflict) {
         markProjectModuleEdited(scriptId, path);
@@ -114,12 +126,14 @@ export default function ProjectFilesDialog({ scriptId, initialSource, screenUISo
       }}>
       <h2 id="project-files-title">Project files</h2>
       {!modules && !error && <p role="status">Loading project files…</p>}
-      {modules?.length === 0 && <p>This project has no other JavaScript modules.</p>}
+      {modules?.length === 0 && <p>This project has no other editable files.</p>}
       {!!modules?.length && (
         <label className="project-module-label">
-          JavaScript module
+          Project file
           <select className="scene-control" value={path} disabled={dirty || saving || conflict} onChange={event => {
-            setPath(event.target.value);
+            const selected = event.target.value;
+            if (selected === path) return;
+            setPath(selected);
             setLoaded(undefined);
             setStatus('');
             setError('');
@@ -132,7 +146,7 @@ export default function ProjectFilesDialog({ scriptId, initialSource, screenUISo
       {ready && staleLocation && !status && !error && <p role="status">Reset the game to refresh the source location.</p>}
       {ready && (
         <div className="project-module-editor">
-          <Editor height="100%" defaultLanguage="javascript" theme="vs-dark" value={draft} saveViewState={!sourcePath}
+          <Editor height="100%" language={isJson ? 'json' : 'javascript'} theme="vs-dark" value={draft} saveViewState={!sourcePath}
             path={`file:///projects/${scriptId.split('/')[0]}/${path.split('/').map(encodeURIComponent).join('/')}`}
             onMount={(editor: editor.IStandaloneCodeEditor) => {
               const move = pendingScreenUIMove.current;
@@ -193,7 +207,7 @@ export default function ProjectFilesDialog({ scriptId, initialSource, screenUISo
           }
         }}>{conflict ? 'Discard and reload' : 'Discard changes'}</button>}
         <button type="button" className="scene-control" disabled={!dirty || saving || conflict} onClick={() => void save()}>
-          {saving ? 'Saving…' : 'Save module'}
+          {saving ? 'Saving…' : isJson ? 'Save file' : 'Save module'}
         </button>
         <button type="button" className="scene-control" disabled={dirty || saving} onClick={close}>Close</button>
       </div>

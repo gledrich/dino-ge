@@ -6,6 +6,7 @@ import { createHash, randomUUID } from 'node:crypto';
 const manifest = '.dino-ge-project.json';
 const maxFiles = 512;
 const maxBytes = 16 * 1024 * 1024;
+const editableProjectFile = /\.(?:m?js|json|tmj|tsj)$/;
 const projectName = /^[a-z0-9][a-z0-9_-]{0,63}$/i;
 const maxImageBytes = 5 * 1024 * 1024;
 const moduleReadOptions = { flag: constants.O_RDONLY | (constants.O_NOFOLLOW ?? 0) };
@@ -108,7 +109,7 @@ export class ProjectStore {
     const { directory, entry } = await this.projectDirectory(id);
     const files = await fs.readdir(directory, { recursive: true, withFileTypes: true });
     return files.flatMap(file => {
-      if (!file.isFile() || !/\.m?js$/.test(file.name)) return [];
+      if (!file.isFile() || !editableProjectFile.test(file.name)) return [];
       const relative = path.relative(directory, path.join(file.parentPath, file.name)).split(path.sep).join('/');
       try {
         const parts = relativePath(relative);
@@ -123,8 +124,8 @@ export class ProjectStore {
   async modulePath(id, relative) {
     const parts = relativePath(relative);
     const { directory, entry } = await this.projectDirectory(id);
-    if (relative === entry || !/\.m?js$/.test(relative) || parts.includes('node_modules')) {
-      throw new ProjectError('Choose a JavaScript module in this project.');
+    if (relative === entry || !editableProjectFile.test(relative) || parts.includes('node_modules')) {
+      throw new ProjectError('Choose a JavaScript or JSON file in this project.');
     }
     const filename = path.join(directory, ...parts);
     const parent = path.dirname(filename);

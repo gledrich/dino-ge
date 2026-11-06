@@ -47,6 +47,9 @@ function asBlob(file: StoredFile): Blob {
   return file instanceof Blob ? file : new Blob([file.bytes], { type: file.type });
 }
 
+const editableProjectFile = /\.(?:m?js|json|tmj|tsj)$/;
+const jsonProjectFile = /\.(?:json|tmj|tsj)$/;
+
 function scriptFile(text: string, previous?: StoredFile): StoredFile {
   const next = new TextEncoder().encode(text);
   if (!previous) return { bytes: next.buffer, type: scriptType };
@@ -160,14 +163,14 @@ export const browserWorkspace = {
   async listModules(id: string): Promise<string[]> {
     const project = await browserWorkspace.snapshot(id);
     if (!project) return [];
-    return [...project.files.keys()].filter(path => path !== project.entry && path.endsWith('.js')).sort();
+    return [...project.files.keys()].filter(path => path !== project.entry && editableProjectFile.test(path)).sort();
   },
 
   async readModule(id: string, path: string): Promise<{ value: string; revision: string }> {
     checkPath(path);
     const project = await inStore('readonly', store => findProject(store, id));
     const file = project?.files.get(path);
-    if (!project || !file || path === project.entry || !path.endsWith('.js')) {
+    if (!project || !file || path === project.entry || !editableProjectFile.test(path)) {
       throw new Error('The project module was not found.');
     }
     return { value: await asBlob(file).text(), revision: project.revisions?.get(path) ?? 'initial' };
@@ -177,14 +180,17 @@ export const browserWorkspace = {
     checkPath(path);
     return inStore('readwrite', async store => {
       const project = await findProject(store, id);
-      if (!project || !project.files.has(path) || path === project.entry || !path.endsWith('.js')) {
+      if (!project || !project.files.has(path) || path === project.entry || !editableProjectFile.test(path)) {
         throw new Error('The project module was not found.');
       }
       const revisions = project.revisions ??= new Map();
       if ((revisions.get(path) ?? 'initial') !== expected) return null;
       const revision = crypto.randomUUID();
       revisions.set(path, revision);
-      project.files.set(path, scriptFile(data));
+      const file = jsonProjectFile.test(path)
+        ? { bytes: new TextEncoder().encode(data).buffer, type: 'application/json' }
+        : scriptFile(data);
+      project.files.set(path, file);
       checkSize(project.files);
       await requestResult(store.put(project));
       return revision;

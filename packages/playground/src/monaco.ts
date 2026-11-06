@@ -2,6 +2,7 @@ import { loader } from '@monaco-editor/react';
 import * as monaco from 'monaco-editor';
 import { StandaloneServices } from 'monaco-editor/editor/standalone/browser/standaloneServices.js';
 import EditorWorker from 'monaco-editor/editor/editor.worker.js?worker';
+import JsonWorker from 'monaco-editor/language/json/json.worker.js?worker';
 import TypeScriptWorker from 'monaco-editor/language/typescript/ts.worker.js?worker';
 
 // Bind before the Playground starts capturing the page console for game output.
@@ -33,6 +34,7 @@ const monacoServices: monaco.editor.IEditorOverrideServices = {
 
 globalThis.MonacoEnvironment = {
   getWorker(_workerId, label) {
+    if (label === 'json') return new JsonWorker();
     return label === 'typescript' || label === 'javascript'
       ? new TypeScriptWorker()
       : new EditorWorker();
