@@ -6,7 +6,7 @@
 
 A game loop reads input, advances the game state and draws the result. Start with a scene that owns one object and a fixed update that moves it a little each step.
 
-[Run the demo](demos/first-scene/index.html) · [View the source](demos/first-scene/main.js)
+[Run the demo](demos/first-scene/index.html) · [View the source](demos/first-scene/source.html)
 
 The explorer moves across the canvas. Select **Pause** to freeze it, then **Resume** to continue. **Restart** replaces the engine and starts the explorer at the left again.
 

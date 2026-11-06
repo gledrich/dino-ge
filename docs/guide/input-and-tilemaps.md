@@ -6,7 +6,7 @@
 
 A tilemap divides the world into rows and columns. Keep the player's cell as game state, then convert it to pixels to position the player object.
 
-[Run the demo](demos/input-and-tilemaps/index.html) · [View the source](demos/input-and-tilemaps/main.js) · [View the Tiled map](demos/input-and-tilemaps/room.tmj)
+[Run the demo](demos/input-and-tilemaps/index.html) · [View the source](demos/input-and-tilemaps/source.html) · [View the Tiled map](demos/input-and-tilemaps/room.tmj)
 
 Focus the map and use the arrow keys or a gamepad's left stick. The four buttons also work with touch and the keyboard. Try moving right first, then go down and around the wall to collect the relic.
 

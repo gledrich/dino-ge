@@ -6,7 +6,7 @@
 
 Use physics when objects should move under velocity or acceleration and respond to contact. The engine's physics system integrates bodies at a fixed interval and checks their geometry for collisions.
 
-[Run the demo](demos/physics-and-collisions/index.html) · [View the source](demos/physics-and-collisions/main.js)
+[Run the demo](demos/physics-and-collisions/index.html) · [View the source](demos/physics-and-collisions/source.html)
 
 The ball passes through the amber sensor and bounces off the blue wall. **Launch again** repeats the example. **Toggle collision debug** shows collision and velocity information.
 

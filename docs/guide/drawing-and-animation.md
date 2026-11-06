@@ -6,7 +6,7 @@
 
 A sprite sheet packs several frames into one image. Load the sheet, tell the sprite how it is divided, then play the frames you want.
 
-[Run the demo](demos/drawing-and-animation/index.html) · [View the source](demos/drawing-and-animation/main.js)
+[Run the demo](demos/drawing-and-animation/index.html) · [View the source](demos/drawing-and-animation/source.html)
 
 Watch the explorer walk behind the pillar. **Toggle animation** stops the frames while the explorer keeps moving, so you can see how animation and position work independently.
 

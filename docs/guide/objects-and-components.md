@@ -6,7 +6,7 @@
 
 A `GameObject` is an entity. Components attach data and capabilities to it. A system reads or updates objects with particular components. Dino GE runs its own rendering and physics systems. The demo calls its custom system from the game callback.
 
-[Run the demo](demos/objects-and-components/index.html) · [View the source](demos/objects-and-components/main.js)
+[Run the demo](demos/objects-and-components/index.html) · [View the source](demos/objects-and-components/source.html)
 
 Select **Move sign**. The board and marker move together. Select **Toggle marker**. The sign stays visible while the marker disappears.
 

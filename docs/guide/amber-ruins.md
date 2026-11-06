@@ -6,7 +6,7 @@
 
 The original Amber Ruins expedition brings the previous chapters together. You move through three rooms, collect relics, avoid spikes and reach the gate.
 
-[Play the original expedition](demos/amber-ruins/index.html?expedition) · [Read the game source](https://github.com/gledrich/dino-ge/blob/v1.15.0-beta.5/packages/example/amber-ruins/game.js) · [Play the Lanternreach chapter](demos/amber-ruins/index.html)
+[Play the original expedition](demos/amber-ruins/index.html?expedition) · [View the demo source](demos/amber-ruins/source.html) · [Read the full game source on GitHub](https://github.com/gledrich/dino-ge/blob/v1.15.0-beta.5/packages/example/amber-ruins/game.js) · [Play the Lanternreach chapter](demos/amber-ruins/index.html)
 
 Start the expedition. Move with WASD, the arrow keys, a gamepad's left stick or the touch arrows. Pick up a relic and watch the counter. Move into another room and watch the world slide beneath the HUD.
 

@@ -6,7 +6,7 @@
 
 A camera chooses which part of the world is visible. A scene owns a set of objects and their update logic. Moving the camera can reveal another room within the same scene. Replacing the scene can take you to a different level or menu.
 
-[Run the demo](demos/camera-and-scenes/index.html) · [View the source](demos/camera-and-scenes/main.js)
+[Run the demo](demos/camera-and-scenes/index.html) · [View the source](demos/camera-and-scenes/source.html)
 
 Select **Cross room** to pan from the Gatehouse to the Amber Vault. Select **Enter exit** to fade into a new scene.
 

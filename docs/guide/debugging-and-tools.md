@@ -6,7 +6,7 @@
 
 A debug view can show the data the engine is using. Start by pausing the scene, then inspect positions, bounds and the current camera.
 
-[Run the demo](demos/debugging-and-tools/index.html) · [View the source](demos/debugging-and-tools/main.js)
+[Run the demo](demos/debugging-and-tools/index.html) · [View the source](demos/debugging-and-tools/source.html)
 
 Select **Pause**, then **Toggle bounds**. The highlighted rectangle shows the marker's bounds. **Snap to grid** rounds its position from (73, 91) to (64, 96).
 

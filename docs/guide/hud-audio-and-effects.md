@@ -6,7 +6,7 @@
 
 Keep score and inventory in game state. Draw the interface from that state, then trigger short-lived feedback at the point where the state changes.
 
-[Run the demo](demos/hud-audio-and-effects/index.html) · [View the source](demos/hud-audio-and-effects/main.js)
+[Run the demo](demos/hud-audio-and-effects/index.html) · [View the source](demos/hud-audio-and-effects/source.html)
 
 The relic moves on screen as the camera pans. The counter stays in the top-left corner. Select **Collect relic** to update it and see the particle burst. For sound, select **Enable audio** first. **Trigger hazard** shows the screen effects unless reduced motion is enabled. Try the button inside the canvas or its HTML counterpart below it.
 
