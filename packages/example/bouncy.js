@@ -126,6 +126,7 @@ new Engine(
   }
 }, {
   title: 'Bouncy Physics',
+  containerId: 'playground-canvas-container',
   backgroundColour: '#264653'
 });
 
