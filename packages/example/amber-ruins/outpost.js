@@ -408,42 +408,51 @@ export class Outpost {
 
   drawTitle(ui, centre) {
     const { width, height } = ui;
-    const cardWidth = Math.min(460, width - 24);
-    const cardHeight = Math.min(300, height - 20);
-    const top = Math.max(10, (height - cardHeight) / 2 - (this.embedded ? 25 : 0));
-    const x = centre - cardWidth / 2;
+    const baseWidth = Math.min(460, width - 24);
+    const baseHeight = Math.min(300, height - 20);
+    const baseTop = Math.max(10, (height - baseHeight) / 2 - (this.embedded ? 25 : 0));
+    const baseX = centre - baseWidth / 2;
     ui.panel({ x: 0, y: 0, width, height }, '#08161888');
-    ui.panel({ x, y: top, width: cardWidth, height: cardHeight }, panel);
+    const card = ui.panel({ x: baseX, y: baseTop, width: baseWidth, height: baseHeight }, panel, 'outpost-title');
+    const { x, y: top, width: cardWidth, height: cardHeight } = card;
+    const cardCentre = x + cardWidth / 2;
     ui.panel({ x, y: top, width: cardWidth, height: 2 }, gold);
     if (cardHeight >= 250 && this.player) {
-      ui.image(Loader.getImage('amber'), { x: centre - 32, y: top + 11, width: 64, height: 64 });
+      ui.image(Loader.getImage('amber'), { x: cardCentre - 32, y: top + 11, width: 64, height: 64 });
     }
     const titleY = top + (cardHeight >= 250 ? 97 : 55);
-    label(ui, 'AMBER RUINS', centre, titleY, {
+    label(ui, 'AMBER RUINS', cardCentre, titleY, {
       align: 'center', font: 'bold 38px Georgia, serif', colour: gold, maxWidth: cardWidth - 24,
     });
-    label(ui, 'THE LANTERNREACH CHAPTER', centre, titleY + 33, {
+    label(ui, 'THE LANTERNREACH CHAPTER', cardCentre, titleY + 33, {
       align: 'center', font: 'bold 12px system-ui', colour: soft, maxWidth: cardWidth - 20,
     });
-    if (cardHeight >= 250) label(ui, 'An old road. A dark beacon. Someone waiting for the light.', centre, top + 173, {
+    if (cardHeight >= 250) label(ui, 'An old road. A dark beacon. Someone waiting for the light.', cardCentre, top + 173, {
       align: 'center', maxWidth: cardWidth - 20,
     });
     if (this.phase === 'title') {
-      button(ui, 'begin', this.progress ? 'Continue chapter' : 'Begin chapter', centre - 95, top + cardHeight - 68, 190,
+      button(ui, 'begin', this.progress ? 'Continue chapter' : 'Begin chapter', cardCentre - 95, top + cardHeight - 68, 190,
         () => this.start(), true);
     } else label(ui, this.phase === 'error' ? 'The chapter could not load. Reload to try again.' : 'Opening the road…',
-      centre, top + cardHeight - 36, { align: 'center', maxWidth: cardWidth - 20 });
+      cardCentre, top + cardHeight - 36, { align: 'center', maxWidth: cardWidth - 20 });
   }
 
   drawOverlay(ui, centre) {
     const { width, height } = ui;
     const journal = this.overlay === 'journal';
-    const cardWidth = Math.min(520, width - 24);
-    const cardHeight = Math.min(journal ? 248 : 190, height - 8);
-    const top = Math.max(4, (height - cardHeight) / 2 - (this.embedded ? 20 : 0));
-    const x = centre - cardWidth / 2;
+    const baseWidth = Math.min(520, width - 24);
+    const baseHeight = Math.min(journal ? 248 : 190, height - 8);
+    const baseTop = Math.max(4, (height - baseHeight) / 2 - (this.embedded ? 20 : 0));
+    const baseX = centre - baseWidth / 2;
     ui.panel({ x: 0, y: 0, width, height }, '#081618b8');
-    ui.panel({ x, y: top, width: cardWidth, height: cardHeight }, panel);
+    let card;
+    if (journal) {
+      card = ui.panel({ x: baseX, y: baseTop, width: baseWidth, height: baseHeight }, panel, 'outpost-journal');
+    } else {
+      card = { x: baseX, y: baseTop, width: baseWidth, height: baseHeight };
+      ui.panel(card, panel);
+    }
+    const { x, y: top, width: cardWidth, height: cardHeight } = card;
     ui.panel({ x, y: top, width: cardWidth, height: 2 }, gold);
     const { wood, lens, bridge, beacon, flowers, gift, notes } = this.progress;
     const [title, lines] = journal ? ['Field journal', [

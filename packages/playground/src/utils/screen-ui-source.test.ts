@@ -256,3 +256,25 @@ test('keeps a move preview across unrelated edits and restores it through undo a
   window.dispatchEvent(new Event('playground-before-run'));
   expect(change).toBeUndefined();
 });
+
+test('resizes a uniquely identified panel in a class method at its shared layout call', () => {
+  const source = [
+    'class Outpost {',
+    '  draw(ui) {',
+    "    const card = ui.panel({ x: 10, y: 20, width: Math.min(460, ui.width), height: 300 }, panel, 'outpost-title');",
+    '    ui.panel({ ...card, height: 2 }, gold);',
+    '  }',
+    '}',
+  ].join('\n');
+  const position = { lineNumber: 3, column: 18 };
+  const offset = { x: 0, y: 0, properties: { width: 30, height: 20 } };
+  const edits = getScreenUIMoveEdits(source, 'panel', position, offset);
+  expect(edits && applyEdits(source, edits)).toBe(source
+    .replace('Math.min(460, ui.width)', 'Math.max(1, (Math.min(460, ui.width)) + 30)')
+    .replace('height: 300', 'height: 320'));
+  const duplicate = source.replace('    ui.panel({ ...card, height: 2 }, gold);',
+    "    ui.panel({ ...card, height: 2 }, gold, 'outpost-title');");
+  expect(getScreenUIMoveEdits(duplicate, 'panel', position, offset)).toBeUndefined();
+  expect(getScreenUIMoveEdits(source.replace('outpost-title', 'other'), 'panel', position, offset, source))
+    .toBeUndefined();
+});

@@ -253,17 +253,25 @@ export default class ScreenUI {
     if (frame && !this.lifetime.signal.aborted) this.publish(frame, observers);
   }
 
-  panel(rect: ScreenRect, colour: string): void {
+  panel(rect: ScreenRect, colour: string): void;
+  /**
+   * Draw a panel with a stable ID and return its effective bounds for dependent layout.
+   * Use a unique string literal ID at the call site to opt into Playground source editing.
+   */
+  panel(rect: ScreenRect, colour: string, id: string): ScreenRect;
+  panel(rect: ScreenRect, colour: string, id?: string): ScreenRect | void {
     const frame = this.observedFrame;
     if (!frame) {
       this.drawPanel(rect, colour);
-      return;
+      return id === undefined ? undefined : rect;
     }
     const { x, y, width, height } = rect;
     const dimensions = { x, y, width, height };
-    const control: ScreenUIControl = { kind: 'panel', ...dimensions, colour };
+    const control: ScreenUIControl = { kind: 'panel', ...dimensions, colour, ...(id ? { id } : {}) };
     const edit = this.record(frame, control);
-    this.drawPanel(edit ? previewRect(dimensions, control, edit) : dimensions, previewText(edit?.properties?.colour, colour));
+    const painted = edit ? previewRect(dimensions, control, edit) : dimensions;
+    this.drawPanel(painted, previewText(edit?.properties?.colour, colour));
+    return id === undefined ? undefined : painted;
   }
 
   label(label: ScreenLabel): void {

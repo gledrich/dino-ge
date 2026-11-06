@@ -310,11 +310,18 @@ const propertyControls: Record<keyof ScreenUIPropertyChanges, readonly ScreenUIC
   enabled: ['button'],
 };
 
-/** Rewrite a verified singleton draw call while retaining responsive geometry and game state. */
+/** Rewrite a verified draw call while retaining responsive geometry and game state. */
 export function getScreenUIMoveEdits(
   source: string, kind: ScreenUIControlKind, position: SourcePosition, offset: ScreenUIEdit, runtimeSource = source,
 ): ScreenUIMoveEdit[] | undefined {
   return prepareScreenUIEdits(source, kind, position, runtimeSource)?.(offset);
+}
+
+function panelSourceId(call: CallExpression): string | undefined {
+  const id = call.arguments[2];
+  if (call.arguments.length === 3 && id?.type === 'Literal' && typeof id.value === 'string' && id.value) {
+    return id.value;
+  }
 }
 
 export function prepareScreenUIEdits(
@@ -324,7 +331,16 @@ export function prepareScreenUIEdits(
     const scan = inspectSource(source, kind, true);
     const runtime = source === runtimeSource ? scan.calls : inspectSource(runtimeSource, kind).calls;
     const match = findMatchingCalls(scan.calls, runtime, position);
-    if (match && isUniqueScreenDraw(match.call, scan)) return offset => offsetDrawArguments(source, kind, offset, match);
+    if (!match) return;
+    const id = kind === 'panel' ? panelSourceId(match.runningCall) : undefined;
+    if (id) {
+      if (panelSourceId(match.call) !== id ||
+          scan.calls.filter(call => panelSourceId(call) === id).length !== 1 ||
+          runtime.filter(call => panelSourceId(call) === id).length !== 1) return;
+    } else if ((kind === 'panel' && match.call.arguments.length > 2) || !isUniqueScreenDraw(match.call, scan)) {
+      return;
+    }
+    return offset => offsetDrawArguments(source, kind, offset, match);
   } catch {
     return;
   }

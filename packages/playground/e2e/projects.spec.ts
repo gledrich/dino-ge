@@ -77,9 +77,41 @@ test('a fresh Playground runs its editable Amber Ruins copy', async ({ page, bro
     await page.goto(url);
     await expect(page.locator('.script-selector')).toHaveValue('amber-ruins/game');
     await expect(page.locator('#playground-canvas-container canvas')).toBeVisible();
+    const resizeCard = async (id: string) => {
+      await page.getByRole('tab', { name: 'Explorer', exact: true }).click();
+      await page.getByRole('region', { name: 'Screen UI', exact: true })
+        .getByRole('button', { name: id, exact: true }).click();
+      const inspector = page.getByRole('region', { name: 'Screen UI properties', exact: true });
+      await inspector.getByRole('button', { name: 'Edit Screen UI', exact: true }).click();
+      for (const [name, delta] of [['Width', 20], ['Height', 10]] as const) {
+        const input = inspector.getByRole('spinbutton', { name, exact: true });
+        await input.fill(String(Number(await input.inputValue()) + delta));
+        await input.press('Tab');
+      }
+      await inspector.getByRole('button', { name: 'Apply changes', exact: true }).click({ timeout: 5000 });
+      const files = page.getByRole('dialog', { name: 'Project files' });
+      await files.getByRole('button', { name: 'Save module', exact: true }).click();
+      await expect(files.getByText('Saved. Reset the game to run the updated module.')).toBeVisible();
+      const source = await readFile(join(workspace, 'scripts/amber-ruins/outpost.js'), 'utf8');
+      const panel = source.split('\n').find(line => line.includes(`'${id}'`));
+      expect(panel).toContain('width: Math.max(1, (baseWidth) + 20)');
+      expect(panel).toContain('height: Math.max(1, (baseHeight) + 10)');
+      await files.getByRole('button', { name: 'Close', exact: true }).click();
+      await page.getByRole('tab', { name: 'Inspector', exact: true }).click();
+      await inspector.getByRole('button', { name: 'Finish editing Screen UI', exact: true }).click();
+    };
     await expectCanvasText(page, 'THE LANTERNREACH CHAPTER');
-    await clickCanvasText(page, 'Begin chapter');
-    await expectCanvasText(page, 'Lanternreach');
+    await test.step('resize and save the title panel', () => resizeCard('outpost-title'));
+    await page.reload();
+    await test.step('open the journal in the reloaded game', async () => {
+      await clickCanvasText(page, 'Begin chapter');
+      await expectCanvasText(page, 'Lanternreach');
+      await clickCanvasText(page, 'J · Journal');
+      await expectCanvasText(page, 'Field journal');
+    });
+    await test.step('resize and save the journal panel', () => resizeCard('outpost-journal'));
+    await clickCanvasText(page, 'Close');
+    await page.getByRole('tab', { name: 'Editor', exact: true }).click();
     const audioState = () => page.evaluate(() =>
       (window as typeof window & { gameAudio?: BaseAudioContext }).gameAudio?.state
     );

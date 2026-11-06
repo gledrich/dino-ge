@@ -138,6 +138,30 @@ describe('ScreenUI', () => {
     expect(listener).toHaveBeenCalledWith(expect.objectContaining({ controls: [edit.control] }));
   });
 
+  it('shares an identified panel’s preview bounds with dependent controls', () => {
+    const { ui, ctx } = setup();
+    const listener = jest.fn();
+    const getEditing = jest.fn();
+    const observers = new Set([{ listener, getEditing }]);
+    const rect = { x: 10, y: 20, width: 80, height: 30 };
+    const draw = (frame: ScreenUI) => {
+      const card = frame.panel(rect, 'red', 'title-card');
+      frame.panel({ ...card, height: 2 }, 'gold');
+    };
+    ui.render(draw, observers);
+    const control = listener.mock.calls[0][0].controls[0];
+    expect(control.id).toBe('title-card');
+    getEditing.mockReturnValue({
+      positions: [{ index: 0, control, x: 0, y: 0, properties: { width: 20, height: 10 } }],
+    });
+    ui.render(draw, observers);
+    ui.render(draw, observers);
+    expect(ctx.fillRect.mock.calls.slice(-4)).toEqual([
+      [10, 20, 100, 40], [10, 20, 100, 2],
+      [10, 20, 100, 40], [10, 20, 100, 2],
+    ]);
+  });
+
   it('previews button properties without mutating its options or inspection values', () => {
     const { ui, ctx, canvas } = setup();
     const listener = jest.fn();
