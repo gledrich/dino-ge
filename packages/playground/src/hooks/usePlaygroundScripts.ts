@@ -151,6 +151,23 @@ export const usePlaygroundScripts = () => {
         const sourceBase = isProject ? new URL(`/project-runs/${run}/${encodeURIComponent(project)}/`, location.href)
           : new URL('./', sourceUrl);
         const entryPath = `${isProject ? modules.join('/') : currentScriptId}.js`;
+        // Observe module loads directly so a full resource timing buffer cannot drop their revisions.
+        const runningRevisions = new Map<string, string>();
+        const recordModuleRevisions = (entries: readonly PerformanceEntry[]) => {
+          for (const entry of entries) {
+            if (!entry.name.startsWith(sourceBase.href) || runningRevisions.has(entry.name)) continue;
+            const revision = (entry as PerformanceResourceTiming).serverTiming
+              ?.find(timing => timing.name === 'dino-source')?.description;
+            if (revision) runningRevisions.set(entry.name, revision);
+          }
+        };
+        const moduleObserver = isProject && typeof PerformanceObserver !== 'undefined' &&
+          PerformanceObserver.supportedEntryTypes?.includes('resource')
+          ? new PerformanceObserver(list => recordModuleRevisions(list.getEntries())) : undefined;
+        if (moduleObserver) {
+          moduleObserver.observe({ type: 'resource' });
+          sources.signal.addEventListener('abort', () => moduleObserver.disconnect(), { once: true });
+        }
         let sourceIndex: number | undefined;
         let sourceRequest = 0;
         const screenUI = screenUIPreview.start(index => {
@@ -172,8 +189,8 @@ export const usePlaygroundScripts = () => {
           const loadSource = isEntry ? Promise.resolve({ value: scriptText, revision: undefined })
             : readProjectModule(currentScriptId, position.path, sources.signal);
           void loadSource.then(({ value: source, revision }) => {
-            const runningRevision = performance.getEntriesByName(address, 'resource').flatMap(resource =>
-              (resource as PerformanceResourceTiming).serverTiming ?? []).find(timing => timing.name === 'dino-source')?.description;
+            if (moduleObserver) recordModuleRevisions(moduleObserver.takeRecords());
+            const runningRevision = runningRevisions.get(address);
             if (!isEntry && runningRevision && runningRevision !== revision) return;
             const call = findScreenUICall(source, control.kind, position, isEntry ? entry : source);
             if (call && request === sourceRequest) {

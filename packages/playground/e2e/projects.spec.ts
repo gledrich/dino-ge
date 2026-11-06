@@ -50,6 +50,8 @@ test('a fresh Playground runs its editable Amber Ruins copy', async ({ page, bro
 
   try {
     await observeCanvasUI(page);
+    // Source verification must still work when the page's resource timing buffer fills.
+    await page.addInitScript(() => performance.setResourceTimingBufferSize(0));
     await page.addInitScript(() => {
       const observed = window as typeof window & { gameAudio?: BaseAudioContext; loopsStarted: number };
       observed.loopsStarted = 0;
