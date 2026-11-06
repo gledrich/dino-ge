@@ -58,6 +58,13 @@
   touch-action: none;
 }
 
+.screen-ui-grid {
+  position: absolute;
+  pointer-events: none;
+  background-image: linear-gradient(to right, #54d6ad38 1px, transparent 1px),
+    linear-gradient(to bottom, #54d6ad38 1px, transparent 1px);
+}
+
 .screen-ui-outline {
   position: absolute;
   outline: 2px solid var(--accent-primary);

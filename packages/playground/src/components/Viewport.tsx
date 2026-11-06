@@ -207,6 +207,8 @@ const Viewport: React.FC<{
   const isGridSnapping = snapMode === 'grid';
   const isAlignmentSnapping = snapMode === 'objects';
   const [sceneGridSize, setSceneGridSize] = useState(16);
+  const [screenGridSize, setScreenGridSize] = useState(16);
+  const [snapScreenUI, setSnapScreenUI] = useState(false);
   const [keepProportions, setKeepProportions] = useState(false);
   const [snapRotation, setSnapRotation] = useState(false);
   const placementStep = isGridSnapping ? sceneGridSize : 1;
@@ -1080,6 +1082,15 @@ const Viewport: React.FC<{
               </button>
               <button type="button" className="scene-control" onClick={toggleScreenUIEditing}>Done</button>
             </div>
+            <div className="scene-object-options" role="group" aria-label="Screen UI snapping">
+              <button type="button" className="scene-control" aria-label="Snap to grid" aria-pressed={snapScreenUI}
+                title={`Snap moves and resize edges to the ${screenGridSize} px screen grid`}
+                onClick={() => setSnapScreenUI(enabled => !enabled)}>Grid snap</button>
+              <select className="scene-control scene-grid-size" aria-label="Grid cell size" value={screenGridSize}
+                onChange={event => setScreenGridSize(Number(event.target.value))}>
+                {sceneGridSizes.map(size => <option key={size} value={size}>{size} px</option>)}
+              </select>
+            </div>
             <span className="scene-edit-hint">{!screenUISelected ? 'Select a control on the canvas.' :
               'Drag to move or resize. Apply changes in Inspector.'}</span>
           </>}
@@ -1207,7 +1218,7 @@ const Viewport: React.FC<{
           Play Amber Ruins directly
         </a>}
       </div>}
-      <ScreenUIOutline />
+      <ScreenUIOutline gridSize={snapScreenUI ? screenGridSize : 0} />
       {browserPreviewUrl && <HostedLibraryPlacement />}
       <Toolbar 
         isPaused={isPaused}

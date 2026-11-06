@@ -1,6 +1,7 @@
 import { useEffect, useRef } from 'react';
 import type { ScreenUIControl } from 'dino-ge';
 import { getScreenUIBounds, screenUIArrowOffsets, screenUIPreview, type ScreenUIMove } from '../utils/screen-ui-preview';
+import { snapScreenUIDelta } from '../utils/screen-ui-grid';
 import { screenUIControlName } from './ScreenUIFields';
 
 const corners = [
@@ -12,17 +13,19 @@ const corners = [
 type Corner = typeof corners[number];
 type Start = { pointer: number; clientX: number; clientY: number; move?: ScreenUIMove; finish: (cancel?: boolean) => void };
 
-export function ScreenUIResizeHandles({ control, move, projection, scaleX, scaleY }: {
+export function ScreenUIResizeHandles({ control, move, projection, scaleX, scaleY, gridSize }: {
   control: ScreenUIControl; move?: ScreenUIMove;
   projection: { left: number; top: number; width: number; height: number };
-  scaleX: number; scaleY: number;
+  scaleX: number; scaleY: number; gridSize: number;
 }) {
   const start = useRef<Start>(undefined);
   useEffect(() => () => start.current?.finish(true), []);
   const changeSize = (corner: Corner, initial: ScreenUIMove | undefined, dx: number, dy: number) => {
     const bounds = getScreenUIBounds(control, initial);
-    const width = Math.max(1, bounds.width + corner.x * dx);
-    const height = Math.max(1, bounds.height + corner.y * dy);
+    const edgeX = bounds.x + (corner.x > 0 ? bounds.width : 0);
+    const edgeY = bounds.y + (corner.y > 0 ? bounds.height : 0);
+    const width = Math.max(1, bounds.width + corner.x * snapScreenUIDelta(edgeX, dx, gridSize));
+    const height = Math.max(1, bounds.height + corner.y * snapScreenUIDelta(edgeY, dy, gridSize));
     const x = (initial?.x ?? 0) + ((corner.x < 0) !== !!control.reversedX ? bounds.width - width : 0) *
       (control.reversedX ? -1 : 1);
     const y = (initial?.y ?? 0) + ((corner.y < 0) !== !!control.reversedY ? bounds.height - height : 0) *
@@ -65,7 +68,7 @@ export function ScreenUIResizeHandles({ control, move, projection, scaleX, scale
       if (!direction) return;
       event.preventDefault();
       event.stopPropagation();
-      const step = event.shiftKey ? 10 : 1;
+      const step = (gridSize || 1) * (event.shiftKey ? 10 : 1);
       changeSize(corner, move, direction[0] * step, direction[1] * step);
     }} />);
 }

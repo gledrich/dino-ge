@@ -186,6 +186,34 @@ async function expectScreenPosition(page: Page, x: number, y: number) {
   }
 }
 
+test('snaps Screen UI moves and resize edges to the grid and keeps each edit undoable', async ({ page }) => {
+  await openGame(page);
+  await selectScreenControl(page, 'Hide meter');
+  await screenUIProperties(page).getByRole('button', { name: 'Edit Screen UI', exact: true }).click();
+  const tools = page.getByRole('group', { name: 'Screen UI editing', exact: true });
+  await tools.getByRole('button', { name: 'Snap to grid', exact: true }).click();
+  await tools.getByRole('combobox', { name: 'Grid cell size' }).selectOption('16');
+  const start = await canvasPoint(page, 68, 42);
+  const end = await canvasPoint(page, 88, 54);
+  await page.mouse.move(start.x, start.y);
+  await page.mouse.down();
+  await page.mouse.move(end.x, end.y, { steps: 4 });
+  await page.mouse.up();
+  await expectScreenPosition(page, 32, 32);
+  await tools.getByRole('combobox', { name: 'Grid cell size' }).selectOption('32');
+  const resize = page.getByRole('button', { name: 'Resize Hide meter from bottom right', exact: true });
+  await resize.press('ArrowRight');
+  const width = screenUIProperties(page).getByRole('spinbutton', { name: 'Width', exact: true });
+  await expect(width).toHaveValue('128');
+  await expect(screenUIProperties(page).getByRole('spinbutton', { name: 'Height', exact: true })).toHaveValue('36');
+  await tools.getByRole('button', { name: 'Undo Screen UI edit' }).click();
+  await expect(width).toHaveValue('100');
+  await tools.getByRole('button', { name: 'Undo Screen UI edit' }).click();
+  await expectScreenPosition(page, 18, 24);
+  await tools.getByRole('button', { name: 'Redo Screen UI edit' }).click();
+  await expectScreenPosition(page, 32, 32);
+});
+
 test('drags Screen UI in canvas pixels and discards the preview without activating the game button', async ({ page }) => {
   await openGame(page);
   await selectScreenControl(page, 'Hide meter');

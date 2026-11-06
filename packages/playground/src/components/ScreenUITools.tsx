@@ -3,6 +3,7 @@ import { Engine, type GameObject, type ScreenUIControl } from 'dino-ge';
 import { usePlayground } from '../context/PlaygroundContext';
 import { useScreenUIEditing } from '../hooks/useScreenUIEditing';
 import { getScreenUIBounds, openScreenUISourceEvent, screenUIArrowOffsets, screenUIPreview, type OpenScreenUISource, type ScreenUIBounds, type ScreenUIMove } from '../utils/screen-ui-preview';
+import { snapScreenUIDelta } from '../utils/screen-ui-grid';
 import { applyScreenUIMoveEvent, prepareScreenUIEdits, type ApplyScreenUIMove } from '../utils/screen-ui-source';
 import { ScreenUIFields, screenUIControlKinds, screenUIControlName } from './ScreenUIFields';
 import { ScreenUIResizeHandles } from './ScreenUIResizeHandles';
@@ -81,7 +82,7 @@ function ScreenUIProperties({ control, source, move, editing, pending, onStart, 
         <section className="inspector-section screen-ui-inspector" aria-label="Screen UI properties">
           <h3>{control ? screenUIControlName(control, move) : 'Screen UI'}</h3>
           <p className="inspector-section-description">{editing
-            ? 'Drag to move, pull a corner to resize, or edit a value below. Hold Shift with the arrow keys for 10-pixel steps.'
+            ? 'Drag to move, pull a corner to resize, or edit a value below. Hold Shift with the arrow keys for larger steps.'
             : 'Screen UI · Live preview'}</p>
           {control && <ScreenUIFields control={control} move={move} editable={editing && !move?.applied} />}
           {source && <button type="button" className="scene-control" onClick={event =>
@@ -123,11 +124,11 @@ function ScreenUIProperties({ control, source, move, editing, pending, onStart, 
   );
 }
 
-export function ScreenUIOutline() {
+export function ScreenUIOutline({ gridSize }: { gridSize: number }) {
   const { frame, canvas, selected, editing, moves } = useSyncExternalStore(screenUIPreview.subscribe, screenUIPreview.getSnapshot);
   const origin = useRef<HTMLDivElement>(null);
   const drag = useRef<{ pointer: number; index: number; clientX: number; clientY: number; x: number; y: number;
-    finish: (cancel?: boolean) => void } | undefined>(undefined);
+    left: number; top: number; finish: (cancel?: boolean) => void } | undefined>(undefined);
   const [bounds, setBounds] = useState<ScreenUIBounds>();
   const active = selected !== undefined || editing;
   const hosted = canvas !== undefined;
@@ -177,6 +178,12 @@ export function ScreenUIOutline() {
   const selectedMove = moves.find(move => move.index === selected);
   return <div ref={origin} className="screen-ui-outline-layer" data-editing={editing || undefined}
     aria-hidden={editing ? undefined : true}>
+    {editing && gridSize > 0 && bounds && frame && scaleX > 0 && scaleY > 0 &&
+      <div className="screen-ui-grid" aria-hidden="true" style={{
+        left: bounds.x + (canvas?.x ?? 0), top: bounds.y + (canvas?.y ?? 0),
+        width: frame.width * scaleX, height: frame.height * scaleY,
+        backgroundSize: `${gridSize * scaleX}px ${gridSize * scaleY}px`,
+      }} />}
     {bounds && scaleX > 0 && scaleY > 0 && (editing ? frame?.controls.map((item, index) => {
       const offset = moves.find(move => move.index === index);
       return <button key={index} type="button" aria-label={`Move ${screenUIControlName(item, offset)}`}
@@ -189,15 +196,18 @@ export function ScreenUIOutline() {
           if (offset?.applied) return;
           const finish = screenUIPreview.beginGesture();
           if (!finish) return;
+          const { x: left, y: top } = getScreenUIBounds(item, offset);
           drag.current = { pointer: event.pointerId, index, clientX: event.clientX, clientY: event.clientY,
-            x: offset?.x ?? 0, y: offset?.y ?? 0, finish };
+            x: offset?.x ?? 0, y: offset?.y ?? 0, left, top, finish };
           event.currentTarget.setPointerCapture(event.pointerId);
         }}
         onPointerMove={event => {
           const start = drag.current;
           if (!start || start.pointer !== event.pointerId || start.index !== screenUIPreview.getSnapshot().selected) return;
-          screenUIPreview.move(start.x + Math.round((event.clientX - start.clientX) / scaleX),
-            start.y + Math.round((event.clientY - start.clientY) / scaleY));
+          const dx = Math.round((event.clientX - start.clientX) / scaleX);
+          const dy = Math.round((event.clientY - start.clientY) / scaleY);
+          screenUIPreview.move(start.x + snapScreenUIDelta(start.left, dx, gridSize),
+            start.y + snapScreenUIDelta(start.top, dy, gridSize));
         }}
         onPointerUp={event => {
           if (drag.current?.pointer !== event.pointerId) return;
@@ -218,12 +228,14 @@ export function ScreenUIOutline() {
           event.preventDefault();
           event.stopPropagation();
           screenUIPreview.select(index);
-          const step = event.shiftKey ? 10 : 1;
-          screenUIPreview.move((offset?.x ?? 0) + direction[0] * step, (offset?.y ?? 0) + direction[1] * step);
+          const step = (gridSize || 1) * (event.shiftKey ? 10 : 1);
+          const { x, y } = getScreenUIBounds(item, offset);
+          screenUIPreview.move((offset?.x ?? 0) + snapScreenUIDelta(x, direction[0] * step, gridSize),
+            (offset?.y ?? 0) + snapScreenUIDelta(y, direction[1] * step, gridSize));
         }} />;
     }) : control && <div className="screen-ui-outline" style={project(control)} />)}
     {editing && bounds && control && control.kind !== 'label' && !selectedMove?.applied && scaleX > 0 && scaleY > 0 &&
       <ScreenUIResizeHandles key={selected} control={control} move={selectedMove}
-        projection={project(control, selectedMove)} scaleX={scaleX} scaleY={scaleY} />}
+        projection={project(control, selectedMove)} scaleX={scaleX} scaleY={scaleY} gridSize={gridSize} />}
   </div>;
 }
