@@ -45,4 +45,46 @@ Use `Sound.unlock()` from a click or key press before playing a decoded sound.
 To try this flow, build dino-ge with `npm run build -w dino-ge`, start
 `npm run example` and open `http://localhost:3001/asset-loading.html`.
 
+## Write a world shader
+
+Install a GLSL ES 3.00 fragment shader on the engine to change the composed
+world. The Canvas renderer supplies the world image. The shader runs before
+the built-in colour separation and fade overlays, and the screen HUD is drawn
+after the effect.
+
+```js
+const result = game.setPostProcessShader({
+  fragmentSource: `#version 300 es
+precision highp float;
+in vec2 v_uv;
+uniform sampler2D u_scene;
+uniform float amount;
+out vec4 colour;
+
+void main() {
+  vec4 source = texture(u_scene, v_uv);
+  colour = vec4(mix(source.rgb, source.bgr, amount), source.a);
+}`,
+  uniforms: { amount: 0.7 },
+});
+if (!result.ok) console.warn(result.message);
+```
+
+Use `v_uv` as normalised texture coordinates with the origin at the bottom left.
+Declare `uniform vec2 u_resolution` for the backing canvas size in pixels and
+`uniform float u_time` for unpaused game time in seconds. You can update custom
+float and vector uniforms with `game.setPostProcessUniforms({ amount: 0.4 })`.
+Pass `null` to `setPostProcessShader()` to turn the effect off. If a replacement
+fails to compile or link, the previous shader stays installed.
+
+When WebGL2 is unavailable or the context is lost, the engine draws the world
+through Canvas 2D. Use same-origin artwork or load remote artwork with CORS
+enabled so WebGL can sample it. The engine also falls back for cross-origin
+artwork without CORS and retries with a fresh world canvas as game time
+advances. Read `game.postProcessStatus` to show the current rendering status.
+
+Build the engine with `npm run build -w dino-ge`, run `npm run example` and open
+[World shaders](http://localhost:3001/shader-effects.html). Toggle the shader
+or move the strength slider while the white HUD panel stays in place.
+
 [ScreenUI](../api/classes/core_ScreenUI.ScreenUI.html) · [Sound](../api/classes/core_Sound.Sound.html) · [ParticleEmitter](../api/classes/objects_ParticleEmitter.ParticleEmitter.html) · [Engine effects](../api/classes/core_Engine.Engine.html)

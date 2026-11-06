@@ -40,6 +40,17 @@ new Engine({
 }, { containerId: 'game', width: '100%', height: '100%' });
 ```
 
+## World shaders
+
+`game.setPostProcessShader({ fragmentSource, uniforms })` adds a GLSL ES 3.00
+fragment pass to the Canvas-rendered world. The shader can sample the scene
+through `u_scene` and read the backing resolution and game time from
+`u_resolution` and `u_time`. Use `setPostProcessUniforms()` to update custom
+float or vector uniforms and `setPostProcessShader(null)` to disable the pass.
+The Canvas world remains visible when WebGL2 cannot apply the shader. See the
+[HUD and effects guide](../../docs/guide/hud-audio-and-effects.md) for a shader
+and a local demo.
+
 ## Learn more
 
 - [Engine guide](../../docs/guide/index.md) covers scenes, physics, animation, input, tile maps, audio and effects.

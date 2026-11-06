@@ -1,0 +1,36 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>World shaders | Dino GE</title>
+  <style>
+    body { margin: 0; color: #e8efe9; background: #132125; font: 1rem/1.55 system-ui, sans-serif; }
+    main { max-width: 38rem; margin: 2rem auto; padding: 0 1rem; }
+    h1 { line-height: 1.1; }
+    #world { width: 100%; max-width: 480px; height: 220px; outline: 1px solid #799d92; }
+    canvas { display: block; }
+    .controls { display: flex; flex-wrap: wrap; align-items: center; gap: .75rem 1.5rem; margin-block: 1rem; }
+    button, input { font: inherit; }
+    a { color: #bee9d6; }
+    :focus-visible { outline: 2px solid #f6ce8f; outline-offset: 4px; }
+    pre { overflow: auto; padding: 1rem; background: #0c181b; }
+  </style>
+  <script type="importmap">{"imports":{"dino-ge":"/built/index.js"}}</script>
+  <script type="module" src="/shader-effects.js"></script>
+</head>
+<body>
+  <main>
+    <h1>World shaders</h1>
+    <p>A custom GLSL shader swaps colour channels and sweeps a band of light across the room. The Canvas HUD stays white while the world changes.</p>
+    <div id="world"></div>
+    <div class="controls">
+      <button id="toggle" type="button" aria-pressed="true" disabled>World shader</button>
+      <label>Strength <input id="strength" type="range" min="0" max="1" step="0.05" value="1"></label>
+    </div>
+    <p id="status" role="status">Loading world…</p>
+    <details><summary>View the fragment shader</summary><pre id="source"></pre></details>
+    <p><a href="/">Back to Amber Ruins</a></p>
+  </main>
+</body>
+</html>
