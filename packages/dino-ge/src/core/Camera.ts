@@ -10,10 +10,25 @@ export interface CameraBounds {
   height: number;
 }
 
-function followAxis(centre: number, viewportSize: number, start: number, size: number): number {
+export interface CameraSmoothFollowOptions {
+  /** Positive exponential response rate per second. Defaults to 8. */
+  response?: number;
+  /** Optional rectangle in world coordinates. */
+  bounds?: CameraBounds;
+}
+
+function fitAxis(origin: number, viewportSize: number, start: number, size: number): number {
   const travel = size - viewportSize;
   if (travel <= 0) return start + travel / 2;
-  return Math.max(start, Math.min(centre - viewportSize / 2, start + travel));
+  return Math.max(start, Math.min(origin, start + travel));
+}
+
+function worldFollowOrigin(target: GameObject, width: number, height: number) {
+  const { left, right, top, bottom } = getViewportBounds(getViewportGeometry(target));
+  return {
+    x: left + (right - left) / 2 - width / 2,
+    y: top + (bottom - top) / 2 - height / 2,
+  };
 }
 
 /**
@@ -41,17 +56,11 @@ export default class Camera {
    */
   public follow(target: GameObject, viewportWidth: number, viewportHeight: number, bounds?: CameraBounds) {
     if (bounds) {
-      const { x, y, width, height } = bounds;
-      const viewport = this.getViewportBounds(viewportWidth, viewportHeight);
-      if (this.zoom <= 0 || ![this.zoom, x, y, width, height, x + width, y + height,
-        viewport.width, viewport.height].every(Number.isFinite) ||
-        width < 0 || height < 0 || viewport.width < 0 || viewport.height < 0) {
-        throw new RangeError('Bounded camera follow needs finite bounds and viewport dimensions, and positive zoom.');
-      }
-      const { left, right, top, bottom } = getViewportBounds(getViewportGeometry(target));
+      const viewport = this.followViewport(viewportWidth, viewportHeight, bounds);
+      const origin = worldFollowOrigin(target, viewport.width, viewport.height);
       this.position.set(
-        followAxis(left + (right - left) / 2, viewport.width, x, width),
-        followAxis(top + (bottom - top) / 2, viewport.height, y, height),
+        fitAxis(origin.x, viewport.width, bounds.x, bounds.width),
+        fitAxis(origin.y, viewport.height, bounds.y, bounds.height),
       );
       return;
     }
@@ -60,6 +69,58 @@ export default class Camera {
     const height = target.bounds?.height ?? 0;
     this.position.x = (target.transform.position.x + width / 2) - (viewportWidth / 2) / this.zoom;
     this.position.y = (target.transform.position.y + height / 2) - (viewportHeight / 2) / this.zoom;
+  }
+
+  /**
+   * Eases towards the target's rendered world centre using elapsed game time.
+   * With bounds, constrains the current origin and the destination before easing.
+   * An oversized axis centres immediately, including when elapsed time is zero.
+   */
+  public followSmooth(target: GameObject, viewportWidth: number, viewportHeight: number,
+    deltaSeconds: number, { response = 8, bounds }: CameraSmoothFollowOptions = {}): void {
+    if (!Number.isFinite(deltaSeconds) || deltaSeconds < 0 || !Number.isFinite(response) || response <= 0) {
+      throw new RangeError('Smooth camera follow needs non-negative elapsed seconds and a positive finite response.');
+    }
+    const viewport = this.followViewport(viewportWidth, viewportHeight, bounds);
+    const desired = worldFollowOrigin(target, viewport.width, viewport.height);
+    let { x, y } = this.position;
+    if (![x, y, desired.x, desired.y].every(Number.isFinite)) {
+      throw new RangeError('Smooth camera follow needs finite camera and target positions.');
+    }
+
+    if (bounds) {
+      x = fitAxis(x, viewport.width, bounds.x, bounds.width);
+      y = fitAxis(y, viewport.height, bounds.y, bounds.height);
+      desired.x = fitAxis(desired.x, viewport.width, bounds.x, bounds.width);
+      desired.y = fitAxis(desired.y, viewport.height, bounds.y, bounds.height);
+    }
+
+    const blend = -Math.expm1(-response * deltaSeconds);
+    let nextX = x * (1 - blend) + desired.x * blend;
+    let nextY = y * (1 - blend) + desired.y * blend;
+    if (bounds) {
+      // Floating-point rounding can otherwise move a fixed axis by one ulp.
+      nextX = fitAxis(nextX, viewport.width, bounds.x, bounds.width);
+      nextY = fitAxis(nextY, viewport.height, bounds.y, bounds.height);
+    }
+    if (![nextX, nextY].every(Number.isFinite)) {
+      throw new RangeError('Smooth camera follow could not compute a finite camera position.');
+    }
+    this.position.set(nextX, nextY);
+  }
+
+  private followViewport(width: number, height: number, bounds?: CameraBounds) {
+    const viewport = this.getViewportBounds(width, height);
+    if (this.zoom <= 0 || ![this.zoom, viewport.width, viewport.height].every(Number.isFinite) ||
+      viewport.width < 0 || viewport.height < 0) {
+      throw new RangeError('Camera follow needs finite viewport dimensions and positive zoom.');
+    }
+    if (bounds && (![bounds.x, bounds.y, bounds.width, bounds.height,
+      bounds.x + bounds.width, bounds.y + bounds.height].every(Number.isFinite) ||
+      bounds.width < 0 || bounds.height < 0)) {
+      throw new RangeError('Camera follow needs finite bounds with non-negative dimensions.');
+    }
+    return viewport;
   }
 
   /**

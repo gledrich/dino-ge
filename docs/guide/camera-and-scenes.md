@@ -28,7 +28,28 @@ Engine.camera.follow(player, game.width, game.height, world);
 
 Bounded follow uses the target's rendered centre. It clamps the visible area to the rectangle at the current zoom. If the viewport is larger than the world on either axis, the camera centres that axis so the space on both sides is equal. `Engine.camera.getViewportBounds(width, height)` gives the resulting visible region in world coordinates.
 
-To try the bounded follow demo from a repository checkout, run `npm run build -w dino-ge` and `npm run example`, then open [Bounded camera follow](http://localhost:3001/camera-bounds.html). Move to an edge and toggle the bounds, then zoom out to see the oversized viewport behaviour.
+Use `followSmooth()` to ease the camera using elapsed game time. Pass seconds
+since the last follow step and an optional response rate. A higher rate
+approaches the target faster, with a default of 8 per second. For a stationary
+target, splitting the same elapsed time across more updates produces the same
+position.
+
+```js
+fixedUpdate() {
+  Engine.camera.followSmooth(player, game.width, game.height, 1 / 60, {
+    response: 5,
+    bounds: world,
+  });
+}
+```
+
+Smooth follow uses the target's rendered world centre with or without bounds.
+If you pass bounds, the camera first projects its current position into the
+valid range. This corrects the viewport immediately after a resize or zoom,
+then easing continues from the corrected position. An axis larger than the
+world remains centred.
+
+To try the bounded follow demo from a repository checkout, run `npm run build -w dino-ge` and `npm run example`, then open [Bounded camera follow](http://localhost:3001/camera-bounds.html). Select **Jump surveyor** with **Smooth follow** on and off to compare the movement. Toggle the bounds at an edge, then zoom out to see how the larger viewport is centred.
 
 ```js
 game.transitionTo(new BeyondTheRuins(), { type: 'fade', duration: 0.5 });

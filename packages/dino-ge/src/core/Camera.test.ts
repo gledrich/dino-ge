@@ -111,6 +111,76 @@ describe('Camera', () => {
     expect(camera.position).toMatchObject({ x: 4, y: 5 });
   });
 
+  it('smooths towards a stationary target consistently across frame rates', () => {
+    const singleFrame = new Camera();
+    const splitFrames = new Camera();
+    const target = new MockGameObject('target', 0);
+    target.transform.position.set(125, 225);
+    singleFrame.followSmooth(target, 100, 100, 0.25, { response: 4 });
+    for (let frame = 0; frame < 30; frame++) {
+      splitFrames.followSmooth(target, 100, 100, 1 / 120, { response: 4 });
+    }
+
+    expect(singleFrame.position.x).toBeCloseTo(63.2120558829);
+    expect(singleFrame.position.y).toBeCloseTo(126.4241117657);
+    expect(splitFrames.position.x).toBeCloseTo(singleFrame.position.x, 12);
+    expect(splitFrames.position.y).toBeCloseTo(singleFrame.position.y, 12);
+  });
+
+  it('projects an invalid origin into the bounds before easing and clamps on resize at zero delta', () => {
+    const camera = new Camera();
+    camera.zoom = 2;
+    camera.position.set(300, -40);
+    const target = new MockGameObject('target', 0);
+    target.transform.position.set(20, 80);
+    const bounds = { x: -50, y: 20, width: 200, height: 160 };
+    const options = { response: Math.LN2, bounds };
+
+    camera.followSmooth(target, 200, 100, 1, options);
+    expect(camera.position).toMatchObject({ x: 22.5, y: 50 });
+
+    camera.followSmooth(target, 300, 400, 0, options);
+    expect(camera.getViewportBounds(300, 400)).toEqual({ x: 0, y: 0, width: 150, height: 200 });
+  });
+
+  it('keeps an oversized axis at its exact midpoint while the other axis eases', () => {
+    const camera = new Camera();
+    const target = new MockGameObject('target', 0);
+    camera.followSmooth(target, 4, 20, 0.03, { bounds: { x: 0.1, y: 0, width: 2, height: 80 } });
+    expect(camera.position.x).toBe(-0.9);
+    expect(camera.position.y).toBeGreaterThan(0);
+  });
+
+  it('follows a transformed target in world space even without bounds', () => {
+    const camera = new Camera();
+    const parent = new MockGameObject('parent', 0);
+    parent.transform.position.set(100, 100);
+    parent.transform.scale.set(2, 2);
+    const target = new MockGameObject('target', 0);
+    target.transform.parent = parent.transform;
+    target.transform.position.set(20, 0);
+    target.transform.rotation = Math.PI / 2;
+
+    camera.followSmooth(target, 100, 100, 1, { response: Math.LN2 });
+    expect(camera.position).toMatchObject({ x: 20, y: 50 });
+  });
+
+  it('rejects invalid smooth follow inputs without moving the camera', () => {
+    const camera = new Camera();
+    camera.position.set(4, 5);
+    const target = new MockGameObject('target', 0);
+    expect(() => camera.followSmooth(target, 100, 100, -0.1)).toThrow(RangeError);
+    expect(() => camera.followSmooth(target, 100, 100, Infinity)).toThrow(RangeError);
+    expect(() => camera.followSmooth(target, 100, 100, 0.1, { response: 0 })).toThrow(RangeError);
+    expect(() => camera.followSmooth(target, -1, 100, 0.1)).toThrow(RangeError);
+    expect(() => camera.followSmooth(target, 100, 100, 0.1, {
+      bounds: { x: 0, y: 0, width: -1, height: 100 },
+    })).toThrow(RangeError);
+    target.transform.position.set(NaN, 0);
+    expect(() => camera.followSmooth(target, 100, 100, 0.1)).toThrow(RangeError);
+    expect(camera.position).toMatchObject({ x: 4, y: 5 });
+  });
+
   it('calculates viewport bounds with zoom', () => {
     const camera = new Camera();
     camera.position = new Vector2(100, 100);

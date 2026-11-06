@@ -11,7 +11,7 @@
     #survey { width: 100%; max-width: 520px; height: 240px; outline: 1px solid #6c8a80; }
     canvas { display: block; }
     fieldset { border: 0; padding: 0; margin: 1rem 0 0; display: flex; flex-wrap: wrap; gap: .5rem 1.5rem; }
-    select { font: inherit; }
+    select, button { font: inherit; }
     :focus-visible { outline: 2px solid #ffd78a; outline-offset: 4px; }
     a { color: #acebc3; }
   </style>
@@ -21,10 +21,12 @@
 <body>
   <main>
     <h1>Bounded camera follow</h1>
-    <p>Focus the map, then move the surveyor with WASD, the arrow keys or a gamepad’s left stick. Walk to an edge and compare the camera with bounds on and off. Zoom out to see the world centre inside the larger view.</p>
+    <p>Focus the map, then move the surveyor with WASD, the arrow keys or a gamepad’s left stick. Select Jump surveyor to compare smooth and immediate follow. Toggle the bounds at a world edge, or zoom out to see the world centred in the larger view.</p>
     <div id="survey" role="region" aria-label="Survey map" tabindex="0"></div>
     <fieldset aria-label="Camera controls">
       <label><input id="bounded" type="checkbox" checked> Keep camera in the world</label>
+      <label><input id="smooth" type="checkbox" checked> Smooth follow</label>
+      <button id="jump" type="button" disabled>Jump surveyor</button>
       <label>Camera zoom
         <select id="zoom">
           <option value="0.4">40%</option>
