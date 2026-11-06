@@ -1,0 +1,41 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Collider lab | Dino GE</title>
+  <style>
+    body { margin: 0; color: #e3e9e6; background: #0f1c20; font: 1rem/1.55 system-ui, sans-serif; }
+    main { max-width: 36rem; margin: 3rem auto; padding: 0 .75rem; }
+    h1 { line-height: 1.1; }
+    .eyebrow { color: #9bceb5; font-size: .85rem; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; }
+    .lab { width: 280px; height: 186px; margin-block: 1.5rem 1rem; outline: 1px solid #54766c; }
+    canvas { display: block; }
+    .controls { display: flex; flex-wrap: wrap; align-items: center; gap: .6rem 1rem; }
+    label { display: inline-flex; align-items: center; gap: .35rem; }
+    input { accent-color: #aeedc9; }
+    button { padding: .5rem .85rem; border: 1px solid #aeedc9; border-radius: .3rem; font: inherit; color: #11241d; background: #aeedc9; cursor: pointer; }
+    button:focus-visible, input:focus-visible, a:focus-visible { outline: 2px solid #ffcc80; outline-offset: 4px; }
+    [role="status"] { color: #d6b783; }
+    a { color: #aeedc9; }
+  </style>
+  <script type="importmap">{"imports":{"dino-ge":"/built/index.js"}}</script>
+  <script type="module" src="/collider-lab.js"></script>
+</head>
+<body>
+  <main>
+    <p class="eyebrow">Dino GE example</p>
+    <h1>Collider lab</h1>
+    <p>A sign sits above its collision fixtures. The dashed circle is a sensor, and the two solid outlines belong to one compound collider. Aim the ray or launch a probe to see where each makes contact.</p>
+    <div class="lab" id="collider-lab"></div>
+    <div class="controls">
+      <label>Ray target height <input id="ray-height" type="range" min="25" max="160" value="102"></label>
+      <label><input id="ray-sensors" type="checkbox"> Include sensors</label>
+      <button id="launch-probe" type="button" disabled>Launch probe</button>
+    </div>
+    <p id="ray-result" role="status">Preparing the ray…</p>
+    <p id="probe-result" role="status">Probe ready.</p>
+    <p><a href="/">Back to Amber Ruins</a></p>
+  </main>
+</body>
+</html>

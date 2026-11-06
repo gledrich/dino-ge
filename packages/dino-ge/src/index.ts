@@ -37,6 +37,7 @@ export { default as Input, type InputBinding, type ObjectManipulationPreview } f
 export { getViewportAlignment, getViewportBounds, getViewportGeometry, snapToGrid } from './core/ViewportGeometry.js';
 export { default as Line } from './objects/Line.js';
 export { default as Loader } from './core/Loader.js';
+export type { RaycastHit, RaycastOptions } from './physics/Raycast.js';
 export { default as Physics } from './physics/Physics.js';
 export type { CollisionEventDetail, CollisionManifold } from './physics/Physics.js';
 export { default as Rectangle } from './objects/Rectangle.js';

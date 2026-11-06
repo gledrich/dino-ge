@@ -52,4 +52,41 @@ rover.on('collisionStart', ({ detail }) => {
 
 The physics system tracks contacts in the active scene. A direct `Physics.checkCollision(a, b)` applies filters and emits the legacy event without tracking a lifecycle. To try the new events, build dino-ge with `npm run build -w dino-ge`, start `npm run example`, and open [Collision filters](http://localhost:3001/collision-filters.html).
 
+## Explicit colliders and raycasts
+
+Attach a `ColliderComponent` to give an object collision geometry separate from
+its artwork. Fixtures use local coordinates. Rectangles start at their
+top-left corner, circles at their centre, and strictly convex polygons use
+ordered boundary vertices. Several fixtures form one compound. An explicit
+collider without a `PhysicsComponent` is static. Circles stay round using the
+larger absolute world scale. A zero world scale on either axis disables the
+fixtures.
+
+```js
+import { ColliderComponent, Physics, Vector2 } from 'dino-ge';
+
+relay.addComponent(new ColliderComponent([
+  { kind: 'rectangle', x: 0, y: 12, width: 40, height: 8 },
+  { kind: 'circle', x: 48, y: 16, radius: 6 },
+]));
+
+const hit = Physics.raycast(new Vector2(0, 40), new Vector2(200, 40), {
+  ignore: player,
+});
+if (hit) console.log(hit.object.metadata.tag, hit.point, hit.normal);
+```
+
+Compounds produce one collision event per object pair. The manifold describes
+the deepest fixture contact detected in that step. Raycasts read the active
+scene or global objects at the time of the call. `Physics.raycastAll` returns
+the first boundary hit per fixture in distance order. A ray that starts inside
+a fixture reports its exit if the segment reaches it. Use `includeSensors:
+true` to include sensor hits. The `mask` and `category` options apply the same
+mutual bit filtering as collision detection.
+
+To run the collider lab, build the engine with `npm run build -w dino-ge`
+and start the example server with `npm run example` from the repository root.
+Open `http://localhost:3001/collider-lab.html` to aim a ray through a compound
+and launch a probe past a sensor.
+
 [PhysicsComponent](../api/classes/components_PhysicsComponent.PhysicsComponent.html) · [PhysicsSystem](../api/classes/systems_PhysicsSystem.PhysicsSystem.html) · [CollisionManifold](../api/interfaces/physics_Physics.CollisionManifold.html)

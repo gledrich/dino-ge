@@ -4,6 +4,7 @@ import Circle from '../objects/Circle.js';
 import PhysicsComponent from '../components/PhysicsComponent.js';
 import ColliderComponent from '../components/ColliderComponent.js';
 import { getFixtureContact, transformDisplacement } from './ColliderGeometry.js';
+import { rayHits, type RaycastHit, type RaycastOptions } from './Raycast.js';
 import ShapeComponent from '../components/ShapeComponent.js';
 import { getEngineState } from '../core/EngineState.js';
 
@@ -35,6 +36,23 @@ export interface CollisionEventDetail {
  * Utility class for collision detection between game objects.
  */
 export default class Physics {
+  /**
+   * Returns the nearest boundary hit on a finite world-space segment. If the
+   * origin is strictly inside a fixture, the first exit is returned.
+   */
+  static raycast(from: Vector2, to: Vector2, options: RaycastOptions = {}): RaycastHit | null {
+    let nearest: RaycastHit | null = null;
+    for (const hit of rayHits(from, to, options)) {
+      if (!nearest || hit.distance < nearest.distance) nearest = hit;
+    }
+    return nearest;
+  }
+
+  /** Returns the first boundary hit per fixture, sorted by distance and then input order. */
+  static raycastAll(from: Vector2, to: Vector2, options: RaycastOptions = {}): RaycastHit[] {
+    return Array.from(rayHits(from, to, options)).sort((a, b) => a.distance - b.distance);
+  }
+
   /**
    * Checks if two game objects are colliding.
    * @param obj1 First object.
