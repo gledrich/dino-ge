@@ -19,7 +19,16 @@ update() {
 
 When the explorer crosses the boundary, the game updates the target to the vault's world x coordinate. Each frame closes a fraction of the remaining distance. The camera never moves the world objects themselves. This short demo eases per frame. For timing that stays consistent across refresh rates, use an elapsed-time interpolation or the fixed update.
 
-Use `Engine.camera.follow(player, game.width, game.height)` to centre on a moving character. Pass the current viewport dimensions, especially after resizing. `Engine.camera.getViewportBounds(width, height)` gives the visible region in world coordinates at the current zoom. A finite world can clamp the camera to its edges.
+Use `Engine.camera.follow(player, game.width, game.height)` to centre on a moving character. Pass the current viewport dimensions, especially after resizing. For a finite world, pass its rectangle in world units as the fourth argument.
+
+```js
+const world = { x: -120, y: -40, width: 760, height: 280 };
+Engine.camera.follow(player, game.width, game.height, world);
+```
+
+Bounded follow uses the target's rendered centre. It clamps the visible area to the rectangle at the current zoom. If the viewport is larger than the world on either axis, the camera centres that axis so the space on both sides is equal. `Engine.camera.getViewportBounds(width, height)` gives the resulting visible region in world coordinates.
+
+To try the bounded follow demo from a repository checkout, run `npm run build -w dino-ge` and `npm run example`, then open [Bounded camera follow](http://localhost:3001/camera-bounds.html). Move to an edge and toggle the bounds, then zoom out to see the oversized viewport behaviour.
 
 ```js
 game.transitionTo(new BeyondTheRuins(), { type: 'fade', duration: 0.5 });

@@ -25,7 +25,7 @@ export type {
   SpriteAnimationClip, SpriteAnimationFrame, SpriteAnimationMode, SpriteAnimationOptions, SpriteFrameRect,
 } from './objects/SpriteAnimation.js';
 export { default as Vector2 } from './math/Vector2.js';
-export { default as Camera } from './core/Camera.js';
+export { default as Camera, type CameraBounds } from './core/Camera.js';
 export { default as Canvas } from './core/Canvas.js';
 export { default as ParticleEmitter, type ParticleBurst, type ParticleEmitterOptions } from './objects/ParticleEmitter.js';
 export { default as Circle } from './objects/Circle.js';

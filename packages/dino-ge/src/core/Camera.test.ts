@@ -46,6 +46,71 @@ describe('Camera', () => {
     expect(camera.position.y).toBe(-200);
   });
 
+  it('clamps the zoomed viewport to each edge of an offset world', () => {
+    const camera = new Camera();
+    camera.zoom = 2;
+    const target = new MockGameObject('target', 0);
+    const world = { x: -100, y: 20, width: 400, height: 300 };
+
+    target.transform.position.set(-100, 20);
+    camera.follow(target, 400, 200, world);
+    expect(camera.position).toMatchObject({ x: -100, y: 20 });
+
+    target.transform.position.set(250, 270);
+    camera.follow(target, 400, 200, world);
+    expect(camera.getViewportBounds(400, 200)).toEqual({ x: 100, y: 220, width: 200, height: 100 });
+
+    target.transform.position.set(0, 100);
+    camera.follow(target, 400, 200, world);
+    expect(camera.position).toMatchObject({ x: -75, y: 75 });
+  });
+
+  it('centres an oversized axis independently and recalculates after resizing', () => {
+    const camera = new Camera();
+    const target = new MockGameObject('target', 0);
+    const world = { x: -50, y: 50, width: 200, height: 250 };
+    target.transform.position.set(300, 300);
+
+    camera.follow(target, 300, 100, world);
+    expect(camera.position).toMatchObject({ x: -100, y: 200 });
+
+    camera.follow(target, 200, 300, world);
+    expect(camera.position).toMatchObject({ x: -50, y: 25 });
+
+    camera.follow(target, 200, 300);
+    expect(camera.position).toMatchObject({ x: 225, y: 175 });
+  });
+
+  it('uses the rendered world centre for bounded follow and keeps legacy local follow', () => {
+    const camera = new Camera();
+    const parent = new MockGameObject('parent', 0);
+    parent.transform.position.set(100, 100);
+    parent.transform.scale.set(2, 2);
+    const target = new MockGameObject('target', 0);
+    target.transform.parent = parent.transform;
+    target.transform.position.set(20, 0);
+    target.transform.rotation = Math.PI / 2;
+
+    camera.follow(target, 100, 100, { x: -100, y: -100, width: 400, height: 400 });
+    expect(camera.position).toMatchObject({ x: 40, y: 100 });
+
+    camera.follow(target, 100, 100);
+    expect(camera.position).toMatchObject({ x: -5, y: -25 });
+  });
+
+  it('rejects invalid bounded viewports without changing the camera position', () => {
+    const camera = new Camera();
+    camera.position.set(4, 5);
+    const target = new MockGameObject('target', 0);
+    const world = { x: 0, y: 0, width: 100, height: 100 };
+
+    expect(() => camera.follow(target, 80, 80, { ...world, width: -1 })).toThrow(RangeError);
+    expect(() => camera.follow(target, NaN, 80, world)).toThrow(RangeError);
+    camera.zoom = 0;
+    expect(() => camera.follow(target, 80, 80, world)).toThrow(RangeError);
+    expect(camera.position).toMatchObject({ x: 4, y: 5 });
+  });
+
   it('calculates viewport bounds with zoom', () => {
     const camera = new Camera();
     camera.position = new Vector2(100, 100);
