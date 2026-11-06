@@ -10,10 +10,10 @@ const app = express();
 app.use("/templates", express.static(fileURLToPath(new URL("../../packages/playground/dist/templates", import.meta.url))));
 app.get("/", (_request, response) => response.type("html").send("<!doctype html><title>Workspace check</title>"));
 for (const name of ["browser-workspace", "browser-project-archive"]) {
-  app.get("/" + name, async (_request, response) => {
-    const { outputText } = ts.transpileModule(await readFile(new URL(name + ".ts", source), "utf8"), {
-      compilerOptions: { module: ts.ModuleKind.ESNext, target: ts.ScriptTarget.ESNext }
-    });
+  const { outputText } = ts.transpileModule(await readFile(new URL(name + ".ts", source), "utf8"), {
+    compilerOptions: { module: ts.ModuleKind.ESNext, target: ts.ScriptTarget.ESNext }
+  });
+  app.get("/" + name, (_request, response) => {
     response.type("js").send(outputText);
   });
 }

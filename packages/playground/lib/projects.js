@@ -70,7 +70,10 @@ export class ProjectStore {
     if (entryOnly && parts.length > 1) {
       const { directory, entry } = await this.projectDirectory(id);
       const filename = path.join(directory, entry);
-      if (await fs.realpath(filename) !== filename) throw new ProjectError('Project entry could not be found.', 404);
+      const parent = path.dirname(filename);
+      if (await fs.realpath(parent) !== parent || await fs.realpath(filename) !== filename) {
+        throw new ProjectError('Project entry could not be found.', 404);
+      }
       return filename;
     }
     if (parts.length === 1 && (!id || id.startsWith('.') || id.includes('\\') || id.includes('\0') ||
@@ -124,6 +127,10 @@ export class ProjectStore {
       throw new ProjectError('Choose a JavaScript module in this project.');
     }
     const filename = path.join(directory, ...parts);
+    const parent = path.dirname(filename);
+    if (await fs.realpath(parent) !== parent) {
+      throw new ProjectError('Module could not be found.', 404);
+    }
     if (!(await fs.lstat(filename)).isFile() || await fs.realpath(filename) !== filename) {
       throw new ProjectError('Module could not be found.', 404);
     }
@@ -199,7 +206,10 @@ export class ProjectStore {
     if (!(await fs.lstat(directory)).isDirectory()) throw new ProjectError('The sprite asset directory is unavailable.');
 
     const stem = typeof name === 'string' ? path.parse(name).name.toLowerCase() : '';
-    const label = stem.replace(/[^a-z0-9_-]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 48) || 'sprite';
+    const slug = stem.replace(/[^a-z0-9_-]+/g, '-').replace(/^-+/, '');
+    let end = slug.length;
+    while (end > 0 && slug[end - 1] === '-') end--;
+    const label = slug.slice(0, Math.min(end, 48)) || 'sprite';
     const digest = createHash('sha256').update(bytes).digest('hex');
     const filename = path.join(directory, `${label}-${digest}.${extension}`);
     const temporary = path.join(directory, `.${randomUUID()}.tmp`);

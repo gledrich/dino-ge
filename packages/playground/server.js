@@ -41,6 +41,23 @@ try {
   DINO_GE_DIST = path.join(__dirname, '../dino-ge/dist');
 }
 
+// Bound filesystem and upload work across clients, including requests behind a proxy.
+let workspaceWindowEnd = 0;
+let workspaceRequests = 0;
+app.use(['/api', '/files'], (_req, res, next) => {
+  const now = Date.now();
+  if (now >= workspaceWindowEnd) {
+    workspaceWindowEnd = now + 60_000;
+    workspaceRequests = 0;
+  }
+  if (workspaceRequests >= 600) {
+    return res.set('Retry-After', String(Math.ceil((workspaceWindowEnd - now) / 1000)))
+      .status(429).json({ error: 'Too many workspace requests. Try again shortly.' });
+  }
+  workspaceRequests++;
+  next();
+});
+
 app.post('/api/projects', express.json({ limit: '24mb' }), async (req, res) => {
   try {
     res.status(201).json({ id: await projects.import(req.body) });
@@ -63,6 +80,7 @@ app.use(express.json());
 const serveWorkspace = [async (req, res, next) => {
   try {
     const requested = path.resolve(scriptsRoot, `.${decodeURIComponent(req.path)}`);
+    if (!requested.startsWith(scriptsRoot + path.sep)) return res.sendStatus(404);
     const resolved = await fs.realpath(requested);
     if (resolved.startsWith(scriptsRoot + path.sep)) {
       if (req.params.run && (req.method === 'GET' || req.method === 'HEAD') && /\.m?js$/.test(requested)) {
@@ -144,6 +162,7 @@ app.get('/api/scripts/:id/assets', async (req, res) => {
 
 app.post('/api/scripts/:id/assets', express.raw({ type: spriteImageTypes, limit: '5mb' }), async (req, res) => {
   try {
+    if (!Buffer.isBuffer(req.body)) throw new ProjectError('Choose a PNG, JPEG, GIF or WebP image.', 415);
     const type = req.get('content-type')?.split(';')[0].trim().toLowerCase();
     const url = await projects.importSprite(req.params.id, req.query.name, type, req.body);
     res.status(201).json({ url });
