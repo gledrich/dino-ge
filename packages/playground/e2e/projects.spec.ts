@@ -1,6 +1,5 @@
 import { clickCanvasText, expectCanvasText, observeCanvasUI } from '../../example/e2e/canvas-ui';
 import { expect, test } from '@playwright/test';
-import type { Monaco } from '@monaco-editor/react';
 import { spawn } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
@@ -8,6 +7,8 @@ import { tmpdir } from 'node:os';
 import { basename, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { once } from 'node:events';
+
+type Monaco = typeof import('monaco-editor');
 
 const moduleRevision = (source: string) => createHash('sha256').update(source).digest('hex');
 const moduleHeaders = (source: string) => ({ 'X-Dino-Module-Revision': moduleRevision(source) });
@@ -323,7 +324,7 @@ export const makeExternal = () => new Rectangle({ tag: 'External platform', posi
     const editor = monaco.editor.getEditors().find(item => item.getDomNode() === element);
     const model = editor?.getModel();
     const position = editor?.getPosition();
-    if (!model || !position || !editor.hasTextFocus()) return '';
+    if (!editor || !model || !position || !editor.hasTextFocus()) return '';
     const visible = editor.getScrolledVisiblePosition(position);
     if (!visible || visible.top < 0 || visible.top >= editor.getLayoutInfo().height) return '';
     const offset = model.getOffsetAt(position);

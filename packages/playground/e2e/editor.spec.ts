@@ -1,5 +1,6 @@
 import { expect, test } from '@playwright/test';
-import type { Monaco } from '@monaco-editor/react';
+
+type Monaco = typeof import('monaco-editor');
 
 for (const failure of [
   { name: 'synchronous setup', callback: "onLoad() { throw new Error('Missing level data'); }", heading: 'Game setup failed', message: 'Missing level data' },

@@ -1,5 +1,6 @@
 import { expect, test, type Page } from '@playwright/test';
-import type { Monaco } from '@monaco-editor/react';
+
+type Monaco = typeof import('monaco-editor');
 
 const gameScript = `import { Engine } from 'dino-ge';
 const base = 18;
