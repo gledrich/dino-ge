@@ -209,7 +209,15 @@ app.put('/api/scripts/:id', async (req, res) => {
 
 const PORT = process.env.PORT || 3000;
 const host = process.env.HOST || '127.0.0.1';
-const server = app.listen(PORT, host, () => {
+const server = app.listen(PORT, host, error => {
+  if (error) {
+    const reason = error.code === 'EADDRINUSE'
+      ? `port ${PORT} is already in use on ${host}. Set PORT to a free port and try again.`
+      : error.message;
+    console.error(`Could not start Dino GE Playground (${ENV}): ${reason}`);
+    process.exitCode = 1;
+    return;
+  }
   console.log(`Dino GE Playground (${ENV}): http://${host}:${server.address().port}`);
   console.log(`Scripts directory: ${SCRIPTS_DIR}`);
 });
