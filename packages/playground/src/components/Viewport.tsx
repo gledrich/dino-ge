@@ -175,6 +175,8 @@ const Viewport: React.FC<{
   const [sceneControlsPosition, setSceneControlsPosition] = useState({ x: 12, y: 12 });
   const [screenControlsPosition, setScreenControlsPosition] = useState<ScenePoint>();
   const sceneControlsDrag = useRef<{ x: number; y: number } | null>(null);
+  const sceneControlsResize = useRef<ScenePoint | null>(null);
+  const [sceneControlsSize, setSceneControlsSize] = useState<{ width: number; height: number }>();
 
   const moveSceneControls = (x: number, y: number) => {
     const panel = sceneControlsRef.current;
@@ -1043,6 +1045,7 @@ const Viewport: React.FC<{
           style={showEditingControls ? {
             '--scene-controls-left': controlsPosition ? `${controlsPosition.x}px` : 'max(12px, 100% - 240px)',
             '--scene-controls-top': `${controlsPosition?.y ?? 12}px`,
+            ...(isEditingScene ? sceneControlsSize : undefined),
           } as React.CSSProperties : undefined}>
           {showEditingControls && <button type="button" className="scene-controls-drag"
               aria-label={isEditingScreenUI ? 'Move Screen UI controls' : 'Move scene controls'}
@@ -1181,6 +1184,20 @@ const Viewport: React.FC<{
           ) : placementStatus && (
             <span className="scene-edit-status" role="status">{placementStatus.message}</span>
           )}
+          {isEditingScene && <span className="scene-controls-resize" aria-hidden="true"
+            onPointerDown={event => {
+              const panel = sceneControlsRef.current;
+              if (!panel || !event.isPrimary || event.button !== 0) return;
+              event.currentTarget.setPointerCapture(event.pointerId);
+              sceneControlsResize.current = { x: event.clientX - panel.offsetWidth, y: event.clientY - panel.offsetHeight };
+            }}
+            onPointerMove={event => {
+              const start = sceneControlsResize.current;
+              if (!start || !event.currentTarget.hasPointerCapture(event.pointerId)) return;
+              setSceneControlsSize({ width: Math.max(80, event.clientX - start.x), height: Math.max(56, event.clientY - start.y) });
+            }}
+            onLostPointerCapture={() => { sceneControlsResize.current = null; }}
+          />}
         </div>
       )}
       {dropGuide && <div className="scene-drop-preview" aria-hidden={keyboardPlacement ? undefined : true}>
