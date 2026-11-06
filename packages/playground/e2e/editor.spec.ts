@@ -2,6 +2,49 @@ import { expect, test } from '@playwright/test';
 
 type Monaco = typeof import('monaco-editor');
 
+test('keeps Monaco clipboard diagnostics in the browser console', async ({ page, browserName }) => {
+  test.skip(browserName !== 'webkit', 'Monaco uses this clipboard workaround in WebKit.');
+  await page.addInitScript(() => {
+    Object.defineProperty(navigator.clipboard, 'write', {
+      value: () => Promise.reject(new DOMException('Editor clipboard write denied', 'NotAllowedError')),
+    });
+  });
+  await page.route('**/files', route => route.fulfill({ json: ['script'] }));
+  await page.route('**/api/scripts/script', route => route.fulfill({ json: `import { Engine } from 'dino-ge';
+new Engine({ onLoad() { console.error(new DOMException('Game clipboard error', 'NotAllowedError')); } },
+  { containerId: 'playground-canvas-container' });` }));
+  await page.goto('/');
+  const diagnostic = page.waitForEvent('console', message => message.type() === 'error' &&
+    message.text().includes('Editor clipboard write denied'));
+  await page.locator('.monaco-editor .view-lines').click();
+  await diagnostic;
+  await expect(page.locator('.console-line.error').filter({ hasText: 'Game clipboard error' })).toHaveCount(1);
+  await expect(page.locator('.console-line').filter({ hasText: 'Editor clipboard write denied' })).toHaveCount(0);
+});
+
+test('copies and pastes code in WebKit', async ({ page, browserName }) => {
+  test.skip(browserName !== 'webkit', 'Checks the WebKit clipboard path.');
+  const marker = `// Safari clipboard ${crypto.randomUUID()}`;
+  await page.route('**/files', route => route.fulfill({ json: ['script'] }));
+  await page.route('**/api/scripts/script', route => route.fulfill({ json: marker }));
+  await page.goto('/');
+  await expect(page.locator('.monaco-editor .view-lines')).toContainText(marker);
+  await page.evaluate(() => {
+    const { monaco } = window as typeof window & { monaco: Monaco };
+    const editor = monaco.editor.getEditors()[0];
+    editor.setSelection(new monaco.Range(1, 1, 1, editor.getModel()!.getLineMaxColumn(1)));
+    editor.focus();
+  });
+  await page.keyboard.press('ControlOrMeta+c');
+  await page.keyboard.press('ArrowRight');
+  await page.keyboard.press('Enter');
+  await page.keyboard.press('ControlOrMeta+v');
+  await expect.poll(() => page.evaluate(() => {
+    const { monaco } = window as typeof window & { monaco: Monaco };
+    return monaco.editor.getEditors()[0].getValue().trimEnd();
+  })).toBe(`${marker}\n${marker}`);
+});
+
 for (const failure of [
   { name: 'synchronous setup', callback: "onLoad() { throw new Error('Missing level data'); }", heading: 'Game setup failed', message: 'Missing level data' },
   { name: 'asynchronous setup', callback: "async onLoad() { await Promise.resolve(); throw new Error('Missing level data'); }", heading: 'Game setup failed', message: 'Missing level data' },
