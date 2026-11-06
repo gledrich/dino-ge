@@ -48,15 +48,14 @@ through `u_scene` and read the backing resolution and game time from
 `u_resolution` and `u_time`. Use `setPostProcessUniforms()` to update custom
 float or vector uniforms and `setPostProcessShader(null)` to disable the pass.
 The Canvas world remains visible when WebGL2 cannot apply the shader. See the
-[HUD and effects guide](../../docs/guide/hud-audio-and-effects.md) for a shader
+[HUD and effects guide](https://gledrich.github.io/dino-ge/guide/hud-audio-and-effects.html) for a shader
 and a local demo.
 
 ## Learn more
 
-- [Engine guide](../../docs/guide/index.md) covers scenes, physics, animation, input, tile maps, audio and effects.
-- [Gameplay Foundations](../example/gameplay-foundations/README.md) shows layered Tiled maps, named sprite clips and object actions working together.
+- [Engine guide](https://gledrich.github.io/dino-ge/guide/index.html) covers scenes, physics, animation, input, tile maps, audio and effects.
+- [Amber Ruins](https://gledrich.github.io/dino-ge/guide/amber-ruins.html) shows how a playable game uses Tiled maps, sprite animation and a HUD.
+- [API reference](https://gledrich.github.io/dino-ge/api/index.html) lists engine classes, methods and options.
 - [Dino GE Playground](https://www.npmjs.com/package/dino-ge-playground) lets you edit scripts and inspect scenes in the browser.
-
-Run `npm run docs` from the repository root to generate the API reference in `docs/api/`.
 
 MIT licence.
