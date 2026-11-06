@@ -486,6 +486,10 @@
 }
 
 .viewport-panel .toolbar {
+  --toolbar-padding-block: 8px;
+  --toolbar-button-size: 25px;
+  --edit-popover-size: 40px;
+  --edit-popover-gap: 10px;
   position: absolute;
   bottom: 20px;
   left: 50%;
@@ -493,7 +497,7 @@
   z-index: 100;
   background: rgba(30, 30, 30, 0.85);
   backdrop-filter: blur(4px);
-  padding: 8px 16px;
+  padding: var(--toolbar-padding-block) 16px;
   border-radius: 24px;
   border: 1px solid var(--border-color);
   display: flex;
@@ -510,11 +514,15 @@
   transform: none;
 }
 
+.viewport-panel:has([data-playground-game]) .toolbar:has(.toolbar-edit-disclosure) {
+  top: calc(var(--edit-popover-size) + var(--edit-popover-gap) + 4px);
+}
+
 .toolbar button {
   display: grid;
   place-items: center;
-  width: 25px;
-  height: 25px;
+  width: var(--toolbar-button-size);
+  height: var(--toolbar-button-size);
   padding: 2px;
   border: 0;
   border-radius: 3px;
@@ -538,21 +546,28 @@
 .toolbar-edit-popover {
   position: absolute;
   bottom: 100%;
-  left: 0;
-  padding-bottom: 8px;
+  left: calc(var(--toolbar-button-size) / 2);
+  transform: translateX(-50%);
+  /* Keep the gap hoverable as the pointer moves up from the brush. */
+  padding-bottom: calc(var(--toolbar-padding-block) + 1px + var(--edit-popover-gap));
 }
 .toolbar .toolbar-edit-popover button {
+  width: var(--edit-popover-size);
+  height: var(--edit-popover-size);
+  padding: 8px;
   border: 1px solid var(--border-color);
   background: var(--bg-secondary);
-  border-radius: 8px;
+  border-radius: 12px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
 }
+.toolbar .toolbar-edit-popover button svg { width: 20px; height: 20px; }
+.toolbar .toolbar-edit-popover button:hover { transform: none; background: var(--bg-tertiary); }
 .toolbar .toolbar-edit-disclosure { display: none; }
 @media (hover: none), (pointer: coarse) {
+  .viewport-panel .toolbar { --edit-popover-size: 44px; }
   .toolbar .toolbar-edit-disclosure { display: grid; width: 24px; min-height: 32px; }
   .toolbar .toolbar-edit-disclosure svg { width: 12px; }
-  .toolbar .toolbar-edit-popover button { width: 40px; height: 40px; }
 }
-.viewport-panel:has([data-playground-game]) .toolbar-edit-popover button { height: 30px; }
 
 .toolbar button[aria-pressed='true'] {
   color: var(--accent-secondary);

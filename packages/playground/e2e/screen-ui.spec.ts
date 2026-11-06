@@ -69,8 +69,13 @@ test('switches from the paintbrush to Screen UI and undoes preview edits', async
   await brush.hover();
   const brushBounds = await brush.boundingBox();
   const screenBounds = await screen.boundingBox();
-  expect(screenBounds!.y + screenBounds!.height).toBeLessThan(brushBounds!.y);
-  await screen.hover();
+  const toolbarBounds = await toolbar.boundingBox();
+  expect(screenBounds!.width).toBeGreaterThanOrEqual(40);
+  expect(screenBounds!.height).toBeGreaterThanOrEqual(40);
+  expect(toolbarBounds!.y - (screenBounds!.y + screenBounds!.height)).toBeGreaterThanOrEqual(10);
+  expect(Math.abs(screenBounds!.x + screenBounds!.width / 2 - (brushBounds!.x + brushBounds!.width / 2))).toBeLessThan(1);
+  await page.mouse.move(screenBounds!.x + screenBounds!.width / 2, screenBounds!.y + screenBounds!.height / 2, { steps: 8 });
+  await expect(screen).toBeVisible();
   await screen.click();
   await expect(brush).toHaveAttribute('aria-pressed', 'false');
   await expect(toolbar.getByRole('button', { name: 'Play', exact: true })).toBeVisible();
@@ -91,6 +96,11 @@ test('switches from the paintbrush to Screen UI and undoes preview edits', async
   await expect(tools).toBeHidden();
   await brush.click();
   await expect(page.getByText('Zoom 100%', { exact: true })).toBeVisible();
+
+  await page.locator('#canvas').evaluate(canvas => canvas.setAttribute('data-playground-game', ''));
+  await brush.hover();
+  const viewport = await page.locator('.viewport-panel').boundingBox();
+  expect((await screen.boundingBox())!.y).toBeGreaterThanOrEqual(viewport!.y);
 });
 
 test('inspects a live Screen UI button and opens its exact draw call', async ({ page }) => {
@@ -457,7 +467,11 @@ test.describe('Screen UI touch editing', () => {
     await openGame(page, gameScript, { width: 390, height: 844 });
     const toolbar = page.locator('.toolbar');
     await toolbar.getByRole('button', { name: 'More editing tools', exact: true }).tap();
-    await toolbar.getByRole('button', { name: 'Edit Screen UI', exact: true }).tap();
+    const screen = toolbar.getByRole('button', { name: 'Edit Screen UI', exact: true });
+    const bounds = await screen.boundingBox();
+    expect(bounds!.width).toBeGreaterThanOrEqual(44);
+    expect(bounds!.height).toBeGreaterThanOrEqual(44);
+    await screen.tap();
     await expect(page.getByRole('group', { name: 'Screen UI editing', exact: true })).toBeVisible();
     await expect(toolbar.getByRole('button', { name: 'Edit scene', exact: true })).toHaveAttribute('aria-pressed', 'false');
   });
