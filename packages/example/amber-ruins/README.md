@@ -16,6 +16,10 @@ or **Continue chapter** if you have a save.
   saves automatically in your browser when you make a discovery or finish a
   restoration. Continuing starts you back in Lanternreach.
 
+Both modes use named sprite clips for the explorer. Lanternreach binds its
+interact and journal actions to keyboard and gamepad buttons through `Input`.
+The expedition loads its Tiled map and images in one `Loader` batch.
+
 [Chapter logic](outpost.js) · [Maps and save format](outpost-world.js) · [Assets](assets/)
 
 Play the [original relic hunt](http://localhost:3001/?expedition) on the same

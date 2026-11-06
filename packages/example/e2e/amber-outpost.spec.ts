@@ -41,6 +41,16 @@ test('Lanternreach draws all four explorer poses during a step', async ({ page }
 });
 
 test('restoring the bridge opens the Skywell and the lit beacon survives a reload', async ({ page }) => {
+  await page.evaluate(() => {
+    const drawImage = CanvasRenderingContext2D.prototype.drawImage;
+    CanvasRenderingContext2D.prototype.drawImage = function (image, ...args) {
+      if (image instanceof HTMLImageElement && image.src.endsWith('/lanternreach-props.svg') &&
+          args.length === 8 && args[0] === image.naturalWidth - args[2]) {
+        document.documentElement.dataset.scoutDrawn = 'true';
+      }
+      Reflect.apply(drawImage, this, [image, ...args]);
+    };
+  });
   await clickCanvasText(page, 'Begin chapter');
   await expectCanvasText(page, 'Lanternreach');
   await walk(page, 'ArrowRight', 2);
@@ -49,6 +59,7 @@ test('restoring the bridge opens the Skywell and the lit beacon survives a reloa
   await interact(page);
   await walk(page, 'ArrowRight', 2);
   await expectCanvasText(page, 'The Reedbank');
+  await test.expect(page.locator('html')).toHaveAttribute('data-scout-drawn', 'true');
   await walk(page, 'ArrowRight', 2);
   await interact(page);
   await expectCanvasText(page, 'Reedwood recovered');

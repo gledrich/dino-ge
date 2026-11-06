@@ -1,5 +1,5 @@
 import {
-  Engine, Input, Loader, ParticleEmitter, Sprite, SpriteComponent, Tilemap, Vector2,
+  Engine, Input, Loader, ParticleEmitter, Sprite, Tilemap, Vector2,
 } from 'dino-ge';
 import { maps, newChapter, propFrames, readChapter, saveChapter, tiles } from './outpost-world.js';
 
@@ -7,6 +7,14 @@ const cell = 48;
 const mapBorder = 8;
 const propColumns = Object.keys(propFrames).length;
 const stepTime = 145;
+const walkDuration = 120;
+const explorerAnimations = {
+  idle: { frames: [{ frame: 0, durationMs: walkDuration }] },
+  walk: {
+    mode: 'once',
+    frames: [0, 1, 2, 3].map(frame => ({ frame, durationMs: walkDuration / 4 })),
+  },
+};
 const gold = '#f6c477';
 const ivory = '#f5e9d5';
 const soft = '#b8c9bc';
@@ -63,11 +71,11 @@ function sprite(tag, image, cols, frame, size, x, y) {
   const rows = image === 'explorer' ? 2 : 1;
   const object = new Sprite({
     tag, img: sheet, cols, rows, endCol: cols * rows,
+    animations: image === 'explorer' ? explorerAnimations : undefined,
     scale: size / (sheet.width / cols),
     position: new Vector2(x, y),
   });
-  object.play();
-  object.getComponent(SpriteComponent).playing = false;
+  object.registerSelf();
   object.currentFrame = frame;
   return object;
 }
@@ -86,6 +94,10 @@ export class Outpost {
   }
 
   async load(asset, signal) {
+    Input.setActions({
+      interact: [{ key: 'e' }, { button: 0 }],
+      journal: [{ key: 'j' }, { button: 3 }],
+    });
     for (const [name, file] of [
       ['outpost-tiles', 'lanternreach-tiles.svg'],
       ['outpost-props', 'lanternreach-props.svg'],
@@ -276,6 +288,7 @@ export class Outpost {
       return;
     }
     this.walk = { x: this.x, y: this.y, time: now };
+    if (!reducedMotion.matches) this.player.playAnimation('walk', { restart: true });
     this.x = x;
     this.y = y;
     if (dx) this.player.flip = dx < 0;
@@ -293,13 +306,16 @@ export class Outpost {
   }
 
   animate(now) {
-    const t = this.walk && !reducedMotion.matches ? Math.min(1, (now - this.walk.time) / 120) : 1;
+    const t = this.walk && !reducedMotion.matches ? Math.min(1, (now - this.walk.time) / walkDuration) : 1;
     const ease = t * t * (3 - 2 * t);
     const x = t === 1 ? this.x : this.walk.x + (this.x - this.walk.x) * ease;
     const y = t === 1 ? this.y : this.walk.y + (this.y - this.walk.y) * ease;
     this.player.transform.position.set(x * cell + 2, y * cell + 2);
     this.player.metadata.zIndex = 110 + Math.round(y * cell);
-    this.player.currentFrame = t === 1 ? 0 : Math.floor(t * 4);
+    if (t === 1) {
+      this.walk = null;
+      if (this.player.currentAnimation !== 'idle') this.player.playAnimation('idle');
+    }
   }
 
   camera(width, height) {
@@ -320,9 +336,8 @@ export class Outpost {
   update(width, height) {
     if (!this.player) return;
     const now = Engine.totalTime;
-    const gamepad = Input.getGamepad();
-    const interact = Input.isKeyDown('e') || gamepad?.buttons?.[0]?.pressed;
-    const journal = Input.isKeyDown('j') || gamepad?.buttons?.[3]?.pressed;
+    const interact = Input.isActionDown('interact');
+    const journal = Input.isActionDown('journal');
     if (this.phase === 'title' && interact && !this.buttons.interact) {
       this.start();
     } else if (this.phase === 'playing') {

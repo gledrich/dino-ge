@@ -12,8 +12,8 @@ Start the expedition. Move with WASD, the arrow keys, a gamepad's left stick or 
 
 | What you see | Where to look in the game |
 | --- | --- |
-| The rooms and the explorer appear | `loadLevel()` fetches the Tiled export and loads the images before constructing the map, relics and explorer. |
-| An arrow key moves you one cell | `update()` calls `move(now)`, which reads input, checks the target tile and updates the player's cell. `animate(now)` makes the sprite travel between the cells. |
+| The rooms and the explorer appear | `loadLevel()` queues the Tiled export and images with `Loader` before constructing the map, relics and explorer. |
+| An arrow key moves you one cell | `update()` calls `move(now)`, which reads input, checks the target tile and updates the player's cell. `animate(now)` eases the sprite between the cells while the named walk clip advances through its four poses. |
 | A relic disappears and the counter changes | `collectRelic(now)` checks the current cell, marks the relic invisible, increments the count and triggers sound and particles. `drawHud()` reads the count when it draws. |
 | The next room slides into view | `updateCamera(now)` computes a target from the current room and interpolates the camera towards it. |
 | A spike costs health | `checkSpikeDamage(now)` checks the current tile and honours a short recovery window. Shake and colour effects give immediate feedback. |

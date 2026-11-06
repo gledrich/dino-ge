@@ -5,7 +5,6 @@ import {
   ParticleEmitter,
   Sound,
   Sprite,
-  SpriteComponent,
   Tilemap,
   Vector2,
   VisibilityComponent,
@@ -87,19 +86,18 @@ function positionInCell(sprite, column, row, size) {
   );
 }
 
-function makeSprite(tag, image, x, y, size, framesAcross = 1) {
+function makeSprite(tag, image, x, y, size, framesAcross = 1, animations) {
   const sprite = new Sprite({
     tag,
     img: image,
     rows: framesAcross,
     cols: framesAcross,
-    endCol: framesAcross ** 2,
+    animations,
     scale: (size * framesAcross) / image.width,
     zIndex: 2,
   });
   positionInCell(sprite, x, y, size);
-  sprite.play();
-  sprite.getComponent(SpriteComponent).playing = false;
+  sprite.registerSelf();
   return sprite;
 }
 
@@ -135,7 +133,7 @@ function start() {
   positionInCell(player, column, row, explorerSize);
   player.flip = false;
   player.getComponent(VisibilityComponent).visible = true;
-  player.currentFrame = 0;
+  player.playAnimation('idle');
   healthPulse = 0;
   relicPulse = 0;
   active = true;
@@ -181,6 +179,7 @@ function move(now) {
   }
 
   walk = { column, row, start: now };
+  if (!reducedMotion.matches) player.playAnimation('walk', { restart: true });
   column = nextColumn;
   row = nextRow;
   if (horizontal) player.flip = x < 0;
@@ -219,7 +218,7 @@ function animate(now) {
   const y = walk ? walk.row + (row - walk.row) * eased : row;
   const lift = walk ? (Math.sin(progress * Math.PI) * 2) / cellSize : 0;
   positionInCell(player, x, y - lift, explorerSize);
-  player.currentFrame = walk ? Math.min(3, Math.floor(progress * 4)) : 0;
+  if (!walk && player.currentAnimation !== 'idle') player.playAnimation('idle');
   player.getComponent(VisibilityComponent).visible =
     !active ||
     now >= vulnerableAt ||
@@ -315,12 +314,7 @@ function update() {
 }
 
 async function loadLevel() {
-  const response = await fetch(asset('rooms.tmj'), { signal: lifetime.signal });
-  if (!response.ok)
-    throw new Error(`Could not load rooms (HTTP ${response.status})`);
-  const map = await response.json();
-  if (lifetime.signal.aborted) return;
-
+  Loader.queueJson('expedition-rooms', asset('rooms.tmj'));
   for (const [name, file] of [
     ['tiles', 'ruins-atlas.png'],
     ['explorer', 'explorer-walk.png'],
@@ -331,7 +325,7 @@ async function loadLevel() {
   await Loader.loadAll();
   if (lifetime.signal.aborted) return;
 
-  tilemap = Tilemap.fromTiled(map, {
+  tilemap = Tilemap.fromTiled(Loader.getJson('expedition-rooms'), {
     tileset: 'tiles',
     tag: 'ruin-rooms',
     position: new Vector2(0, 0),
@@ -350,7 +344,15 @@ async function loadLevel() {
     row,
     explorerSize,
     2,
+    {
+      idle: { frames: [{ frame: 0, durationMs: walkDuration }] },
+      walk: {
+        mode: 'once',
+        frames: [0, 1, 2, 3].map(frame => ({ frame, durationMs: walkDuration / 4 })),
+      },
+    },
   );
+  player.playAnimation('idle');
   phase = 'ready';
 }
 
@@ -597,6 +599,7 @@ const game = new Engine(
     onDispose: () => {
       lifetime.abort();
       stopMusic?.();
+      if (outpost) Input.setActions({});
       Engine.off('paused', onPaused);
     },
     update,
