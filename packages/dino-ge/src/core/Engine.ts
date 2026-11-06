@@ -3,6 +3,9 @@ import GameObject from './GameObject.js';
 import Input from './Input.js';
 import Scene from './Scene.js';
 import SceneEffects, { type SceneTransitionOptions } from './SceneEffects.js';
+import PostProcess, {
+  type PostProcessInstallResult, type PostProcessShader, type PostProcessStatus, type PostProcessUniform,
+} from './PostProcess.js';
 import ParticleEmitter from '../objects/ParticleEmitter.js';
 import ScreenUI, { type ScreenUIEditing, type ScreenUISnapshot } from './ScreenUI.js';
 import Camera from './Camera.js';
@@ -344,6 +347,8 @@ export default class Engine {
   }
 
   private readonly effects = new SceneEffects();
+  private readonly postProcess = new PostProcess();
+  private _shaderTime = 0;
   private _canvas: Canvas;
   private readonly screenUI?: ScreenUI;
   private readonly timers = new Set<number>();
@@ -516,12 +521,30 @@ export default class Engine {
     if (!this._destroyed) this.effects.startAberration(strength, duration);
   }
 
+  /** Current availability of the optional world shader. */
+  public get postProcessStatus(): PostProcessStatus { return this.postProcess.status; }
+
+  /**
+   * Installs one full-screen world shader, or removes it when passed null.
+   * The previous shader remains in use if the new source cannot be installed.
+   */
+  public setPostProcessShader(shader: PostProcessShader | null): PostProcessInstallResult {
+    if (this._destroyed) return { ok: false, reason: 'unavailable', message: 'The engine has stopped.' };
+    return this.postProcess.setShader(shader);
+  }
+
+  /** Updates custom float and vector uniforms on the installed shader. */
+  public setPostProcessUniforms(values: Readonly<Record<string, PostProcessUniform>>): void {
+    this.postProcess.setUniforms(values);
+  }
+
   /** Completely stops this engine and cleans up its resources. */
   public terminate() {
     if (this._destroyed) return;
     this._destroyed = true;
     Engine.resetPhysicsContacts();
     this.effects.cancel();
+    this.postProcess.dispose();
     this.screenUI?.dispose();
     this.timers.forEach(timer => window.clearTimeout(timer));
     this.timers.clear();
@@ -579,6 +602,7 @@ export default class Engine {
       const playbackObjects = playbackScene?.objects ?? Engine.objects;
       const frameObjects = Engine.paused ? [] : Array.from(playbackObjects);
       if (!Engine.paused) {
+        this._shaderTime += this._secondsPassed;
         this.effects.advance(this._secondsPassed, scene => Engine.activateScene(scene));
       }
       if (this._destroyed) return;
@@ -638,20 +662,29 @@ export default class Engine {
     }
   }
 
-  private _setBackground() {
-    if (this._ctx) {
-      this._ctx.fillStyle = this.backgroundColour;
-      this._ctx.fillRect(0, 0, this._canvas.canvas.width, this._canvas.canvas.height);
+  private _setBackground(ctx = this._ctx): void {
+    if (ctx) {
+      ctx.fillStyle = this.backgroundColour;
+      ctx.fillRect(0, 0, this._canvas.canvas.width, this._canvas.canvas.height);
+    }
+  }
+
+  private _drawWorld(ctx: CanvasRenderingContext2D, objects: Set<GameObject>): void {
+    this._setBackground(ctx);
+    const renderer = Engine.renderingSystem;
+    if (!renderer) return;
+    if (ctx !== this._ctx) renderer.setContext(ctx);
+    try {
+      this.effects.drawWorld(ctx, () => renderer.update(objects, 0, Engine.debug));
+    } finally {
+      if (ctx !== this._ctx) renderer.setContext(this._ctx);
     }
   }
 
   private _draw() {
     this.effects.prepareFrame(this._ctx);
-    this._setBackground();
-
     const objects = Engine.currentScene ? Engine.currentScene.objects : Engine.objects;
-
-    this.effects.drawWorld(this._ctx, () => Engine.renderingSystem?.update(objects, 0, Engine.debug));
+    this.postProcess.draw(this._ctx, objects, this._shaderTime, ctx => this._drawWorld(ctx, objects));
     this.effects.drawOverlays(this._ctx);
 
     if (Engine.debug && Engine.debugPositionGridSize > 0) this._drawPositionGrid();

@@ -113,6 +113,27 @@ describe('Engine', () => {
     jest.restoreAllMocks();
   });
 
+  it('keeps drawing the world and UI when WebGL2 cannot be created', () => {
+    const getContext = HTMLCanvasElement.prototype.getContext as jest.Mock;
+    getContext.mockImplementation(function (this: HTMLCanvasElement, type: string) {
+      if (type === 'webgl2') return null;
+      mockCtx.canvas = this;
+      return mockCtx;
+    });
+    const drawUI = jest.fn();
+    const game = new Engine({ ...callbacks, drawUI });
+
+    expect(game.setPostProcessShader({ fragmentSource: '#version 300 es' })).toMatchObject({
+      ok: false, reason: 'unavailable',
+    });
+    expect(game.postProcessStatus).toBe('unavailable');
+
+    jest.advanceTimersByTime(32);
+    expect(mockCtx.fillRect).toHaveBeenCalled();
+    expect(drawUI).toHaveBeenCalled();
+    game.terminate();
+  });
+
   it('manages singleton state across instances', () => {
     const emitSpy = jest.spyOn(Engine, 'emit');
     
