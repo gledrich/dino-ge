@@ -1,0 +1,40 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Bounded camera follow | Dino GE</title>
+  <style>
+    body { margin: 0; color: #e7eee8; background: #111d22; font: 1rem/1.55 system-ui, sans-serif; }
+    main { max-width: 38rem; margin: 2rem auto; padding: 0 1rem; }
+    h1 { line-height: 1.1; }
+    #survey { width: 100%; max-width: 520px; height: 240px; outline: 1px solid #6c8a80; }
+    canvas { display: block; }
+    fieldset { border: 0; padding: 0; margin: 1rem 0 0; display: flex; flex-wrap: wrap; gap: .5rem 1.5rem; }
+    select { font: inherit; }
+    :focus-visible { outline: 2px solid #ffd78a; outline-offset: 4px; }
+    a { color: #acebc3; }
+  </style>
+  <script type="importmap">{"imports":{"dino-ge":"/built/index.js"}}</script>
+  <script type="module" src="/camera-bounds.js"></script>
+</head>
+<body>
+  <main>
+    <h1>Bounded camera follow</h1>
+    <p>Focus the map, then move the surveyor with WASD, the arrow keys or a gamepad’s left stick. Walk to an edge and compare the camera with bounds on and off. Zoom out to see the world centre inside the larger view.</p>
+    <div id="survey" role="region" aria-label="Survey map" tabindex="0"></div>
+    <fieldset aria-label="Camera controls">
+      <label><input id="bounded" type="checkbox" checked> Keep camera in the world</label>
+      <label>Camera zoom
+        <select id="zoom">
+          <option value="0.4">40%</option>
+          <option value="1" selected>100%</option>
+          <option value="1.5">150%</option>
+        </select>
+      </label>
+    </fieldset>
+    <p id="camera-origin"></p>
+    <p><a href="/">Back to Amber Ruins</a></p>
+  </main>
+</body>
+</html>

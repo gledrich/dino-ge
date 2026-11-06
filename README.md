@@ -67,6 +67,10 @@ scripted delivery. Select **Replay delivery** to run the sequence again.
 The [example notes](./packages/example/gameplay-foundations/README.md) explain
 how the three APIs work together.
 
+Open [Bounded Camera Follow](http://localhost:3001/camera-bounds.html) to try
+keyboard and controller action bindings and compare camera movement with and
+without world bounds.
+
 _Note: The engine handles initialization; create your game instance directly in your entry file._
 
 ## Documentation
