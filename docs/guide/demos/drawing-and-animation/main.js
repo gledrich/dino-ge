@@ -1,8 +1,8 @@
-import { Circle, Engine, Line, Loader, Rectangle, Sprite, Text, Vector2 } from 'dino-ge';
+import { Circle, Engine, Line, Loader, Rectangle, Sprite, SpriteComponent, Text, Vector2 } from 'dino-ge';
 
 const status = document.querySelector('#status');
 let explorer;
-let animating = true;
+const frameSize = 44;
 
 new Engine({
   async onLoad() {
@@ -10,9 +10,11 @@ new Engine({
       Loader.queueImage('explorer', import.meta.resolve('amber-assets/explorer-walk.png'));
       await Loader.loadAll(percent => { status.textContent = `Loading ${Math.round(percent)}%`; });
 
+      const image = Loader.getImage('explorer');
       explorer = new Sprite({
-        tag: 'explorer', img: 'explorer', rows: 1, cols: 2,
-        startCol: 0, endCol: 1, scale: 0.75, position: new Vector2(24, 85), zIndex: 1,
+        tag: 'explorer', img: image, rows: 2, cols: 2,
+        startCol: 0, endCol: 4, scale: frameSize / (image.width / 2),
+        position: new Vector2(24, 121), zIndex: 1,
       });
       explorer.play();
       new Rectangle({ position: new Vector2(145, 64), width: 32, height: 97, colour: '#4c766e', zIndex: 2 });
@@ -34,8 +36,7 @@ new Engine({
 
 document.querySelector('#animate').addEventListener('click', () => {
   if (!explorer) return;
-  animating = !animating;
-  if (animating) explorer.play();
-  else explorer.stop();
-  status.textContent = animating ? 'Sprite animation playing' : 'Sprite animation stopped';
+  const animation = explorer.getComponent(SpriteComponent);
+  animation.playing = !animation.playing;
+  status.textContent = animation.playing ? 'Sprite animation playing' : 'Sprite animation stopped';
 });
