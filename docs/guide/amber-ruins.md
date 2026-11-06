@@ -6,7 +6,7 @@
 
 The original Amber Ruins expedition brings the previous chapters together. You move through three rooms, collect relics, avoid spikes and reach the gate.
 
-[Play the original expedition](demos/amber-ruins/index.html?expedition) · [View the demo source](demos/amber-ruins/source.html) · [Read the full game source on GitHub](https://github.com/gledrich/dino-ge/blob/v1.16.0-beta.3/packages/example/amber-ruins/game.js) · [Play the Lanternreach chapter](demos/amber-ruins/index.html)
+[Play the original expedition](demos/amber-ruins/index.html?expedition) · [View the demo source](demos/amber-ruins/source.html) · [Read the full game source on GitHub](https://github.com/gledrich/dino-ge/blob/v1.16.0-beta.4/packages/example/amber-ruins/game.js) · [Play the Lanternreach chapter](demos/amber-ruins/index.html)
 
 Start the expedition. Move with WASD, the arrow keys, a gamepad's left stick or the touch arrows. Pick up a relic and watch the counter. Move into another room and watch the world slide beneath the HUD.
 
@@ -41,7 +41,7 @@ Put a breakpoint inside `collectRelic(now)` and move onto a relic. Inspect the c
 
 ## See how the larger chapter saves progress
 
-Lanternreach adds a journal, interactions, checkpoints and multiple maps. In [outpost.js](https://github.com/gledrich/dino-ge/blob/v1.16.0-beta.3/packages/example/amber-ruins/outpost.js), look at `interact()` and `checkpoint()`. In [outpost-world.js](https://github.com/gledrich/dino-ge/blob/v1.16.0-beta.3/packages/example/amber-ruins/outpost-world.js), follow `readChapter()`, `newChapter()` and `saveChapter()`. The game decides what gets saved and writes its own data to browser storage.
+Lanternreach adds a journal, interactions, checkpoints and multiple maps. In [outpost.js](https://github.com/gledrich/dino-ge/blob/v1.16.0-beta.4/packages/example/amber-ruins/outpost.js), look at `interact()` and `checkpoint()`. In [outpost-world.js](https://github.com/gledrich/dino-ge/blob/v1.16.0-beta.4/packages/example/amber-ruins/outpost-world.js), follow `readChapter()`, `newChapter()` and `saveChapter()`. The game decides what gets saved and writes its own data to browser storage.
 
 To build your own variant, start with the [tilemap demo](input-and-tilemaps.html). Add a second room, then decide whether moving into it should pan the camera or activate a new scene.
 
