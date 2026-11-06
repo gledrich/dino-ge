@@ -16,7 +16,7 @@
 </div></section>
 <div class="tsd-signature"><span class="tsd-signature-keyword">interface</span> <span class="tsd-kind-interface">EngineState</span> <span class="tsd-signature-symbol">{</span><br/>    <a class="tsd-kind-property" href="#camera">camera</a><span class="tsd-signature-symbol">:</span> <a href="../classes/core_Camera.Camera.html" class="tsd-signature-type tsd-kind-class">Camera</a><span class="tsd-signature-symbol">;</span><br/>    <a class="tsd-kind-property" href="#currentscene">currentScene</a><span class="tsd-signature-symbol">:</span> <a href="../classes/core_Scene.Scene.html" class="tsd-signature-type tsd-kind-class">Scene</a> <span class="tsd-signature-symbol">|</span> <span class="tsd-signature-type">null</span><span class="tsd-signature-symbol">;</span><br/>    <a class="tsd-kind-property" href="#debug">debug</a><span class="tsd-signature-symbol">:</span> <span class="tsd-signature-type">boolean</span><span class="tsd-signature-symbol">;</span><br/>    <a class="tsd-kind-property" href="#debugcollisions">debugCollisions</a><span class="tsd-signature-symbol">:</span> <span class="tsd-signature-symbol">{</span> <span class="tsd-kind-property">manifold</span><span class="tsd-signature-symbol">:</span> <a href="physics_Physics.CollisionManifold.html" class="tsd-signature-type tsd-kind-interface">CollisionManifold</a><span class="tsd-signature-symbol">;</span> <span class="tsd-kind-property">timestamp</span><span class="tsd-signature-symbol">:</span> <span class="tsd-signature-type">number</span> <span class="tsd-signature-symbol">}</span><span class="tsd-signature-symbol">[]</span><span class="tsd-signature-symbol">;</span><br/>    <a class="tsd-kind-property" href="#debugkeepproportions">debugKeepProportions</a><span class="tsd-signature-symbol">:</span> <span class="tsd-signature-type">boolean</span><span class="tsd-signature-symbol">;</span><br/>    <a class="tsd-kind-property" href="#debugpositiongridsize">debugPositionGridSize</a><span class="tsd-signature-symbol">:</span> <span class="tsd-signature-type">number</span><span class="tsd-signature-symbol">;</span><br/>    <a class="tsd-kind-property" href="#debugsnapalignment">debugSnapAlignment</a><span class="tsd-signature-symbol">:</span> <span class="tsd-signature-type">boolean</span><span class="tsd-signature-symbol">;</span><br/>    <a class="tsd-kind-property" href="#debugsnaprotation">debugSnapRotation</a><span class="tsd-signature-symbol">:</span> <span class="tsd-signature-type">boolean</span><span class="tsd-signature-symbol">;</span><br/>    <a class="tsd-kind-property" href="#events">events</a><span class="tsd-signature-symbol">:</span> <span class="tsd-signature-type">EventTarget</span><span class="tsd-signature-symbol">;</span><br/>    <a class="tsd-kind-property" href="#objectcreationobservers">objectCreationObservers</a><span class="tsd-signature-symbol">?:</span> <span class="tsd-signature-symbol">{</span> <span class="tsd-kind-property">count</span><span class="tsd-signature-symbol">:</span> <span class="tsd-signature-type">number</span><span class="tsd-signature-symbol">;</span> <span class="tsd-kind-property">events</span><span class="tsd-signature-symbol">:</span> <span class="tsd-signature-type">EventTarget</span> <span class="tsd-signature-symbol">}</span><span class="tsd-signature-symbol">;</span><br/>    <a class="tsd-kind-property" href="#objects">objects</a><span class="tsd-signature-symbol">:</span> <a href="../classes/core_ObjectSet.ObjectSet.html" class="tsd-signature-type tsd-kind-class">ObjectSet</a><span class="tsd-signature-symbol">;</span><br/>    <a class="tsd-kind-property" href="#paused">paused</a><span class="tsd-signature-symbol">:</span> <span class="tsd-signature-type">boolean</span><span class="tsd-signature-symbol">;</span><br/>    <a class="tsd-kind-property" href="#pausestarttime">pauseStartTime</a><span class="tsd-signature-symbol">:</span> <span class="tsd-signature-type">number</span><span class="tsd-signature-symbol">;</span><br/>    <a class="tsd-kind-property" href="#renderingsystem">renderingSystem</a><span class="tsd-signature-symbol">?:</span> <a href="../classes/systems_RenderingSystem.RenderingSystem.html" class="tsd-signature-type tsd-kind-class">RenderingSystem</a><span class="tsd-signature-symbol">;</span><br/>    <a class="tsd-kind-property" href="#screenuiobservers">screenUIObservers</a><span class="tsd-signature-symbol">?:</span> <span class="tsd-signature-type">Set</span><span class="tsd-signature-symbol">&lt;</span><a href="core_ScreenUI.ScreenUIObservation.html" class="tsd-signature-type tsd-kind-interface">ScreenUIObservation</a><span class="tsd-signature-symbol">&gt;</span><span class="tsd-signature-symbol">;</span><br/>    <a class="tsd-kind-property" href="#selectedobject">selectedObject</a><span class="tsd-signature-symbol">:</span> <a href="../classes/core_GameObject.GameObject.html" class="tsd-signature-type tsd-kind-class">GameObject</a> <span class="tsd-signature-symbol">|</span> <span class="tsd-signature-type">null</span><span class="tsd-signature-symbol">;</span><br/>    <a class="tsd-kind-property" href="#showcollisionlines">showCollisionLines</a><span class="tsd-signature-symbol">:</span> <span class="tsd-signature-type">boolean</span><span class="tsd-signature-symbol">;</span><br/>    <a class="tsd-kind-property" href="#showdebughud">showDebugHud</a><span class="tsd-signature-symbol">:</span> <span class="tsd-signature-type">boolean</span><span class="tsd-signature-symbol">;</span><br/>    <a class="tsd-kind-property" href="#showphysicsvectors">showPhysicsVectors</a><span class="tsd-signature-symbol">:</span> <span class="tsd-signature-type">boolean</span><span class="tsd-signature-symbol">;</span><br/>    <a class="tsd-kind-property" href="#sortedobjects">sortedObjects</a><span class="tsd-signature-symbol">:</span> <a href="../classes/core_GameObject.GameObject.html" class="tsd-signature-type tsd-kind-class">GameObject</a><span class="tsd-signature-symbol">[]</span><span class="tsd-signature-symbol">;</span><br/>    <a class="tsd-kind-property" href="#systems">systems</a><span class="tsd-signature-symbol">:</span> <a href="../classes/core_System.System.html" class="tsd-signature-type tsd-kind-class">System</a><span class="tsd-signature-symbol">[]</span><span class="tsd-signature-symbol">;</span><br/>    <a class="tsd-kind-property" href="#totalpausedtime">totalPausedTime</a><span class="tsd-signature-symbol">:</span> <span class="tsd-signature-type">number</span><span class="tsd-signature-symbol">;</span><br/>    <a class="tsd-kind-property" href="#zorderdirty">zOrderDirty</a><span class="tsd-signature-symbol">:</span> <span class="tsd-signature-type">boolean</span><span class="tsd-signature-symbol">;</span><br/><span class="tsd-signature-symbol">}</span></div><aside class="tsd-sources">
 <ul>
-<li>Defined in src/core/EngineState.ts:13</li></ul></aside>
+<li>Defined in <a href="https://github.com/gledrich/tsge/blob/2e3c0208bb3b80d12e68461d3c554333a4956991/packages/dino-ge/src/core/EngineState.ts#L13">packages/dino-ge/src/core/EngineState.ts:13</a></li></ul></aside>
 <section class="tsd-panel-group tsd-index-group">
 <section class="tsd-panel tsd-index-panel">
 <details class="tsd-index-content tsd-accordion" open><summary class="tsd-accordion-summary tsd-index-summary"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden="true"><use href="../assets/icons.svg#icon-chevronDown"></use></svg>
@@ -55,117 +55,117 @@
 <h3 class="tsd-anchor-link" id="camera"><span>camera</span><a href="#camera" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></h3>
 <div class="tsd-signature"><span class="tsd-kind-property">camera</span><span class="tsd-signature-symbol">:</span> <a href="../classes/core_Camera.Camera.html" class="tsd-signature-type tsd-kind-class">Camera</a></div><aside class="tsd-sources">
 <ul>
-<li>Defined in src/core/EngineState.ts:18</li></ul></aside></section>
+<li>Defined in <a href="https://github.com/gledrich/tsge/blob/2e3c0208bb3b80d12e68461d3c554333a4956991/packages/dino-ge/src/core/EngineState.ts#L18">packages/dino-ge/src/core/EngineState.ts:18</a></li></ul></aside></section>
 <section class="tsd-panel tsd-member">
 <h3 class="tsd-anchor-link" id="currentscene"><span>current<wbr/>Scene</span><a href="#currentscene" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></h3>
 <div class="tsd-signature"><span class="tsd-kind-property">currentScene</span><span class="tsd-signature-symbol">:</span> <a href="../classes/core_Scene.Scene.html" class="tsd-signature-type tsd-kind-class">Scene</a> <span class="tsd-signature-symbol">|</span> <span class="tsd-signature-type">null</span></div><aside class="tsd-sources">
 <ul>
-<li>Defined in src/core/EngineState.ts:26</li></ul></aside></section>
+<li>Defined in <a href="https://github.com/gledrich/tsge/blob/2e3c0208bb3b80d12e68461d3c554333a4956991/packages/dino-ge/src/core/EngineState.ts#L26">packages/dino-ge/src/core/EngineState.ts:26</a></li></ul></aside></section>
 <section class="tsd-panel tsd-member">
 <h3 class="tsd-anchor-link" id="debug"><span>debug</span><a href="#debug" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></h3>
 <div class="tsd-signature"><span class="tsd-kind-property">debug</span><span class="tsd-signature-symbol">:</span> <span class="tsd-signature-type">boolean</span></div><aside class="tsd-sources">
 <ul>
-<li>Defined in src/core/EngineState.ts:16</li></ul></aside></section>
+<li>Defined in <a href="https://github.com/gledrich/tsge/blob/2e3c0208bb3b80d12e68461d3c554333a4956991/packages/dino-ge/src/core/EngineState.ts#L16">packages/dino-ge/src/core/EngineState.ts:16</a></li></ul></aside></section>
 <section class="tsd-panel tsd-member">
 <h3 class="tsd-anchor-link" id="debugcollisions"><span>debug<wbr/>Collisions</span><a href="#debugcollisions" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></h3>
 <div class="tsd-signature"><span class="tsd-kind-property">debugCollisions</span><span class="tsd-signature-symbol">:</span> <span class="tsd-signature-symbol">{</span> <span class="tsd-kind-property">manifold</span><span class="tsd-signature-symbol">:</span> <a href="physics_Physics.CollisionManifold.html" class="tsd-signature-type tsd-kind-interface">CollisionManifold</a><span class="tsd-signature-symbol">;</span> <span class="tsd-kind-property">timestamp</span><span class="tsd-signature-symbol">:</span> <span class="tsd-signature-type">number</span> <span class="tsd-signature-symbol">}</span><span class="tsd-signature-symbol">[]</span></div><aside class="tsd-sources">
 <ul>
-<li>Defined in src/core/EngineState.ts:27</li></ul></aside></section>
+<li>Defined in <a href="https://github.com/gledrich/tsge/blob/2e3c0208bb3b80d12e68461d3c554333a4956991/packages/dino-ge/src/core/EngineState.ts#L27">packages/dino-ge/src/core/EngineState.ts:27</a></li></ul></aside></section>
 <section class="tsd-panel tsd-member">
 <h3 class="tsd-anchor-link" id="debugkeepproportions"><span>debug<wbr/>Keep<wbr/>Proportions</span><a href="#debugkeepproportions" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></h3>
 <div class="tsd-signature"><span class="tsd-kind-property">debugKeepProportions</span><span class="tsd-signature-symbol">:</span> <span class="tsd-signature-type">boolean</span></div><aside class="tsd-sources">
 <ul>
-<li>Defined in src/core/EngineState.ts:31</li></ul></aside></section>
+<li>Defined in <a href="https://github.com/gledrich/tsge/blob/2e3c0208bb3b80d12e68461d3c554333a4956991/packages/dino-ge/src/core/EngineState.ts#L31">packages/dino-ge/src/core/EngineState.ts:31</a></li></ul></aside></section>
 <section class="tsd-panel tsd-member">
 <h3 class="tsd-anchor-link" id="debugpositiongridsize"><span>debug<wbr/>Position<wbr/>Grid<wbr/>Size</span><a href="#debugpositiongridsize" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></h3>
 <div class="tsd-signature"><span class="tsd-kind-property">debugPositionGridSize</span><span class="tsd-signature-symbol">:</span> <span class="tsd-signature-type">number</span></div><aside class="tsd-sources">
 <ul>
-<li>Defined in src/core/EngineState.ts:29</li></ul></aside></section>
+<li>Defined in <a href="https://github.com/gledrich/tsge/blob/2e3c0208bb3b80d12e68461d3c554333a4956991/packages/dino-ge/src/core/EngineState.ts#L29">packages/dino-ge/src/core/EngineState.ts:29</a></li></ul></aside></section>
 <section class="tsd-panel tsd-member">
 <h3 class="tsd-anchor-link" id="debugsnapalignment"><span>debug<wbr/>Snap<wbr/>Alignment</span><a href="#debugsnapalignment" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></h3>
 <div class="tsd-signature"><span class="tsd-kind-property">debugSnapAlignment</span><span class="tsd-signature-symbol">:</span> <span class="tsd-signature-type">boolean</span></div><aside class="tsd-sources">
 <ul>
-<li>Defined in src/core/EngineState.ts:30</li></ul></aside></section>
+<li>Defined in <a href="https://github.com/gledrich/tsge/blob/2e3c0208bb3b80d12e68461d3c554333a4956991/packages/dino-ge/src/core/EngineState.ts#L30">packages/dino-ge/src/core/EngineState.ts:30</a></li></ul></aside></section>
 <section class="tsd-panel tsd-member">
 <h3 class="tsd-anchor-link" id="debugsnaprotation"><span>debug<wbr/>Snap<wbr/>Rotation</span><a href="#debugsnaprotation" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></h3>
 <div class="tsd-signature"><span class="tsd-kind-property">debugSnapRotation</span><span class="tsd-signature-symbol">:</span> <span class="tsd-signature-type">boolean</span></div><aside class="tsd-sources">
 <ul>
-<li>Defined in src/core/EngineState.ts:32</li></ul></aside></section>
+<li>Defined in <a href="https://github.com/gledrich/tsge/blob/2e3c0208bb3b80d12e68461d3c554333a4956991/packages/dino-ge/src/core/EngineState.ts#L32">packages/dino-ge/src/core/EngineState.ts:32</a></li></ul></aside></section>
 <section class="tsd-panel tsd-member">
 <h3 class="tsd-anchor-link" id="events"><span>events</span><a href="#events" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></h3>
 <div class="tsd-signature"><span class="tsd-kind-property">events</span><span class="tsd-signature-symbol">:</span> <span class="tsd-signature-type">EventTarget</span></div><aside class="tsd-sources">
 <ul>
-<li>Defined in src/core/EngineState.ts:21</li></ul></aside></section>
+<li>Defined in <a href="https://github.com/gledrich/tsge/blob/2e3c0208bb3b80d12e68461d3c554333a4956991/packages/dino-ge/src/core/EngineState.ts#L21">packages/dino-ge/src/core/EngineState.ts:21</a></li></ul></aside></section>
 <section class="tsd-panel tsd-member">
 <h3 class="tsd-anchor-link" id="objectcreationobservers"><code class="tsd-tag">Optional</code><span>object<wbr/>Creation<wbr/>Observers</span><a href="#objectcreationobservers" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></h3>
 <div class="tsd-signature"><span class="tsd-kind-property">objectCreationObservers</span><span class="tsd-signature-symbol">?:</span> <span class="tsd-signature-symbol">{</span> <span class="tsd-kind-property">count</span><span class="tsd-signature-symbol">:</span> <span class="tsd-signature-type">number</span><span class="tsd-signature-symbol">;</span> <span class="tsd-kind-property">events</span><span class="tsd-signature-symbol">:</span> <span class="tsd-signature-type">EventTarget</span> <span class="tsd-signature-symbol">}</span></div><aside class="tsd-sources">
 <ul>
-<li>Defined in src/core/EngineState.ts:22</li></ul></aside></section>
+<li>Defined in <a href="https://github.com/gledrich/tsge/blob/2e3c0208bb3b80d12e68461d3c554333a4956991/packages/dino-ge/src/core/EngineState.ts#L22">packages/dino-ge/src/core/EngineState.ts:22</a></li></ul></aside></section>
 <section class="tsd-panel tsd-member">
 <h3 class="tsd-anchor-link" id="objects"><span>objects</span><a href="#objects" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></h3>
 <div class="tsd-signature"><span class="tsd-kind-property">objects</span><span class="tsd-signature-symbol">:</span> <a href="../classes/core_ObjectSet.ObjectSet.html" class="tsd-signature-type tsd-kind-class">ObjectSet</a></div><aside class="tsd-sources">
 <ul>
-<li>Defined in src/core/EngineState.ts:14</li></ul></aside></section>
+<li>Defined in <a href="https://github.com/gledrich/tsge/blob/2e3c0208bb3b80d12e68461d3c554333a4956991/packages/dino-ge/src/core/EngineState.ts#L14">packages/dino-ge/src/core/EngineState.ts:14</a></li></ul></aside></section>
 <section class="tsd-panel tsd-member">
 <h3 class="tsd-anchor-link" id="paused"><span>paused</span><a href="#paused" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></h3>
 <div class="tsd-signature"><span class="tsd-kind-property">paused</span><span class="tsd-signature-symbol">:</span> <span class="tsd-signature-type">boolean</span></div><aside class="tsd-sources">
 <ul>
-<li>Defined in src/core/EngineState.ts:15</li></ul></aside></section>
+<li>Defined in <a href="https://github.com/gledrich/tsge/blob/2e3c0208bb3b80d12e68461d3c554333a4956991/packages/dino-ge/src/core/EngineState.ts#L15">packages/dino-ge/src/core/EngineState.ts:15</a></li></ul></aside></section>
 <section class="tsd-panel tsd-member">
 <h3 class="tsd-anchor-link" id="pausestarttime"><span>pause<wbr/>Start<wbr/>Time</span><a href="#pausestarttime" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></h3>
 <div class="tsd-signature"><span class="tsd-kind-property">pauseStartTime</span><span class="tsd-signature-symbol">:</span> <span class="tsd-signature-type">number</span></div><aside class="tsd-sources">
 <ul>
-<li>Defined in src/core/EngineState.ts:25</li></ul></aside></section>
+<li>Defined in <a href="https://github.com/gledrich/tsge/blob/2e3c0208bb3b80d12e68461d3c554333a4956991/packages/dino-ge/src/core/EngineState.ts#L25">packages/dino-ge/src/core/EngineState.ts:25</a></li></ul></aside></section>
 <section class="tsd-panel tsd-member">
 <h3 class="tsd-anchor-link" id="renderingsystem"><code class="tsd-tag">Optional</code><span>rendering<wbr/>System</span><a href="#renderingsystem" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></h3>
 <div class="tsd-signature"><span class="tsd-kind-property">renderingSystem</span><span class="tsd-signature-symbol">?:</span> <a href="../classes/systems_RenderingSystem.RenderingSystem.html" class="tsd-signature-type tsd-kind-class">RenderingSystem</a></div><aside class="tsd-sources">
 <ul>
-<li>Defined in src/core/EngineState.ts:20</li></ul></aside></section>
+<li>Defined in <a href="https://github.com/gledrich/tsge/blob/2e3c0208bb3b80d12e68461d3c554333a4956991/packages/dino-ge/src/core/EngineState.ts#L20">packages/dino-ge/src/core/EngineState.ts:20</a></li></ul></aside></section>
 <section class="tsd-panel tsd-member">
 <h3 class="tsd-anchor-link" id="screenuiobservers"><code class="tsd-tag">Optional</code><span>screen<wbr/>UI<wbr/>Observers</span><a href="#screenuiobservers" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></h3>
 <div class="tsd-signature"><span class="tsd-kind-property">screenUIObservers</span><span class="tsd-signature-symbol">?:</span> <span class="tsd-signature-type">Set</span><span class="tsd-signature-symbol">&lt;</span><a href="core_ScreenUI.ScreenUIObservation.html" class="tsd-signature-type tsd-kind-interface">ScreenUIObservation</a><span class="tsd-signature-symbol">&gt;</span></div><aside class="tsd-sources">
 <ul>
-<li>Defined in src/core/EngineState.ts:23</li></ul></aside></section>
+<li>Defined in <a href="https://github.com/gledrich/tsge/blob/2e3c0208bb3b80d12e68461d3c554333a4956991/packages/dino-ge/src/core/EngineState.ts#L23">packages/dino-ge/src/core/EngineState.ts:23</a></li></ul></aside></section>
 <section class="tsd-panel tsd-member">
 <h3 class="tsd-anchor-link" id="selectedobject"><span>selected<wbr/>Object</span><a href="#selectedobject" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></h3>
 <div class="tsd-signature"><span class="tsd-kind-property">selectedObject</span><span class="tsd-signature-symbol">:</span> <a href="../classes/core_GameObject.GameObject.html" class="tsd-signature-type tsd-kind-class">GameObject</a> <span class="tsd-signature-symbol">|</span> <span class="tsd-signature-type">null</span></div><aside class="tsd-sources">
 <ul>
-<li>Defined in src/core/EngineState.ts:17</li></ul></aside></section>
+<li>Defined in <a href="https://github.com/gledrich/tsge/blob/2e3c0208bb3b80d12e68461d3c554333a4956991/packages/dino-ge/src/core/EngineState.ts#L17">packages/dino-ge/src/core/EngineState.ts:17</a></li></ul></aside></section>
 <section class="tsd-panel tsd-member">
 <h3 class="tsd-anchor-link" id="showcollisionlines"><span>show<wbr/>Collision<wbr/>Lines</span><a href="#showcollisionlines" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></h3>
 <div class="tsd-signature"><span class="tsd-kind-property">showCollisionLines</span><span class="tsd-signature-symbol">:</span> <span class="tsd-signature-type">boolean</span></div><aside class="tsd-sources">
 <ul>
-<li>Defined in src/core/EngineState.ts:34</li></ul></aside></section>
+<li>Defined in <a href="https://github.com/gledrich/tsge/blob/2e3c0208bb3b80d12e68461d3c554333a4956991/packages/dino-ge/src/core/EngineState.ts#L34">packages/dino-ge/src/core/EngineState.ts:34</a></li></ul></aside></section>
 <section class="tsd-panel tsd-member">
 <h3 class="tsd-anchor-link" id="showdebughud"><span>show<wbr/>Debug<wbr/>Hud</span><a href="#showdebughud" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></h3>
 <div class="tsd-signature"><span class="tsd-kind-property">showDebugHud</span><span class="tsd-signature-symbol">:</span> <span class="tsd-signature-type">boolean</span></div><aside class="tsd-sources">
 <ul>
-<li>Defined in src/core/EngineState.ts:28</li></ul></aside></section>
+<li>Defined in <a href="https://github.com/gledrich/tsge/blob/2e3c0208bb3b80d12e68461d3c554333a4956991/packages/dino-ge/src/core/EngineState.ts#L28">packages/dino-ge/src/core/EngineState.ts:28</a></li></ul></aside></section>
 <section class="tsd-panel tsd-member">
 <h3 class="tsd-anchor-link" id="showphysicsvectors"><span>show<wbr/>Physics<wbr/>Vectors</span><a href="#showphysicsvectors" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></h3>
 <div class="tsd-signature"><span class="tsd-kind-property">showPhysicsVectors</span><span class="tsd-signature-symbol">:</span> <span class="tsd-signature-type">boolean</span></div><aside class="tsd-sources">
 <ul>
-<li>Defined in src/core/EngineState.ts:33</li></ul></aside></section>
+<li>Defined in <a href="https://github.com/gledrich/tsge/blob/2e3c0208bb3b80d12e68461d3c554333a4956991/packages/dino-ge/src/core/EngineState.ts#L33">packages/dino-ge/src/core/EngineState.ts:33</a></li></ul></aside></section>
 <section class="tsd-panel tsd-member">
 <h3 class="tsd-anchor-link" id="sortedobjects"><span>sorted<wbr/>Objects</span><a href="#sortedobjects" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></h3>
 <div class="tsd-signature"><span class="tsd-kind-property">sortedObjects</span><span class="tsd-signature-symbol">:</span> <a href="../classes/core_GameObject.GameObject.html" class="tsd-signature-type tsd-kind-class">GameObject</a><span class="tsd-signature-symbol">[]</span></div><aside class="tsd-sources">
 <ul>
-<li>Defined in src/core/EngineState.ts:36</li></ul></aside></section>
+<li>Defined in <a href="https://github.com/gledrich/tsge/blob/2e3c0208bb3b80d12e68461d3c554333a4956991/packages/dino-ge/src/core/EngineState.ts#L36">packages/dino-ge/src/core/EngineState.ts:36</a></li></ul></aside></section>
 <section class="tsd-panel tsd-member">
 <h3 class="tsd-anchor-link" id="systems"><span>systems</span><a href="#systems" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></h3>
 <div class="tsd-signature"><span class="tsd-kind-property">systems</span><span class="tsd-signature-symbol">:</span> <a href="../classes/core_System.System.html" class="tsd-signature-type tsd-kind-class">System</a><span class="tsd-signature-symbol">[]</span></div><aside class="tsd-sources">
 <ul>
-<li>Defined in src/core/EngineState.ts:19</li></ul></aside></section>
+<li>Defined in <a href="https://github.com/gledrich/tsge/blob/2e3c0208bb3b80d12e68461d3c554333a4956991/packages/dino-ge/src/core/EngineState.ts#L19">packages/dino-ge/src/core/EngineState.ts:19</a></li></ul></aside></section>
 <section class="tsd-panel tsd-member">
 <h3 class="tsd-anchor-link" id="totalpausedtime"><span>total<wbr/>Paused<wbr/>Time</span><a href="#totalpausedtime" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></h3>
 <div class="tsd-signature"><span class="tsd-kind-property">totalPausedTime</span><span class="tsd-signature-symbol">:</span> <span class="tsd-signature-type">number</span></div><aside class="tsd-sources">
 <ul>
-<li>Defined in src/core/EngineState.ts:24</li></ul></aside></section>
+<li>Defined in <a href="https://github.com/gledrich/tsge/blob/2e3c0208bb3b80d12e68461d3c554333a4956991/packages/dino-ge/src/core/EngineState.ts#L24">packages/dino-ge/src/core/EngineState.ts:24</a></li></ul></aside></section>
 <section class="tsd-panel tsd-member">
 <h3 class="tsd-anchor-link" id="zorderdirty"><span>z<wbr/>Order<wbr/>Dirty</span><a href="#zorderdirty" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></h3>
 <div class="tsd-signature"><span class="tsd-kind-property">zOrderDirty</span><span class="tsd-signature-symbol">:</span> <span class="tsd-signature-type">boolean</span></div><aside class="tsd-sources">
 <ul>
-<li>Defined in src/core/EngineState.ts:35</li></ul></aside></section></section></details></div>
+<li>Defined in <a href="https://github.com/gledrich/tsge/blob/2e3c0208bb3b80d12e68461d3c554333a4956991/packages/dino-ge/src/core/EngineState.ts#L35">packages/dino-ge/src/core/EngineState.ts:35</a></li></ul></aside></section></section></details></div>
 <div class="col-sidebar">
 <div class="page-menu">
 <div class="tsd-navigation settings">
