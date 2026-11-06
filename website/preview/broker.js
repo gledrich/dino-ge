@@ -11,8 +11,22 @@ async function connect(event) {
   window.removeEventListener("message", connect);
   parent.postMessage({ type: "preview-broker-loaded" }, editorOrigin);
   try {
-    await navigator.serviceWorker.register("./worker.js");
-    const { active: worker } = await navigator.serviceWorker.ready;
+    // Change the script URL so existing registrations update before a query-bearing
+    // broker asks them to prepare a run.
+    const registration = await navigator.serviceWorker.register("./worker.js?broker=2");
+    const worker = registration.installing ?? registration.waiting ?? registration.active;
+    if (!worker) throw new Error("The preview service worker did not install.");
+    await new Promise((resolve, reject) => {
+      function checkState() {
+        if (worker.state === "activated" || worker.state === "redundant") {
+          worker.removeEventListener("statechange", checkState);
+          if (worker.state === "activated") resolve();
+          else reject(new Error("The preview service worker was replaced before it activated."));
+        }
+      }
+      worker.addEventListener("statechange", checkState);
+      checkState();
+    });
     window.addEventListener("message", event => {
       if (event.source !== parent || event.origin !== editorOrigin ||
           event.data?.type !== "prepare-run" || !event.ports[0]) return;

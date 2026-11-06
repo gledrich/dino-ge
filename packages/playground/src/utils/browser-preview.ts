@@ -88,6 +88,8 @@ export function startBrowserPreview(
   broker.hidden = true;
   broker.title = 'Prepare game preview';
   broker.referrerPolicy = 'no-referrer';
+  // A browser may retain a 404 from a previous deployment of the preview.
+  brokerUrl.searchParams.set('run', crypto.randomUUID());
   broker.src = brokerUrl.href;
   broker.addEventListener('load', () => {
     broker.contentWindow?.postMessage({ type: 'preview-connect' }, origin);

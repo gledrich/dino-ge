@@ -10,7 +10,23 @@ const chromiumOptions = { executablePath: process.env.DINO_PREVIEW_CHROMIUM };
 const webkitOptions = { executablePath: process.env.DINO_PREVIEW_WEBKIT };
 const releaseBroker = process.env.VITE_DINO_PREVIEW_URL;
 
-async function verifyTouchMovement(page, game, container, embedded) {
+async function observeChapterStart(page) {
+  await page.route('**/broker.html', route => route.fulfill({
+    status: 404,
+    body: 'Cannot GET /broker.html',
+  }));
+  await page.addInitScript(() => {
+    const fillText = CanvasRenderingContext2D.prototype.fillText;
+    CanvasRenderingContext2D.prototype.fillText = function (text, x, y, ...options) {
+      if (this.canvas.id === 'canvas' && text === 'Begin chapter') {
+        window.chapterStart = { x: x / this.canvas.width, y: y / this.canvas.height };
+      }
+      fillText.call(this, text, x, y, ...options);
+    };
+  });
+}
+
+async function verifyTouchMovement(page, game, container) {
   const canvas = game.locator(container + ' canvas');
   await canvas.waitFor({ timeout: 15_000 });
   await game.evaluate(async () => {
@@ -21,9 +37,9 @@ async function verifyTouchMovement(page, game, container, embedded) {
   await game.waitForFunction(() => Number.isFinite(window.readExplorerX()));
   const box = await canvas.boundingBox();
   assert.ok(box);
-  const cardHeight = Math.min(208, Math.max(125, box.height - 100));
-  const cardY = Math.max(54, (box.height - cardHeight - (embedded ? 30 : 0)) / 2);
-  await page.touchscreen.tap(box.x + box.width / 2, box.y + cardY + cardHeight - 36);
+  await game.waitForFunction(() => window.chapterStart);
+  const { x, y } = await game.evaluate(() => window.chapterStart);
+  await page.touchscreen.tap(box.x + box.width * x, box.y + box.height * y);
   const initialX = await game.evaluate(() => window.readExplorerX());
   const arrow = game.getByRole('button', { name: 'Move right' });
   assert.equal(await arrow.evaluate(button => getComputedStyle(button).userSelect), 'none');
@@ -278,7 +294,7 @@ try {
   await restoredGame.locator('#playground-canvas-container canvas').waitFor();
 
   const unavailable = await desktop.newPage();
-  await unavailable.route('**/broker.html', route => route.abort());
+  await unavailable.route(/\/broker\.html(?:\?.*)?$/, route => route.abort());
   await unavailable.goto(playground.href);
   const error = unavailable.getByRole('alert').filter({ hasText: 'timed out while connecting to the isolated preview' });
   await error.waitFor({ timeout: 16_000 });
@@ -323,6 +339,7 @@ const phone = await webkit.launch(webkitOptions);
 try {
   const device = devices['iPhone 13'];
   const page = await phone.newPage({ ...device, defaultBrowserType: undefined });
+  await observeChapterStart(page);
   await page.goto(playground.href);
   const iframe = await page.locator(previewFrame).elementHandle({ timeout: 15_000 });
   const game = await iframe.contentFrame();
@@ -379,16 +396,17 @@ try {
   assert.ok(toolbarBounds.y + toolbarBounds.height <= arrows.y, 'The toolbar must clear the touch arrows.');
   assert.deepEqual(await iframe.boundingBox(), previewBounds);
   assert.deepEqual(await canvas.boundingBox(), canvasBounds);
-  await verifyTouchMovement(page, game, '#playground-canvas-container', true);
+  await verifyTouchMovement(page, game, '#playground-canvas-container');
   await verifyHostedNamedScenePlacement(phone, { ...device, defaultBrowserType: undefined });
 
   const standalonePage = await phone.newPage({ ...device, defaultBrowserType: undefined });
+  await observeChapterStart(standalonePage);
   const offOrigin = [];
   standalonePage.on('request', request => {
     if (new URL(request.url()).origin !== standalone.origin) offOrigin.push(request.url());
   });
   await standalonePage.goto(standalone.href);
-  await verifyTouchMovement(standalonePage, standalonePage, '#amber-ruins-viewport', false);
+  await verifyTouchMovement(standalonePage, standalonePage, '#amber-ruins-viewport');
   assert.deepEqual(offOrigin, []);
 } finally {
   await phone.close();

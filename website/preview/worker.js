@@ -1,5 +1,5 @@
 const scope = new URL(self.registration.scope);
-const broker = new URL("broker.html", scope).href;
+const broker = new URL("broker.html", scope);
 const runs = new Map();
 
 self.addEventListener("install", () => self.skipWaiting());
@@ -13,7 +13,9 @@ self.addEventListener("message", event => {
     event.ports[0].postMessage({ files: run[1].files, entry: run[1].entry });
     return;
   }
-  if (event.source?.url !== broker || event.data?.type !== "prepare-run") return;
+  if (!event.source?.url || event.data?.type !== "prepare-run") return;
+  const source = new URL(event.source.url);
+  if (source.origin !== broker.origin || source.pathname !== broker.pathname) return;
   const { files, entry, editorOrigin } = event.data;
   if (!event.ports[0] || typeof editorOrigin !== "string" || typeof entry !== "string" ||
       !(files instanceof Map) || !files.has(entry) || files.size > 512) return;
