@@ -1,132 +1,179 @@
-/**
- * Interface for the shared global state of the Loader.
- */
-interface LoaderState {
-  assets: Map<string, HTMLImageElement>;
-  loadingQueue: Map<string, string>;
-  totalToLoad: number;
-  loadedCount: number;
+import Sound from './Sound.js';
+
+type LoadedAsset =
+  | { kind: 'image'; tag: string; value: HTMLImageElement }
+  | { kind: 'json'; tag: string; value: unknown }
+  | { kind: 'sound'; tag: string; value: Sound };
+
+type AssetKind = LoadedAsset['kind'];
+
+interface QueuedAsset {
+  kind: AssetKind;
+  tag: string;
+  src: string;
+  inFlight?: Promise<void>;
 }
 
-/**
- * Initial state for the loader.
- */
-const INITIAL_STATE: LoaderState = {
-  assets: new Map(),
-  loadingQueue: new Map(),
-  totalToLoad: 0,
-  loadedCount: 0
-};
+interface LoaderState {
+  assets: Map<string, LoadedAsset>;
+  queue: Map<string, QueuedAsset>;
+  controller: AbortController;
+}
 
-/**
- * Handles asynchronous loading of assets like images.
- */
+function newState(): LoaderState {
+  return { assets: new Map(), queue: new Map(), controller: new AbortController() };
+}
+
+function assetKey(kind: AssetKind, tag: string): string {
+  return `${kind}:${tag}`;
+}
+
+function assetNotFound(tag: string): Error {
+  return new Error(`Asset not found: ${tag}. Make sure it is queued and loaded.`);
+}
+
+function cancelledLoad(): DOMException {
+  return new DOMException('The asset load was cancelled.', 'AbortError');
+}
+
+/** Queues and loads images, JSON data and decoded sounds. */
 export default class ResourceLoader {
-  private static generation = 0;
-  /** Internal helper to access the global shared state. */
+  private static get _global() {
+    return globalThis as unknown as { __DINO_LOADER_STATE__?: LoaderState };
+  }
+
   private static get _state(): LoaderState {
-    const global = globalThis as unknown as { __DINO_LOADER_STATE__: LoaderState };
-    if (!global.__DINO_LOADER_STATE__) {
-      global.__DINO_LOADER_STATE__ = INITIAL_STATE;
-    }
-    return global.__DINO_LOADER_STATE__;
+    return this._global.__DINO_LOADER_STATE__ ??= newState();
   }
 
-  private static get assets() { return this._state.assets; }
-  private static get loadingQueue() { return this._state.loadingQueue; }
-  private static get totalToLoad() { return this._state.totalToLoad; }
-  private static set totalToLoad(val: number) { this._state.totalToLoad = val; }
-  private static get loadedCount() { return this._state.loadedCount; }
-  private static set loadedCount(val: number) { this._state.loadedCount = val; }
+  /** Queues an image. Reusing an image tag keeps its existing source. */
+  static queueImage(tag: string, src: string): void {
+    this.queue('image', tag, src);
+  }
 
-  /**
-   * Queue an image for loading.
-   * @param tag Unique tag to reference the image later.
-   * @param src Path to the image file.
-   */
-  static queueImage(tag: string, src: string) {
-    if (this.assets.has(tag) || this.loadingQueue.has(tag)) return;
-    
-    this.loadingQueue.set(tag, src);
-    this.totalToLoad++;
+  /** Queues a JSON file. Reusing a JSON tag keeps its existing source. */
+  static queueJson(tag: string, src: string): void {
+    this.queue('json', tag, src);
+  }
+
+  /** Queues a sound for decoding. Reusing a sound tag keeps its existing source. */
+  static queueSound(tag: string, src: string): void {
+    this.queue('sound', tag, src);
+  }
+
+  private static queue(kind: AssetKind, tag: string, src: string): void {
+    const { assets, queue } = this._state;
+    const key = assetKey(kind, tag);
+    if (!assets.has(key) && !queue.has(key)) queue.set(key, { kind, tag, src });
   }
 
   /**
-   * Start loading all queued assets.
-   * @param onProgress Optional callback for loading progress updates.
+   * Loads the entries queued when called and reports their percentage loaded.
+   * Overlapping calls share pending requests. Successful assets remain cached
+   * and failed entries can be retried by calling this method again.
    */
   static async loadAll(onProgress?: (percent: number) => void): Promise<void> {
-    if (this.loadingQueue.size === 0) return Promise.resolve();
-    const generation = this.generation;
+    const state = this._state;
+    const snapshot = Array.from(state.queue.entries());
+    if (!snapshot.length) return;
 
-    const promises = Array.from(this.loadingQueue.entries()).map(([tag, src]) => {
-      return new Promise<void>((resolve, reject) => {
-        const img = new Image();
-        img.src = src;
-        img.onload = () => {
-          if (generation !== this.generation) {
-            resolve();
-            return;
-          }
-          this.assets.set(tag, img);
-          this.loadedCount++;
-          if (onProgress) {
-            onProgress((this.loadedCount / this.totalToLoad) * 100);
-          }
-          resolve();
-        };
-        img.onerror = () => {
-          if (generation !== this.generation) {
-            resolve();
-            return;
-          }
-          console.error(`Failed to load asset: ${src}`);
-          reject();
-        };
-      });
+    const { signal } = state.controller;
+    let cancel!: () => void;
+    const cancellation = new Promise<never>((_, reject) => {
+      cancel = () => reject(cancelledLoad());
+      signal.addEventListener('abort', cancel, { once: true });
     });
 
-    await Promise.all(promises);
-    if (generation !== this.generation) {
-      throw new DOMException('The asset load was cancelled.', 'AbortError');
+    let active = true;
+    let loaded = 0;
+    try {
+      const loading = snapshot.map(([key, entry]) => this.loadEntry(state, key, entry).then(() => {
+        if (active && !signal.aborted) onProgress?.(++loaded / snapshot.length * 100);
+      }));
+      await Promise.race([Promise.all(loading), cancellation]);
+    } finally {
+      active = false;
+      signal.removeEventListener('abort', cancel);
     }
-    this.loadingQueue.clear();
-    this.totalToLoad = 0;
-    this.loadedCount = 0;
   }
 
-  /**
-   * Get a loaded asset by its tag.
-   * @param tag The tag used when queuing the asset.
-   * @returns The loaded HTMLImageElement.
-   */
+  private static loadEntry(state: LoaderState, key: string, entry: QueuedAsset): Promise<void> {
+    const { signal } = state.controller;
+    return entry.inFlight ??= this.readAsset(entry, signal).then(asset => {
+      if (signal.aborted) return;
+      state.assets.set(key, asset);
+      state.queue.delete(key);
+    }, error => {
+      entry.inFlight = undefined;
+      throw error;
+    });
+  }
+
+  private static async readAsset({ kind, tag, src }: QueuedAsset, signal: AbortSignal): Promise<LoadedAsset> {
+    switch (kind) {
+      case 'image': {
+        const value = await new Promise<HTMLImageElement>((resolve, reject) => {
+          const image = new Image();
+          const cleanUp = () => { image.onload = null; image.onerror = null; };
+          image.onload = () => {
+            cleanUp();
+            resolve(image);
+          };
+          image.onerror = () => {
+            cleanUp();
+            if (!signal.aborted) console.error(`Failed to load asset: ${src}`);
+            reject();
+          };
+          image.src = src;
+        });
+        return { kind, tag, value };
+      }
+      case 'json': {
+        const response = await fetch(src, { signal });
+        if (!response.ok) throw new Error(`Could not load JSON (HTTP ${response.status}): ${src}`);
+        return { kind, tag, value: await response.json() };
+      }
+      case 'sound':
+        return { kind, tag, value: await Sound.load(src) };
+    }
+  }
+
+  /** Gets the loaded image for this tag. */
   static getImage(tag: string): HTMLImageElement {
-    const asset = this.assets.get(tag);
-    if (!asset) {
-      throw new Error(`Asset not found: ${tag}. Make sure it is queued and loaded.`);
+    const asset = this._state.assets.get(assetKey('image', tag));
+    if (asset?.kind !== 'image') throw assetNotFound(tag);
+    return asset.value;
+  }
+
+  /** Gets the parsed JSON for this tag. The caller supplies its expected type. */
+  static getJson<T = unknown>(tag: string): T {
+    const asset = this._state.assets.get(assetKey('json', tag));
+    if (asset?.kind !== 'json') throw assetNotFound(tag);
+    return asset.value as T;
+  }
+
+  /** Gets the decoded sound for this tag. */
+  static getSound(tag: string): Sound {
+    const asset = this._state.assets.get(assetKey('sound', tag));
+    if (asset?.kind !== 'sound') throw assetNotFound(tag);
+    return asset.value;
+  }
+
+  /** Lists loaded images for the Playground asset panel and other image consumers. */
+  static getLoadedAssets(): { tag: string; image: HTMLImageElement }[] {
+    const images: { tag: string; image: HTMLImageElement }[] = [];
+    for (const asset of this._state.assets.values()) {
+      if (asset.kind === 'image') images.push({ tag: asset.tag, image: asset.value });
     }
-    return asset;
+    return images;
   }
 
-  /**
-   * Returns all loaded assets.
-   * @returns An array of { tag, image } objects.
-   */
-  static getLoadedAssets(): { tag: string, image: HTMLImageElement }[] {
-    return Array.from(this.assets.entries()).map(([tag, image]) => ({
-      tag,
-      image
-    }));
-  }
-
-  /**
-   * Clears all loaded assets and the loading queue.
-   */
-  static clear() {
-    this.generation++;
-    this.assets.clear();
-    this.loadingQueue.clear();
-    this.totalToLoad = 0;
-    this.loadedCount = 0;
+  /** Clears all assets and queued work, cancelling outstanding batches. */
+  static clear(): void {
+    const previous = this._state;
+    this._global.__DINO_LOADER_STATE__ = newState();
+    previous.controller.abort();
+    previous.assets.clear();
+    previous.queue.clear();
   }
 }

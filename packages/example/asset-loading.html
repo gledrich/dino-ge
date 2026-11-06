@@ -1,0 +1,27 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Load game assets | Dino GE</title>
+  <style>
+    body { max-width: 38rem; margin: 2rem auto; padding: 0 1rem; background: #111d22; color: #e7eee8; font: 1rem/1.55 system-ui, sans-serif; }
+    button { font: inherit; padding: .4rem .8rem; }
+    img { display: block; width: 128px; margin-block: 1rem; image-rendering: pixelated; }
+    a { color: #acebc3; }
+  </style>
+  <script type="importmap">{"imports":{"dino-ge":"/built/index.js"}}</script>
+  <script type="module" src="/asset-loading.js"></script>
+</head>
+<body>
+  <main>
+    <h1>Load game assets</h1>
+    <p>Load an atlas, a Tiled room and a sound together. Once ready, inspect the room dimensions and play the pickup sound.</p>
+    <progress aria-label="Asset loading progress" max="100" value="0"></progress>
+    <p role="status">Loading assets…</p>
+    <div id="atlas"></div>
+    <button type="button" disabled>Play pickup sound</button>
+    <p><a href="/">Back to Amber Ruins</a></p>
+  </main>
+</body>
+</html>

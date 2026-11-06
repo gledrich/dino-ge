@@ -25,4 +25,24 @@ Call `Sound.unlock()` from a user interaction before playback. `Sound.load(url)`
 
 The particle burst uses a world position, a lifetime in seconds and one initial velocity per particle. The emitter manages individual particle lifetimes. `shakeScreen()` and `chromaticAberration()` provide short feedback on damage. Keep important information available when motion effects are disabled. The pickup sound comes from Amber Ruins.
 
+## Preload images, JSON and sound together
+
+Queue each asset by name, then pass a progress callback to `Loader.loadAll()`.
+Read the decoded assets after the batch finishes.
+
+```js
+Loader.queueImage('floor', '/floor.svg');
+Loader.queueJson('room', '/room.tmj');
+Loader.queueSound('pickup', '/pickup.wav');
+await Loader.loadAll(percent => { progress.value = percent; });
+
+const floor = Loader.getImage('floor');
+const room = Loader.getJson('room');
+const pickup = Loader.getSound('pickup');
+```
+
+Use `Sound.unlock()` from a click or key press before playing a decoded sound.
+To try this flow, build dino-ge with `npm run build -w dino-ge`, start
+`npm run example` and open `http://localhost:3001/asset-loading.html`.
+
 [ScreenUI](../api/classes/core_ScreenUI.ScreenUI.html) · [Sound](../api/classes/core_Sound.Sound.html) · [ParticleEmitter](../api/classes/objects_ParticleEmitter.ParticleEmitter.html) · [Engine effects](../api/classes/core_Engine.Engine.html)
