@@ -8,6 +8,8 @@ export interface PropertyRowDef {
   type: string;
   propertyPath: string;
   min?: number;
+  max?: number;
+  step?: number;
   emptyColourLabel?: string;
 }
 
@@ -239,7 +241,7 @@ const InspectorRow: React.FC<{
             inputRef.current.checked = !!val;
           } else if (def.type === 'number') {
             inputRef.current.value = typeof val === 'number'
-              ? (isRotation ? val * (180 / Math.PI) : val).toFixed(2) : '0';
+              ? (isRotation ? val * (180 / Math.PI) : val).toFixed(def.step === 1 ? 0 : 2) : '0';
           } else {
             inputRef.current.value = val !== undefined ? String(val) : '';
           }
@@ -268,7 +270,8 @@ const InspectorRow: React.FC<{
     if (isColour && !emptyColour && !getCanvasColourHex(element.value)) return;
     if (def.type !== 'number') return element.value;
     const value = element.valueAsNumber;
-    if (Number.isFinite(value) && !element.validity.rangeUnderflow) {
+    if (Number.isFinite(value) && !element.validity.rangeUnderflow &&
+        !element.validity.rangeOverflow && !element.validity.stepMismatch) {
       return isRotation ? value * (Math.PI / 180) : value;
     }
   };
@@ -374,7 +377,8 @@ const InspectorRow: React.FC<{
           id={inputId}
           type={isColour ? 'text' : def.type}
           min={minimum}
-          step="any"
+          max={def.max}
+          step={def.step ?? "any"}
           ref={inputRef}
           placeholder={def.emptyColourLabel}
           aria-invalid={invalid || undefined}

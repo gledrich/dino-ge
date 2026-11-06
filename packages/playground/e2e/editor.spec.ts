@@ -384,7 +384,7 @@ import { Engine, Rectangle, Vector2 } from 'dino-ge';
 new Engine({
   onLoad() {
     new Rectangle({ tag: 'reserved-box', position: new Vector2(72, 24), width: 30, height: 30 });
-    new Rectangle({ 'tag': 'beta-box', position: new Vector2(12, 24), width: 30, height: 30, colour: '#abc' });
+    new Rectangle({ 'tag': 'beta-box', position: new Vector2(12, 24), width: 30, height: 30, colour: '#abc', physics: { collisionCategory: 1, collisionMask: 4294967295 } });
   },
   update: () => {},
 }, { containerId: 'playground-canvas-container' });
@@ -408,6 +408,15 @@ new Engine({
     const { monaco } = window as typeof window & { monaco: Monaco };
     return monaco.editor.getModels().find(model => model.getLanguageId() === 'javascript')?.getValue();
   })).toContain('new Vector2(120, 24)');
+  const mask = page.getByRole('spinbutton', { name: 'Collision mask', exact: true });
+  await expect(mask).toHaveValue('4294967295');
+  await mask.fill('6');
+  await page.getByRole('button', { name: 'Save Collision mask to code', exact: true }).click();
+  await expect.poll(() => page.evaluate(() => {
+    const { monaco } = window as typeof window & { monaco: Monaco };
+    return monaco.editor.getModels().find(model => model.getLanguageId() === 'javascript')?.getValue();
+  })).toContain('collisionMask: 6');
+
   const tag = page.getByRole('textbox', { name: 'Tag', exact: true });
   const saveTag = page.getByRole('button', { name: 'Save Tag to code', exact: true });
   await tag.fill('reserved-box');

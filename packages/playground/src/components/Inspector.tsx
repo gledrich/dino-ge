@@ -80,7 +80,9 @@ const SECTIONS: Record<string, { rows: PropertyRowDef[], component: any, descrip
       { label: 'Restitution', type: 'number', propertyPath: '_physics.restitution' },
       { label: 'Friction', type: 'number', propertyPath: '_physics.friction' },
       { label: 'Is Static', type: 'checkbox', propertyPath: '_physics.isStatic' },
-      { label: 'Is Sensor', type: 'checkbox', propertyPath: '_physics.isSensor' }
+      { label: 'Is Sensor', type: 'checkbox', propertyPath: '_physics.isSensor' },
+      { label: 'Collision category', type: 'number', propertyPath: '_physics.collisionCategory', min: 0, max: 0xffffffff, step: 1 },
+      { label: 'Collision mask', type: 'number', propertyPath: '_physics.collisionMask', min: 0, max: 0xffffffff, step: 1 }
     ]
   }
 };
