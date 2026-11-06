@@ -2,8 +2,6 @@
 
 Dino GE is a TypeScript engine for 2D browser games with zero runtime dependencies. It provides scenes, physics, sprite animation and tile maps. The Playground lets you edit scripts and inspect scenes in the browser.
 
-**Beta preview.** APIs and workflows may change.
-
 ## Run locally
 
 Use the Node.js version in [`.nvmrc`](.nvmrc). From the repository root:

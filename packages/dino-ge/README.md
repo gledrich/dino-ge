@@ -2,12 +2,10 @@
 
 A TypeScript engine for 2D browser games with zero runtime dependencies. It provides scenes, physics, sprite animation and Tiled map import.
 
-**Beta preview.** APIs and workflows may change.
-
 ## Install
 
 ```sh
-npm install dino-ge@beta
+npm install dino-ge
 ```
 
 ## Draw your first scene

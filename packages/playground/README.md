@@ -2,14 +2,12 @@
 
 Edit Dino GE scripts, inspect scene objects and try changes in the browser.
 
-**Beta preview.** APIs and workflows may change.
-
 ## Install and run
 
 Use Node.js 24.22.1 or later on the 24.x line, or 26.13.0 or later on the 26.x line.
 
 ```sh
-npm install -g dino-ge-playground@beta
+npm install -g dino-ge-playground
 dino-ge-playground
 ```
 
