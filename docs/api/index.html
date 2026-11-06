@@ -9,70 +9,38 @@
 <div class="tsd-page-title">
 <h1>dino-ge</h1></div>
 <div class="tsd-panel tsd-typography"><h1 id="dino-ge" class="tsd-anchor-link">dino-ge<a href="#dino-ge" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="assets/icons.svg#icon-anchor"></use></svg></a></h1>
-<p>A lightweight, performant 2D game engine built from the ground up in TypeScript. <code>dino-ge</code> provides a robust, developer-friendly framework for building 2D web games. Friend of <a href="https://www.npmjs.com/package/dino-ge-playground">dino-ge-playground</a>.</p>
-<p><strong>Beta preview.</strong> APIs and workflows may change during the beta.</p>
-<h2 id="features" class="tsd-anchor-link">Features<a href="#features" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="assets/icons.svg#icon-anchor"></use></svg></a></h2>
+<p>A TypeScript engine for 2D browser games with zero runtime dependencies. It provides scenes, physics, sprite animation and Tiled map import.</p>
+<p><strong>Beta preview.</strong> APIs and workflows may change.</p>
+<h2 id="install" class="tsd-anchor-link">Install<a href="#install" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="assets/icons.svg#icon-anchor"></use></svg></a></h2>
+<pre><code class="sh"><span class="hl-0">npm</span><span class="hl-1"> </span><span class="hl-2">install</span><span class="hl-1"> </span><span class="hl-2">dino-ge@beta</span>
+</code><button type="button">Copy</button></pre>
+
+<h2 id="draw-your-first-scene" class="tsd-anchor-link">Draw your first scene<a href="#draw-your-first-scene" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="assets/icons.svg#icon-anchor"></use></svg></a></h2>
+<p>In a browser project with a bundler, add a container to your HTML:</p>
+<pre><code class="html"><span class="hl-3">&lt;</span><span class="hl-4">div</span><span class="hl-1"> </span><span class="hl-5">id</span><span class="hl-1">=</span><span class="hl-6">&quot;game&quot;</span><span class="hl-1"> </span><span class="hl-5">style</span><span class="hl-1">=</span><span class="hl-6">&quot;width: 100%; height: 240px&quot;</span><span class="hl-3">&gt;&lt;/</span><span class="hl-4">div</span><span class="hl-3">&gt;</span>
+</code><button type="button">Copy</button></pre>
+
+<p>Load this code from your project's JavaScript or TypeScript entry point:</p>
+<pre><code class="ts"><span class="hl-7">import</span><span class="hl-1"> { </span><span class="hl-8">Circle</span><span class="hl-1">, </span><span class="hl-8">Engine</span><span class="hl-1">, </span><span class="hl-8">Scene</span><span class="hl-1">, </span><span class="hl-8">Vector2</span><span class="hl-1"> } </span><span class="hl-7">from</span><span class="hl-1"> </span><span class="hl-2">&#39;dino-ge&#39;</span><span class="hl-1">;</span><br/><br/><span class="hl-9">class</span><span class="hl-1"> </span><span class="hl-10">Clearing</span><span class="hl-1"> </span><span class="hl-9">extends</span><span class="hl-1"> </span><span class="hl-10">Scene</span><span class="hl-1"> {</span><br/><span class="hl-1">  </span><span class="hl-0">onLoad</span><span class="hl-1">() {</span><br/><span class="hl-1">    </span><span class="hl-9">this</span><span class="hl-1">.</span><span class="hl-0">add</span><span class="hl-1">(</span><span class="hl-9">new</span><span class="hl-1"> </span><span class="hl-0">Circle</span><span class="hl-1">({</span><br/><span class="hl-1">      </span><span class="hl-8">position:</span><span class="hl-1"> </span><span class="hl-9">new</span><span class="hl-1"> </span><span class="hl-0">Vector2</span><span class="hl-1">(</span><span class="hl-11">80</span><span class="hl-1">, </span><span class="hl-11">80</span><span class="hl-1">),</span><br/><span class="hl-1">      </span><span class="hl-8">radius:</span><span class="hl-1"> </span><span class="hl-11">16</span><span class="hl-1">,</span><br/><span class="hl-1">      </span><span class="hl-8">colour:</span><span class="hl-1"> </span><span class="hl-2">&#39;#ffc46f&#39;</span><span class="hl-1">,</span><br/><span class="hl-1">    }));</span><br/><span class="hl-1">  }</span><br/><span class="hl-1">}</span><br/><br/><span class="hl-9">new</span><span class="hl-1"> </span><span class="hl-0">Engine</span><span class="hl-1">({</span><br/><span class="hl-1">  </span><span class="hl-0">onLoad</span><span class="hl-1">() {</span><br/><span class="hl-1">    </span><span class="hl-8">Engine</span><span class="hl-1">.</span><span class="hl-8">currentScene</span><span class="hl-1"> = </span><span class="hl-9">new</span><span class="hl-1"> </span><span class="hl-0">Clearing</span><span class="hl-1">();</span><br/><span class="hl-1">  },</span><br/><span class="hl-1">}, { </span><span class="hl-8">containerId:</span><span class="hl-1"> </span><span class="hl-2">&#39;game&#39;</span><span class="hl-1">, </span><span class="hl-8">width:</span><span class="hl-1"> </span><span class="hl-2">&#39;100%&#39;</span><span class="hl-1">, </span><span class="hl-8">height:</span><span class="hl-1"> </span><span class="hl-2">&#39;100%&#39;</span><span class="hl-1"> });</span>
+</code><button type="button">Copy</button></pre>
+
+<h2 id="world-shaders" class="tsd-anchor-link">World shaders<a href="#world-shaders" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="assets/icons.svg#icon-anchor"></use></svg></a></h2>
+<p><code>game.setPostProcessShader({ fragmentSource, uniforms })</code> adds a GLSL ES 3.00
+fragment pass to the Canvas-rendered world. The shader can sample the scene
+through <code>u_scene</code> and read the backing resolution and game time from
+<code>u_resolution</code> and <code>u_time</code>. Use <code>setPostProcessUniforms()</code> to update custom
+float or vector uniforms and <code>setPostProcessShader(null)</code> to disable the pass.
+The Canvas world remains visible when WebGL2 cannot apply the shader. See the
+<a href="media/hud-audio-and-effects.md">HUD and effects guide</a> for a shader
+and a local demo.</p>
+<h2 id="learn-more" class="tsd-anchor-link">Learn more<a href="#learn-more" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="assets/icons.svg#icon-anchor"></use></svg></a></h2>
 <ul>
-<li><strong>Composition-based ECS:</strong> Built around a flexible Entity Component System for modular game design.</li>
-<li><strong>Hierarchical Transform System:</strong> Supports complex parent-child relationships with nested position, rotation, and scaling.</li>
-<li><strong>Pixel-Perfect Sprite Animation:</strong> Efficiently handles spritesheets with automatic frame calculation and smooth playback.</li>
-<li><strong>Robust 2D Physics:</strong> Impulse-based resolution with support for AABB and Circle collision primitives.</li>
-<li><strong>Customisable Camera:</strong> Built-in support for following targets, world-to-viewport coordinate mapping, and smooth zooming.</li>
-<li><strong>Playground Integration:</strong> Seamlessly compatible with the Dino GE Playground for rapid prototyping and live editing.</li>
+<li><a href="media/index.md">Engine guide</a> covers scenes, physics, animation, input, tile maps, audio and effects.</li>
+<li><a href="media/README.md">Gameplay Foundations</a> shows layered Tiled maps, named sprite clips and object actions working together.</li>
+<li><a href="https://www.npmjs.com/package/dino-ge-playground">Dino GE Playground</a> lets you edit scripts and inspect scenes in the browser.</li>
 </ul>
-<h2 id="installation" class="tsd-anchor-link">Installation<a href="#installation" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="assets/icons.svg#icon-anchor"></use></svg></a></h2>
-<pre><code class="bash"><span class="hl-0">npm</span><span class="hl-1"> </span><span class="hl-2">install</span><span class="hl-1"> </span><span class="hl-2">dino-ge@beta</span>
-</code><button type="button">Copy</button></pre>
-
-<h2 id="beta-game-apis" class="tsd-anchor-link">Beta game APIs<a href="#beta-game-apis" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="assets/icons.svg#icon-anchor"></use></svg></a></h2>
-<ul>
-<li><code>Tilemap.fromTiled(map, { tileset, position })</code> imports a finite orthogonal Tiled
-JSON map with one embedded tileset, square tiles and one unencoded tile layer.
-Pass the loaded tileset image or its loader tag as <code>tileset</code>.</li>
-<li><code>Input.getGamepad()</code> returns the first connected standard gamepad, or <code>null</code>.
-<code>Input.getGamepadAxes()</code> returns its left stick as a <code>Vector2</code> with a 0.2
-dead zone on each axis. Both methods accept an optional gamepad index.</li>
-<li>Call <code>await Sound.unlock()</code> from a user gesture. Use <code>Sound.load(url)</code> to
-decode audio, <code>sound.play()</code> for effects, and
-<code>sound.play({ loop: true, channel: 'music' })</code> for a music loop.
-Playback returns a stop function. <code>Sound.setVolume(channel, level)</code> controls
-the <code>master</code>, <code>music</code> or <code>effects</code> channel between zero and one.</li>
-<li>Pass <code>drawUI(ui)</code> to <code>Engine</code> to draw a screen-space interface over the world.
-The game supplies the state and actions. <code>ScreenUI</code> provides anchors,
-labels, panels, images, keyboard- and pointer-activated buttons, and
-progress bars. The <code>onDispose</code> callback can release game resources on reset.</li>
-</ul>
-<h2 id="quick-start" class="tsd-anchor-link">Quick Start<a href="#quick-start" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="assets/icons.svg#icon-anchor"></use></svg></a></h2>
-<pre><code class="typescript"><span class="hl-3">import</span><span class="hl-1"> { </span><span class="hl-4">Engine</span><span class="hl-1">, </span><span class="hl-4">Sprite</span><span class="hl-1">, </span><span class="hl-4">Vector2</span><span class="hl-1"> } </span><span class="hl-3">from</span><span class="hl-1"> </span><span class="hl-2">&#39;dino-ge&#39;</span><span class="hl-1">;</span><br/><br/><span class="hl-5">class</span><span class="hl-1"> </span><span class="hl-6">MyGame</span><span class="hl-1"> {</span><br/><span class="hl-1">  </span><span class="hl-5">constructor</span><span class="hl-1">() {</span><br/><span class="hl-1">    </span><span class="hl-5">new</span><span class="hl-1"> </span><span class="hl-0">Engine</span><span class="hl-1">(</span><br/><span class="hl-1">      {</span><br/><span class="hl-1">        </span><span class="hl-0">onLoad</span><span class="hl-4">:</span><span class="hl-1"> () </span><span class="hl-5">=&gt;</span><span class="hl-1"> </span><span class="hl-5">this</span><span class="hl-1">.</span><span class="hl-0">onLoad</span><span class="hl-1">(),</span><br/><span class="hl-1">        </span><span class="hl-0">update</span><span class="hl-4">:</span><span class="hl-1"> () </span><span class="hl-5">=&gt;</span><span class="hl-1"> </span><span class="hl-5">this</span><span class="hl-1">.</span><span class="hl-0">onUpdate</span><span class="hl-1">()</span><br/><span class="hl-1">      },</span><br/><span class="hl-1">      {</span><br/><span class="hl-1">        </span><span class="hl-4">title:</span><span class="hl-1"> </span><span class="hl-2">&#39;My Game&#39;</span><span class="hl-1">,</span><br/><span class="hl-1">        </span><span class="hl-4">width:</span><span class="hl-1"> </span><span class="hl-2">&#39;100%&#39;</span><span class="hl-1">,</span><br/><span class="hl-1">        </span><span class="hl-4">height:</span><span class="hl-1"> </span><span class="hl-2">&#39;100%&#39;</span><br/><span class="hl-1">      }</span><br/><span class="hl-1">    );</span><br/><span class="hl-1">  }</span><br/><br/><span class="hl-1">  </span><span class="hl-0">onLoad</span><span class="hl-1">() {</span><br/><span class="hl-1">    </span><span class="hl-5">const</span><span class="hl-1"> </span><span class="hl-7">player</span><span class="hl-1"> = </span><span class="hl-5">new</span><span class="hl-1"> </span><span class="hl-0">Sprite</span><span class="hl-1">({</span><br/><span class="hl-1">      </span><span class="hl-4">tag:</span><span class="hl-1"> </span><span class="hl-2">&#39;player&#39;</span><span class="hl-1">,</span><br/><span class="hl-1">      </span><span class="hl-4">img:</span><span class="hl-1"> </span><span class="hl-2">&#39;player&#39;</span><span class="hl-1">, </span><span class="hl-8">// Asset tag from ResourceLoader</span><br/><span class="hl-1">      </span><span class="hl-4">rows:</span><span class="hl-1"> </span><span class="hl-9">1</span><span class="hl-1">,</span><br/><span class="hl-1">      </span><span class="hl-4">cols:</span><span class="hl-1"> </span><span class="hl-9">4</span><span class="hl-1">,</span><br/><span class="hl-1">      </span><span class="hl-4">position:</span><span class="hl-1"> </span><span class="hl-5">new</span><span class="hl-1"> </span><span class="hl-0">Vector2</span><span class="hl-1">(</span><span class="hl-9">400</span><span class="hl-1">, </span><span class="hl-9">300</span><span class="hl-1">),</span><br/><span class="hl-1">      </span><span class="hl-4">zIndex:</span><span class="hl-1"> </span><span class="hl-9">10</span><span class="hl-1">,</span><br/><span class="hl-1">      </span><span class="hl-4">scale:</span><span class="hl-1"> </span><span class="hl-9">3</span><br/><span class="hl-1">    });</span><br/><span class="hl-1">    </span><span class="hl-4">player</span><span class="hl-1">.</span><span class="hl-0">play</span><span class="hl-1">();</span><br/><span class="hl-1">  }</span><br/><br/><span class="hl-1">  </span><span class="hl-0">onUpdate</span><span class="hl-1">() {</span><br/><span class="hl-1">    </span><span class="hl-8">// Game logic here</span><br/><span class="hl-1">  }</span><br/><span class="hl-1">}</span>
-</code><button type="button">Copy</button></pre>
-
-<h2 id="documentation" class="tsd-anchor-link">Documentation<a href="#documentation" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="assets/icons.svg#icon-anchor"></use></svg></a></h2>
-<p>Full API documentation and guides are available at <a href="https://gledrich.github.io/dino-ge/index.html">https://gledrich.github.io/dino-ge/index.html</a>.</p>
-<h2 id="license" class="tsd-anchor-link">License<a href="#license" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="assets/icons.svg#icon-anchor"></use></svg></a></h2>
-<p>Dino GE is released under the MIT License.</p>
-<h3 id="particle-bursts" class="tsd-anchor-link">Particle bursts<a href="#particle-bursts" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="assets/icons.svg#icon-anchor"></use></svg></a></h3>
-<p>Create a <code>ParticleEmitter</code> while a scene is active to keep its visual effects
-with that scene. Each burst starts at a world-space position and uses seconds
-for its lifetime. The emitter caps the number of live particles and advances
-them on the engine's fixed step.</p>
-<pre><code class="ts"><span class="hl-5">const</span><span class="hl-1"> </span><span class="hl-7">sparks</span><span class="hl-1"> = </span><span class="hl-5">new</span><span class="hl-1"> </span><span class="hl-0">ParticleEmitter</span><span class="hl-1">({ </span><span class="hl-4">capacity:</span><span class="hl-1"> </span><span class="hl-9">128</span><span class="hl-1">, </span><span class="hl-4">zIndex:</span><span class="hl-1"> </span><span class="hl-9">10</span><span class="hl-1"> });</span><br/><span class="hl-4">sparks</span><span class="hl-1">.</span><span class="hl-0">burst</span><span class="hl-1">(</span><span class="hl-5">new</span><span class="hl-1"> </span><span class="hl-0">Vector2</span><span class="hl-1">(</span><span class="hl-9">120</span><span class="hl-1">, </span><span class="hl-9">80</span><span class="hl-1">), {</span><br/><span class="hl-1">  </span><span class="hl-4">count:</span><span class="hl-1"> </span><span class="hl-9">8</span><span class="hl-1">,</span><br/><span class="hl-1">  </span><span class="hl-0">velocity</span><span class="hl-4">:</span><span class="hl-1"> </span><span class="hl-4">index</span><span class="hl-1"> </span><span class="hl-5">=&gt;</span><span class="hl-1"> </span><span class="hl-5">new</span><span class="hl-1"> </span><span class="hl-0">Vector2</span><span class="hl-1">((</span><span class="hl-4">index</span><span class="hl-1"> - </span><span class="hl-9">3.5</span><span class="hl-1">) * </span><span class="hl-9">20</span><span class="hl-1">, -</span><span class="hl-9">80</span><span class="hl-1">),</span><br/><span class="hl-1">  </span><span class="hl-4">gravity:</span><span class="hl-1"> </span><span class="hl-5">new</span><span class="hl-1"> </span><span class="hl-0">Vector2</span><span class="hl-1">(</span><span class="hl-9">0</span><span class="hl-1">, </span><span class="hl-9">160</span><span class="hl-1">),</span><br/><span class="hl-1">  </span><span class="hl-4">lifetime:</span><span class="hl-1"> </span><span class="hl-9">0.4</span><span class="hl-1">,</span><br/><span class="hl-1">  </span><span class="hl-4">startRadius:</span><span class="hl-1"> </span><span class="hl-9">4</span><span class="hl-1">,</span><br/><span class="hl-1">  </span><span class="hl-4">endRadius:</span><span class="hl-1"> </span><span class="hl-9">0</span><span class="hl-1">,</span><br/><span class="hl-1">  </span><span class="hl-4">colour:</span><span class="hl-1"> </span><span class="hl-2">&#39;#ffcf64&#39;</span><span class="hl-1">,</span><br/><span class="hl-1">});</span>
-</code><button type="button">Copy</button></pre>
-
-<h3 id="collision-broad-phase" class="tsd-anchor-link">Collision broad phase<a href="#collision-broad-phase" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="assets/icons.svg#icon-anchor"></use></svg></a></h3>
-<p>The default physics system uses a quadtree to find nearby world-space
-colliders before running shape-specific tests. Collisions retain their pair
-order, and later pairs see position changes made by earlier resolution and
-collision handlers. The Bouncy Physics example at <code>/bouncy.html</code> exercises
-the broad phase with a field of 216 static bumpers.</p>
-<h3 id="scene-transitions-and-effects" class="tsd-anchor-link">Scene transitions and effects<a href="#scene-transitions-and-effects" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="assets/icons.svg#icon-anchor"></use></svg></a></h3>
-<p>Use <code>game.transitionTo(nextScene, { type: 'fade', duration: 0.4 })</code> to fade
-through black, or use <code>type: 'slide'</code> to slide the old world off screen and
-the next world in. The engine loads the next scene at the midpoint. Use
-<code>Engine.currentScene = nextScene</code> for an immediate switch.</p>
-<p><code>game.shakeScreen(8, 0.25)</code> and <code>game.chromaticAberration(4, 0.18)</code> take a
-strength in screen pixels and a duration in seconds. Effects decay over
-their duration and freeze when paused. They affect the world before
-<code>drawUI</code>, so the camera coordinates and screen-space HUD stay stable.</p>
+<p>Run <code>npm run docs</code> from the repository root to generate the API reference in <code>docs/api/</code>.</p>
+<p>MIT licence.</p>
 </div></div>
 <div class="col-sidebar">
 <div class="page-menu">
@@ -90,17 +58,10 @@ their duration and freeze when paused. They affect the world before
 <h3>On This Page</h3></summary>
 <div class="tsd-accordion-details"><a href="#dino-ge"><span>dino-<wbr/>ge</span></a>
 <ul>
-<li><a href="#features"><span>Features</span></a></li>
-<li><a href="#installation"><span>Installation</span></a></li>
-<li><a href="#beta-game-apis"><span>Beta game <wbr/>AP<wbr/>Is</span></a></li>
-<li><a href="#quick-start"><span>Quick <wbr/>Start</span></a></li>
-<li><a href="#documentation"><span>Documentation</span></a></li>
-<li><a href="#license"><span>License</span></a></li>
-<li>
-<ul>
-<li><a href="#particle-bursts"><span>Particle bursts</span></a></li>
-<li><a href="#collision-broad-phase"><span>Collision broad phase</span></a></li>
-<li><a href="#scene-transitions-and-effects"><span>Scene transitions and effects</span></a></li></ul></li></ul></div></details></div>
+<li><a href="#install"><span>Install</span></a></li>
+<li><a href="#draw-your-first-scene"><span>Draw your first scene</span></a></li>
+<li><a href="#world-shaders"><span>World shaders</span></a></li>
+<li><a href="#learn-more"><span>Learn more</span></a></li></ul></div></details></div>
 <div class="site-menu">
 <nav class="tsd-navigation"><a href="modules.html">dino-ge</a>
 <ul class="tsd-small-nested-navigation" id="tsd-nav-container">

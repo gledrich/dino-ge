@@ -14,14 +14,14 @@
 <section class="tsd-panel tsd-comment">
 <div class="tsd-comment tsd-typography"><p>A basic circle shape that can be drawn to the screen.</p>
 </div></section>
-<section class="tsd-panel tsd-hierarchy" data-refl="1770">
+<section class="tsd-panel tsd-hierarchy" data-refl="2310">
 <h4>Hierarchy (<a href="../hierarchy.html#objects/Circle.Circle">View Summary</a>)</h4>
 <ul class="tsd-hierarchy">
 <li class="tsd-hierarchy-item"><a href="core_GameObject.GameObject.html" class="tsd-signature-type tsd-kind-class">GameObject</a>
 <ul class="tsd-hierarchy">
 <li class="tsd-hierarchy-item"><span class="tsd-hierarchy-target">Circle</span></li></ul></li></ul></section><aside class="tsd-sources">
 <ul>
-<li>Defined in packages/dino-ge/src/objects/Circle.ts:48</li></ul></aside>
+<li>Defined in src/objects/Circle.ts:50</li></ul></aside>
 <section class="tsd-panel-group tsd-index-group">
 <section class="tsd-panel tsd-index-panel">
 <details class="tsd-index-content tsd-accordion" open><summary class="tsd-accordion-summary tsd-index-summary"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden="true"><use href="../assets/icons.svg#icon-chevronDown"></use></svg>
@@ -33,7 +33,8 @@
 </div></section>
 <section class="tsd-index-section">
 <h3 class="tsd-index-heading tsd-anchor-link" id="properties">Properties<a href="#properties" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></h3>
-<div class="tsd-index-list"><a href="#id" class="tsd-index-link tsd-is-inherited"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Property"><use href="../assets/icons.svg#icon-1024"></use></svg><span>id</span></a>
+<div class="tsd-index-list"><a href="#actions" class="tsd-index-link tsd-is-inherited"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Property"><use href="../assets/icons.svg#icon-1024"></use></svg><span>actions</span></a>
+<a href="#id" class="tsd-index-link tsd-is-inherited"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Property"><use href="../assets/icons.svg#icon-1024"></use></svg><span>id</span></a>
 <a href="#_registry" class="tsd-index-link tsd-is-inherited"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Property"><use href="../assets/icons.svg#icon-1024"></use></svg><span>_<wbr/>registry</span></a>
 </div></section>
 <section class="tsd-index-section">
@@ -78,10 +79,18 @@
 <h4 class="tsd-returns-title">Returns <a href="" class="tsd-signature-type tsd-kind-class">Circle</a></h4><aside class="tsd-sources">
 <p>Overrides <a href="core_GameObject.GameObject.html">GameObject</a>.<a href="core_GameObject.GameObject.html#constructor">constructor</a></p>
 <ul>
-<li>Defined in packages/dino-ge/src/objects/Circle.ts:82</li></ul></aside></div></li></ul></section></section></details>
+<li>Defined in src/objects/Circle.ts:84</li></ul></aside></div></li></ul></section></section></details>
 <details class="tsd-panel-group tsd-member-group tsd-accordion" open><summary class="tsd-accordion-summary" data-key="section-Properties"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden="true"><use href="../assets/icons.svg#icon-chevronDown"></use></svg>
 <h2 class="tsd-anchor-link" id="properties-1">Properties<a href="#properties-1" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></h2></summary>
 <section>
+<section class="tsd-panel tsd-member tsd-is-inherited">
+<h3 class="tsd-anchor-link" id="actions"><code class="tsd-tag">Readonly</code><span>actions</span><a href="#actions" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></h3>
+<div class="tsd-signature"><span class="tsd-kind-property">actions</span><span class="tsd-signature-symbol">:</span> <a href="core_Actions.ActionQueue.html" class="tsd-signature-type tsd-kind-class">ActionQueue</a><span class="tsd-signature-symbol"> = ...</span></div>
+<div class="tsd-comment tsd-typography"><p>Actions advanced for this object as active game time elapses.</p>
+</div><aside class="tsd-sources">
+<p>Inherited from <a href="core_GameObject.GameObject.html">GameObject</a>.<a href="core_GameObject.GameObject.html#actions">actions</a></p>
+<ul>
+<li>Defined in src/core/GameObject.ts:25</li></ul></aside></section>
 <section class="tsd-panel tsd-member tsd-is-inherited">
 <h3 class="tsd-anchor-link" id="id"><code class="tsd-tag">Readonly</code><span>id</span><a href="#id" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></h3>
 <div class="tsd-signature"><span class="tsd-kind-property">id</span><span class="tsd-signature-symbol">:</span> <span class="tsd-signature-type">string</span><span class="tsd-signature-symbol"> = ...</span></div>
@@ -89,7 +98,7 @@
 </div><aside class="tsd-sources">
 <p>Inherited from <a href="core_GameObject.GameObject.html">GameObject</a>.<a href="core_GameObject.GameObject.html#id">id</a></p>
 <ul>
-<li>Defined in packages/dino-ge/src/core/GameObject.ts:22</li></ul></aside></section>
+<li>Defined in src/core/GameObject.ts:23</li></ul></aside></section>
 <section class="tsd-panel tsd-member tsd-is-inherited">
 <h3 class="tsd-anchor-link" id="_registry"><code class="tsd-tag">Static</code><span>_<wbr/>registry</span><a href="#_registry" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></h3>
 <div class="tsd-signature"><span class="tsd-kind-property">_registry</span><span class="tsd-signature-symbol">:</span> <span class="tsd-signature-keyword">typeof</span> <a href="core_Registry.Registry.html" class="tsd-signature-type tsd-kind-class">Registry</a><span class="tsd-signature-symbol"> = Registry</span></div>
@@ -97,7 +106,7 @@
 </div><aside class="tsd-sources">
 <p>Inherited from <a href="core_GameObject.GameObject.html">GameObject</a>.<a href="core_GameObject.GameObject.html#_registry">_registry</a></p>
 <ul>
-<li>Defined in packages/dino-ge/src/core/GameObject.ts:167</li></ul></aside></section></section></details>
+<li>Defined in src/core/GameObject.ts:170</li></ul></aside></section></section></details>
 <details class="tsd-panel-group tsd-member-group tsd-accordion" open><summary class="tsd-accordion-summary" data-key="section-Accessors"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden="true"><use href="../assets/icons.svg#icon-chevronDown"></use></svg>
 <h2 class="tsd-anchor-link" id="accessors-1">Accessors<a href="#accessors-1" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></h2></summary>
 <section>
@@ -112,7 +121,7 @@
 <h4 class="tsd-returns-title">Returns <a href="components_BoundsComponent.BoundsComponent.html" class="tsd-signature-type tsd-kind-class">BoundsComponent</a> <span class="tsd-signature-symbol">|</span> <span class="tsd-signature-type">undefined</span></h4><aside class="tsd-sources">
 <p>Inherited from GameObject.bounds</p>
 <ul>
-<li>Defined in packages/dino-ge/src/core/GameObject.ts:52</li></ul></aside></div></li>
+<li>Defined in src/core/GameObject.ts:55</li></ul></aside></div></li>
 <li>
 <div class="tsd-signature" id="boundsbounds-1"><span class="tsd-signature-keyword">set</span> <span class="tsd-kind-set-signature">bounds</span><span class="tsd-signature-symbol">(</span><span class="tsd-kind-parameter">val</span><span class="tsd-signature-symbol">:</span> <a href="components_BoundsComponent.BoundsComponent.html" class="tsd-signature-type tsd-kind-class">BoundsComponent</a> <span class="tsd-signature-symbol">|</span> <span class="tsd-signature-type">undefined</span><span class="tsd-signature-symbol">)</span><span class="tsd-signature-symbol">:</span> <span class="tsd-signature-type">void</span></div>
 <div class="tsd-description">
@@ -125,7 +134,7 @@
 <h4 class="tsd-returns-title">Returns <span class="tsd-signature-type">void</span></h4><aside class="tsd-sources">
 <p>Inherited from GameObject.bounds</p>
 <ul>
-<li>Defined in packages/dino-ge/src/core/GameObject.ts:59</li></ul></aside></div></li></ul></section>
+<li>Defined in src/core/GameObject.ts:62</li></ul></aside></div></li></ul></section>
 <section class="tsd-panel tsd-member">
 <h3 class="tsd-anchor-link" id="centre"><span>centre</span><a href="#centre" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></h3>
 <ul class="tsd-signatures">
@@ -136,7 +145,7 @@
 </div>
 <h4 class="tsd-returns-title">Returns <a href="math_Vector2.Vector2.html" class="tsd-signature-type tsd-kind-class">Vector2</a></h4><aside class="tsd-sources">
 <ul>
-<li>Defined in packages/dino-ge/src/objects/Circle.ts:62</li></ul></aside></div></li></ul></section>
+<li>Defined in src/objects/Circle.ts:64</li></ul></aside></div></li></ul></section>
 <section class="tsd-panel tsd-member">
 <h3 class="tsd-anchor-link" id="colour"><span>colour</span><a href="#colour" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></h3>
 <ul class="tsd-signatures">
@@ -147,7 +156,7 @@
 </div>
 <h4 class="tsd-returns-title">Returns <span class="tsd-signature-type">string</span></h4><aside class="tsd-sources">
 <ul>
-<li>Defined in packages/dino-ge/src/objects/Circle.ts:56</li></ul></aside></div></li>
+<li>Defined in src/objects/Circle.ts:58</li></ul></aside></div></li>
 <li>
 <div class="tsd-signature" id="colourcolour-1"><span class="tsd-signature-keyword">set</span> <span class="tsd-kind-set-signature">colour</span><span class="tsd-signature-symbol">(</span><span class="tsd-kind-parameter">value</span><span class="tsd-signature-symbol">:</span> <span class="tsd-signature-type">string</span><span class="tsd-signature-symbol">)</span><span class="tsd-signature-symbol">:</span> <span class="tsd-signature-type">void</span></div>
 <div class="tsd-description">
@@ -157,7 +166,7 @@
 <li><span><span class="tsd-kind-parameter">value</span>: <span class="tsd-signature-type">string</span></span></li></ul></div>
 <h4 class="tsd-returns-title">Returns <span class="tsd-signature-type">void</span></h4><aside class="tsd-sources">
 <ul>
-<li>Defined in packages/dino-ge/src/objects/Circle.ts:57</li></ul></aside></div></li></ul></section>
+<li>Defined in src/objects/Circle.ts:59</li></ul></aside></div></li></ul></section>
 <section class="tsd-panel tsd-member tsd-is-inherited">
 <h3 class="tsd-anchor-link" id="metadata"><span>metadata</span><a href="#metadata" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></h3>
 <ul class="tsd-signatures tsd-is-inherited">
@@ -169,7 +178,7 @@
 <h4 class="tsd-returns-title">Returns <a href="components_TagComponent.TagComponent.html" class="tsd-signature-type tsd-kind-class">TagComponent</a></h4><aside class="tsd-sources">
 <p>Inherited from GameObject.metadata</p>
 <ul>
-<li>Defined in packages/dino-ge/src/core/GameObject.ts:40</li></ul></aside></div></li></ul></section>
+<li>Defined in src/core/GameObject.ts:43</li></ul></aside></div></li></ul></section>
 <section class="tsd-panel tsd-member">
 <h3 class="tsd-anchor-link" id="radius"><span>radius</span><a href="#radius" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></h3>
 <ul class="tsd-signatures">
@@ -180,7 +189,7 @@
 </div>
 <h4 class="tsd-returns-title">Returns <span class="tsd-signature-type">number</span></h4><aside class="tsd-sources">
 <ul>
-<li>Defined in packages/dino-ge/src/objects/Circle.ts:52</li></ul></aside></div></li>
+<li>Defined in src/objects/Circle.ts:54</li></ul></aside></div></li>
 <li>
 <div class="tsd-signature" id="radiusradius-1"><span class="tsd-signature-keyword">set</span> <span class="tsd-kind-set-signature">radius</span><span class="tsd-signature-symbol">(</span><span class="tsd-kind-parameter">value</span><span class="tsd-signature-symbol">:</span> <span class="tsd-signature-type">number</span><span class="tsd-signature-symbol">)</span><span class="tsd-signature-symbol">:</span> <span class="tsd-signature-type">void</span></div>
 <div class="tsd-description">
@@ -190,7 +199,7 @@
 <li><span><span class="tsd-kind-parameter">value</span>: <span class="tsd-signature-type">number</span></span></li></ul></div>
 <h4 class="tsd-returns-title">Returns <span class="tsd-signature-type">void</span></h4><aside class="tsd-sources">
 <ul>
-<li>Defined in packages/dino-ge/src/objects/Circle.ts:53</li></ul></aside></div></li></ul></section>
+<li>Defined in src/objects/Circle.ts:55</li></ul></aside></div></li></ul></section>
 <section class="tsd-panel tsd-member tsd-is-inherited">
 <h3 class="tsd-anchor-link" id="transform"><span>transform</span><a href="#transform" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></h3>
 <ul class="tsd-signatures tsd-is-inherited">
@@ -202,7 +211,7 @@
 <h4 class="tsd-returns-title">Returns <a href="components_TransformComponent.TransformComponent.html" class="tsd-signature-type tsd-kind-class">TransformComponent</a></h4><aside class="tsd-sources">
 <p>Inherited from GameObject.transform</p>
 <ul>
-<li>Defined in packages/dino-ge/src/core/GameObject.ts:28</li></ul></aside></div></li></ul></section>
+<li>Defined in src/core/GameObject.ts:31</li></ul></aside></div></li></ul></section>
 <section class="tsd-panel tsd-member">
 <h3 class="tsd-anchor-link" id="worldradius"><span>world<wbr/>Radius</span><a href="#worldradius" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></h3>
 <ul class="tsd-signatures">
@@ -213,7 +222,7 @@
 </div>
 <h4 class="tsd-returns-title">Returns <span class="tsd-signature-type">number</span></h4><aside class="tsd-sources">
 <ul>
-<li>Defined in packages/dino-ge/src/objects/Circle.ts:74</li></ul></aside></div></li></ul></section></section></details>
+<li>Defined in src/objects/Circle.ts:76</li></ul></aside></div></li></ul></section></section></details>
 <details class="tsd-panel-group tsd-member-group tsd-accordion" open><summary class="tsd-accordion-summary" data-key="section-Methods"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden="true"><use href="../assets/icons.svg#icon-chevronDown"></use></svg>
 <h2 class="tsd-anchor-link" id="methods-1">Methods<a href="#methods-1" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></h2></summary>
 <section>
@@ -234,7 +243,7 @@
 <h4 class="tsd-returns-title">Returns <span class="tsd-signature-type">void</span></h4><aside class="tsd-sources">
 <p>Inherited from <a href="core_GameObject.GameObject.html">GameObject</a>.<a href="core_GameObject.GameObject.html#addcomponent">addComponent</a></p>
 <ul>
-<li>Defined in packages/dino-ge/src/core/GameObject.ts:115</li></ul></aside></div></li></ul></section>
+<li>Defined in src/core/GameObject.ts:118</li></ul></aside></div></li></ul></section>
 <section class="tsd-panel tsd-member tsd-is-inherited">
 <h3 class="tsd-anchor-link" id="destroyself"><span>destroy<wbr/>Self</span><a href="#destroyself" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></h3>
 <ul class="tsd-signatures tsd-is-inherited">
@@ -246,7 +255,7 @@
 <h4 class="tsd-returns-title">Returns <span class="tsd-signature-type">void</span></h4><aside class="tsd-sources">
 <p>Inherited from <a href="core_GameObject.GameObject.html">GameObject</a>.<a href="core_GameObject.GameObject.html#destroyself">destroySelf</a></p>
 <ul>
-<li>Defined in packages/dino-ge/src/core/GameObject.ts:172</li></ul></aside></div></li></ul></section>
+<li>Defined in src/core/GameObject.ts:175</li></ul></aside></div></li></ul></section>
 <section class="tsd-panel tsd-member tsd-is-inherited">
 <h3 class="tsd-anchor-link" id="emit"><span>emit</span><a href="#emit" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></h3>
 <ul class="tsd-signatures tsd-is-inherited">
@@ -267,7 +276,7 @@
 <h4 class="tsd-returns-title">Returns <span class="tsd-signature-type">void</span></h4><aside class="tsd-sources">
 <p>Inherited from <a href="core_GameObject.GameObject.html">GameObject</a>.<a href="core_GameObject.GameObject.html#emit">emit</a></p>
 <ul>
-<li>Defined in packages/dino-ge/src/core/GameObject.ts:107</li></ul></aside></div></li></ul></section>
+<li>Defined in src/core/GameObject.ts:110</li></ul></aside></div></li></ul></section>
 <section class="tsd-panel tsd-member tsd-is-inherited">
 <h3 class="tsd-anchor-link" id="getcomponent"><span>get<wbr/>Component</span><a href="#getcomponent" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></h3>
 <ul class="tsd-signatures tsd-is-inherited">
@@ -290,7 +299,7 @@
 <aside class="tsd-sources">
 <p>Inherited from <a href="core_GameObject.GameObject.html">GameObject</a>.<a href="core_GameObject.GameObject.html#getcomponent">getComponent</a></p>
 <ul>
-<li>Defined in packages/dino-ge/src/core/GameObject.ts:155</li></ul></aside></div></li></ul></section>
+<li>Defined in src/core/GameObject.ts:158</li></ul></aside></div></li></ul></section>
 <section class="tsd-panel tsd-member tsd-is-inherited">
 <h3 class="tsd-anchor-link" id="hascomponent"><span>has<wbr/>Component</span><a href="#hascomponent" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></h3>
 <ul class="tsd-signatures tsd-is-inherited">
@@ -313,7 +322,7 @@
 <aside class="tsd-sources">
 <p>Inherited from <a href="core_GameObject.GameObject.html">GameObject</a>.<a href="core_GameObject.GameObject.html#hascomponent">hasComponent</a></p>
 <ul>
-<li>Defined in packages/dino-ge/src/core/GameObject.ts:146</li></ul></aside></div></li></ul></section>
+<li>Defined in src/core/GameObject.ts:149</li></ul></aside></div></li></ul></section>
 <section class="tsd-panel tsd-member tsd-is-inherited">
 <h3 class="tsd-anchor-link" id="off"><span>off</span><a href="#off" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></h3>
 <ul class="tsd-signatures tsd-is-inherited">
@@ -334,7 +343,7 @@
 <h4 class="tsd-returns-title">Returns <span class="tsd-signature-type">void</span></h4><aside class="tsd-sources">
 <p>Inherited from <a href="core_GameObject.GameObject.html">GameObject</a>.<a href="core_GameObject.GameObject.html#off">off</a></p>
 <ul>
-<li>Defined in packages/dino-ge/src/core/GameObject.ts:98</li></ul></aside></div></li></ul></section>
+<li>Defined in src/core/GameObject.ts:101</li></ul></aside></div></li></ul></section>
 <section class="tsd-panel tsd-member tsd-is-inherited">
 <h3 class="tsd-anchor-link" id="on"><span>on</span><a href="#on" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></h3>
 <ul class="tsd-signatures tsd-is-inherited">
@@ -355,7 +364,7 @@
 <h4 class="tsd-returns-title">Returns <span class="tsd-signature-type">void</span></h4><aside class="tsd-sources">
 <p>Inherited from <a href="core_GameObject.GameObject.html">GameObject</a>.<a href="core_GameObject.GameObject.html#on">on</a></p>
 <ul>
-<li>Defined in packages/dino-ge/src/core/GameObject.ts:84</li></ul></aside></div></li></ul></section>
+<li>Defined in src/core/GameObject.ts:87</li></ul></aside></div></li></ul></section>
 <section class="tsd-panel tsd-member tsd-is-inherited">
 <h3 class="tsd-anchor-link" id="registerself"><span>register<wbr/>Self</span><a href="#registerself" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></h3>
 <ul class="tsd-signatures tsd-is-inherited">
@@ -367,7 +376,7 @@
 <h4 class="tsd-returns-title">Returns <span class="tsd-signature-type">void</span></h4><aside class="tsd-sources">
 <p>Inherited from <a href="core_GameObject.GameObject.html">GameObject</a>.<a href="core_GameObject.GameObject.html#registerself">registerSelf</a></p>
 <ul>
-<li>Defined in packages/dino-ge/src/core/GameObject.ts:162</li></ul></aside></div></li></ul></section>
+<li>Defined in src/core/GameObject.ts:165</li></ul></aside></div></li></ul></section>
 <section class="tsd-panel tsd-member tsd-is-inherited">
 <h3 class="tsd-anchor-link" id="removecomponent"><span>remove<wbr/>Component</span><a href="#removecomponent" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></h3>
 <ul class="tsd-signatures tsd-is-inherited">
@@ -389,7 +398,7 @@
 <h4 class="tsd-returns-title">Returns <span class="tsd-signature-type">void</span></h4><aside class="tsd-sources">
 <p>Inherited from <a href="core_GameObject.GameObject.html">GameObject</a>.<a href="core_GameObject.GameObject.html#removecomponent">removeComponent</a></p>
 <ul>
-<li>Defined in packages/dino-ge/src/core/GameObject.ts:131</li></ul></aside></div></li></ul></section></section></details></div>
+<li>Defined in src/core/GameObject.ts:134</li></ul></aside></div></li></ul></section></section></details></div>
 <div class="col-sidebar">
 <div class="page-menu">
 <div class="tsd-navigation settings">
@@ -408,7 +417,7 @@
 <details open class="tsd-accordion tsd-page-navigation-section"><summary class="tsd-accordion-summary" data-key="section-Constructors"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden="true"><use href="../assets/icons.svg#icon-chevronDown"></use></svg>Constructors</summary>
 <div><a href="#constructor"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Constructor"><use href="../assets/icons.svg#icon-512"></use></svg><span>constructor</span></a></div></details>
 <details open class="tsd-accordion tsd-page-navigation-section"><summary class="tsd-accordion-summary" data-key="section-Properties"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden="true"><use href="../assets/icons.svg#icon-chevronDown"></use></svg>Properties</summary>
-<div><a href="#id" class="tsd-is-inherited"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Property"><use href="../assets/icons.svg#icon-1024"></use></svg><span>id</span></a><a href="#_registry" class="tsd-is-inherited"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Property"><use href="../assets/icons.svg#icon-1024"></use></svg><span>_<wbr/>registry</span></a></div></details>
+<div><a href="#actions" class="tsd-is-inherited"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Property"><use href="../assets/icons.svg#icon-1024"></use></svg><span>actions</span></a><a href="#id" class="tsd-is-inherited"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Property"><use href="../assets/icons.svg#icon-1024"></use></svg><span>id</span></a><a href="#_registry" class="tsd-is-inherited"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Property"><use href="../assets/icons.svg#icon-1024"></use></svg><span>_<wbr/>registry</span></a></div></details>
 <details open class="tsd-accordion tsd-page-navigation-section"><summary class="tsd-accordion-summary" data-key="section-Accessors"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden="true"><use href="../assets/icons.svg#icon-chevronDown"></use></svg>Accessors</summary>
 <div><a href="#bounds" class="tsd-is-inherited"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Accessor"><use href="../assets/icons.svg#icon-262144"></use></svg><span>bounds</span></a><a href="#centre"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Accessor"><use href="../assets/icons.svg#icon-262144"></use></svg><span>centre</span></a><a href="#colour"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Accessor"><use href="../assets/icons.svg#icon-262144"></use></svg><span>colour</span></a><a href="#metadata" class="tsd-is-inherited"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Accessor"><use href="../assets/icons.svg#icon-262144"></use></svg><span>metadata</span></a><a href="#radius"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Accessor"><use href="../assets/icons.svg#icon-262144"></use></svg><span>radius</span></a><a href="#transform" class="tsd-is-inherited"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Accessor"><use href="../assets/icons.svg#icon-262144"></use></svg><span>transform</span></a><a href="#worldradius"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Accessor"><use href="../assets/icons.svg#icon-262144"></use></svg><span>world<wbr/>Radius</span></a></div></details>
 <details open class="tsd-accordion tsd-page-navigation-section"><summary class="tsd-accordion-summary" data-key="section-Methods"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden="true"><use href="../assets/icons.svg#icon-chevronDown"></use></svg>Methods</summary>

@@ -15,7 +15,7 @@
 <div class="tsd-comment tsd-typography"><p>Utility class for collision detection between game objects.</p>
 </div></section><aside class="tsd-sources">
 <ul>
-<li>Defined in packages/dino-ge/src/physics/Physics.ts:25</li></ul></aside>
+<li>Defined in src/physics/Physics.ts:38</li></ul></aside>
 <section class="tsd-panel-group tsd-index-group">
 <section class="tsd-panel tsd-index-panel">
 <details class="tsd-index-content tsd-accordion" open><summary class="tsd-accordion-summary tsd-index-summary"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden="true"><use href="../assets/icons.svg#icon-chevronDown"></use></svg>
@@ -29,6 +29,8 @@
 <h3 class="tsd-index-heading tsd-anchor-link" id="methods">Methods<a href="#methods" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></h3>
 <div class="tsd-index-list"><a href="#checkcollision" class="tsd-index-link"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Method"><use href="../assets/icons.svg#icon-2048"></use></svg><span>check<wbr/>Collision</span></a>
 <a href="#getcollisionmanifold" class="tsd-index-link"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Method"><use href="../assets/icons.svg#icon-2048"></use></svg><span>get<wbr/>Collision<wbr/>Manifold</span></a>
+<a href="#raycast" class="tsd-index-link"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Method"><use href="../assets/icons.svg#icon-2048"></use></svg><span>raycast</span></a>
+<a href="#raycastall" class="tsd-index-link"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Method"><use href="../assets/icons.svg#icon-2048"></use></svg><span>raycast<wbr/>All</span></a>
 </div></section></div></details></section></section>
 <details class="tsd-panel-group tsd-member-group tsd-accordion" open><summary class="tsd-accordion-summary" data-key="section-Constructors"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden="true"><use href="../assets/icons.svg#icon-chevronDown"></use></svg>
 <h2 class="tsd-anchor-link" id="constructors-1">Constructors<a href="#constructors-1" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></h2></summary>
@@ -49,7 +51,9 @@
 <li class="">
 <div class="tsd-signature tsd-anchor-link" id="checkcollision-1"><span class="tsd-kind-call-signature">checkCollision</span><span class="tsd-signature-symbol">(</span><span class="tsd-kind-parameter">obj1</span><span class="tsd-signature-symbol">:</span> <a href="core_GameObject.GameObject.html" class="tsd-signature-type tsd-kind-class">GameObject</a><span class="tsd-signature-symbol">,</span> <span class="tsd-kind-parameter">obj2</span><span class="tsd-signature-symbol">:</span> <a href="core_GameObject.GameObject.html" class="tsd-signature-type tsd-kind-class">GameObject</a><span class="tsd-signature-symbol">)</span><span class="tsd-signature-symbol">:</span> <span class="tsd-signature-type">boolean</span><a href="#checkcollision-1" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></div>
 <div class="tsd-description">
-<div class="tsd-comment tsd-typography"><p>Checks if two game objects are colliding and resolves it.</p>
+<div class="tsd-comment tsd-typography"><p>Detects and resolves a contact when both collision masks allow it.
+Emits the legacy collision event on both bodies. Lifecycle events are
+tracked by PhysicsSystem across fixed updates.</p>
 </div>
 <div class="tsd-parameters">
 <h4 class="tsd-parameters-title">Parameters</h4>
@@ -63,7 +67,7 @@
 <h4 class="tsd-returns-title">Returns <span class="tsd-signature-type">boolean</span></h4><p>True if the objects were colliding.</p>
 <aside class="tsd-sources">
 <ul>
-<li>Defined in packages/dino-ge/src/physics/Physics.ts:177</li></ul></aside></div></li></ul></section>
+<li>Defined in src/physics/Physics.ts:213</li></ul></aside></div></li></ul></section>
 <section class="tsd-panel tsd-member">
 <h3 class="tsd-anchor-link" id="getcollisionmanifold"><code class="tsd-tag">Static</code><span>get<wbr/>Collision<wbr/>Manifold</span><a href="#getcollisionmanifold" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></h3>
 <ul class="tsd-signatures">
@@ -84,7 +88,42 @@
 <h4 class="tsd-returns-title">Returns <a href="../interfaces/physics_Physics.CollisionManifold.html" class="tsd-signature-type tsd-kind-interface">CollisionManifold</a> <span class="tsd-signature-symbol">|</span> <span class="tsd-signature-type">null</span></h4><p>A manifold if colliding, else null.</p>
 <aside class="tsd-sources">
 <ul>
-<li>Defined in packages/dino-ge/src/physics/Physics.ts:32</li></ul></aside></div></li></ul></section></section></details></div>
+<li>Defined in src/physics/Physics.ts:62</li></ul></aside></div></li></ul></section>
+<section class="tsd-panel tsd-member">
+<h3 class="tsd-anchor-link" id="raycast"><code class="tsd-tag">Static</code><span>raycast</span><a href="#raycast" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></h3>
+<ul class="tsd-signatures">
+<li class="">
+<div class="tsd-signature tsd-anchor-link" id="raycast-1"><span class="tsd-kind-call-signature">raycast</span><span class="tsd-signature-symbol">(</span><span class="tsd-kind-parameter">from</span><span class="tsd-signature-symbol">:</span> <a href="math_Vector2.Vector2.html" class="tsd-signature-type tsd-kind-class">Vector2</a><span class="tsd-signature-symbol">,</span> <span class="tsd-kind-parameter">to</span><span class="tsd-signature-symbol">:</span> <a href="math_Vector2.Vector2.html" class="tsd-signature-type tsd-kind-class">Vector2</a><span class="tsd-signature-symbol">,</span> <span class="tsd-kind-parameter">options</span><span class="tsd-signature-symbol">?:</span> <a href="../interfaces/physics_Raycast.RaycastOptions.html" class="tsd-signature-type tsd-kind-interface">RaycastOptions</a><span class="tsd-signature-symbol">)</span><span class="tsd-signature-symbol">:</span> <a href="../interfaces/physics_Raycast.RaycastHit.html" class="tsd-signature-type tsd-kind-interface">RaycastHit</a> <span class="tsd-signature-symbol">|</span> <span class="tsd-signature-type">null</span><a href="#raycast-1" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></div>
+<div class="tsd-description">
+<div class="tsd-comment tsd-typography"><p>Returns the nearest boundary hit on a finite world-space segment. If the
+origin is strictly inside a fixture, the first exit is returned.</p>
+</div>
+<div class="tsd-parameters">
+<h4 class="tsd-parameters-title">Parameters</h4>
+<ul class="tsd-parameter-list">
+<li><span><span class="tsd-kind-parameter">from</span>: <a href="math_Vector2.Vector2.html" class="tsd-signature-type tsd-kind-class">Vector2</a></span></li>
+<li><span><span class="tsd-kind-parameter">to</span>: <a href="math_Vector2.Vector2.html" class="tsd-signature-type tsd-kind-class">Vector2</a></span></li>
+<li><span><span class="tsd-kind-parameter">options</span>: <a href="../interfaces/physics_Raycast.RaycastOptions.html" class="tsd-signature-type tsd-kind-interface">RaycastOptions</a><span class="tsd-signature-symbol"> = {}</span></span></li></ul></div>
+<h4 class="tsd-returns-title">Returns <a href="../interfaces/physics_Raycast.RaycastHit.html" class="tsd-signature-type tsd-kind-interface">RaycastHit</a> <span class="tsd-signature-symbol">|</span> <span class="tsd-signature-type">null</span></h4><aside class="tsd-sources">
+<ul>
+<li>Defined in src/physics/Physics.ts:43</li></ul></aside></div></li></ul></section>
+<section class="tsd-panel tsd-member">
+<h3 class="tsd-anchor-link" id="raycastall"><code class="tsd-tag">Static</code><span>raycast<wbr/>All</span><a href="#raycastall" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></h3>
+<ul class="tsd-signatures">
+<li class="">
+<div class="tsd-signature tsd-anchor-link" id="raycastall-1"><span class="tsd-kind-call-signature">raycastAll</span><span class="tsd-signature-symbol">(</span><span class="tsd-kind-parameter">from</span><span class="tsd-signature-symbol">:</span> <a href="math_Vector2.Vector2.html" class="tsd-signature-type tsd-kind-class">Vector2</a><span class="tsd-signature-symbol">,</span> <span class="tsd-kind-parameter">to</span><span class="tsd-signature-symbol">:</span> <a href="math_Vector2.Vector2.html" class="tsd-signature-type tsd-kind-class">Vector2</a><span class="tsd-signature-symbol">,</span> <span class="tsd-kind-parameter">options</span><span class="tsd-signature-symbol">?:</span> <a href="../interfaces/physics_Raycast.RaycastOptions.html" class="tsd-signature-type tsd-kind-interface">RaycastOptions</a><span class="tsd-signature-symbol">)</span><span class="tsd-signature-symbol">:</span> <a href="../interfaces/physics_Raycast.RaycastHit.html" class="tsd-signature-type tsd-kind-interface">RaycastHit</a><span class="tsd-signature-symbol">[]</span><a href="#raycastall-1" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></div>
+<div class="tsd-description">
+<div class="tsd-comment tsd-typography"><p>Returns the first boundary hit per fixture, sorted by distance and then input order.</p>
+</div>
+<div class="tsd-parameters">
+<h4 class="tsd-parameters-title">Parameters</h4>
+<ul class="tsd-parameter-list">
+<li><span><span class="tsd-kind-parameter">from</span>: <a href="math_Vector2.Vector2.html" class="tsd-signature-type tsd-kind-class">Vector2</a></span></li>
+<li><span><span class="tsd-kind-parameter">to</span>: <a href="math_Vector2.Vector2.html" class="tsd-signature-type tsd-kind-class">Vector2</a></span></li>
+<li><span><span class="tsd-kind-parameter">options</span>: <a href="../interfaces/physics_Raycast.RaycastOptions.html" class="tsd-signature-type tsd-kind-interface">RaycastOptions</a><span class="tsd-signature-symbol"> = {}</span></span></li></ul></div>
+<h4 class="tsd-returns-title">Returns <a href="../interfaces/physics_Raycast.RaycastHit.html" class="tsd-signature-type tsd-kind-interface">RaycastHit</a><span class="tsd-signature-symbol">[]</span></h4><aside class="tsd-sources">
+<ul>
+<li>Defined in src/physics/Physics.ts:52</li></ul></aside></div></li></ul></section></section></details></div>
 <div class="col-sidebar">
 <div class="page-menu">
 <div class="tsd-navigation settings">
@@ -103,7 +142,7 @@
 <details open class="tsd-accordion tsd-page-navigation-section"><summary class="tsd-accordion-summary" data-key="section-Constructors"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden="true"><use href="../assets/icons.svg#icon-chevronDown"></use></svg>Constructors</summary>
 <div><a href="#constructor"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Constructor"><use href="../assets/icons.svg#icon-512"></use></svg><span>constructor</span></a></div></details>
 <details open class="tsd-accordion tsd-page-navigation-section"><summary class="tsd-accordion-summary" data-key="section-Methods"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden="true"><use href="../assets/icons.svg#icon-chevronDown"></use></svg>Methods</summary>
-<div><a href="#checkcollision"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Method"><use href="../assets/icons.svg#icon-2048"></use></svg><span>check<wbr/>Collision</span></a><a href="#getcollisionmanifold"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Method"><use href="../assets/icons.svg#icon-2048"></use></svg><span>get<wbr/>Collision<wbr/>Manifold</span></a></div></details></div></details></div>
+<div><a href="#checkcollision"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Method"><use href="../assets/icons.svg#icon-2048"></use></svg><span>check<wbr/>Collision</span></a><a href="#getcollisionmanifold"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Method"><use href="../assets/icons.svg#icon-2048"></use></svg><span>get<wbr/>Collision<wbr/>Manifold</span></a><a href="#raycast"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Method"><use href="../assets/icons.svg#icon-2048"></use></svg><span>raycast</span></a><a href="#raycastall"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Method"><use href="../assets/icons.svg#icon-2048"></use></svg><span>raycast<wbr/>All</span></a></div></details></div></details></div>
 <div class="site-menu">
 <nav class="tsd-navigation"><a href="../modules.html">dino-ge</a>
 <ul class="tsd-small-nested-navigation" id="tsd-nav-container">

@@ -15,14 +15,14 @@
 <div class="tsd-comment tsd-typography"><p>A high-level object that represents an animated sprite.
 Wraps SpriteComponent and TransformComponent for ease of use.</p>
 </div></section>
-<section class="tsd-panel tsd-hierarchy" data-refl="2045">
+<section class="tsd-panel tsd-hierarchy" data-refl="2589">
 <h4>Hierarchy (<a href="../hierarchy.html#objects/Sprite.Sprite">View Summary</a>)</h4>
 <ul class="tsd-hierarchy">
 <li class="tsd-hierarchy-item"><a href="core_GameObject.GameObject.html" class="tsd-signature-type tsd-kind-class">GameObject</a>
 <ul class="tsd-hierarchy">
 <li class="tsd-hierarchy-item"><span class="tsd-hierarchy-target">Sprite</span></li></ul></li></ul></section><aside class="tsd-sources">
 <ul>
-<li>Defined in packages/dino-ge/src/objects/Sprite.ts:54</li></ul></aside>
+<li>Defined in src/objects/Sprite.ts:61</li></ul></aside>
 <section class="tsd-panel-group tsd-index-group">
 <section class="tsd-panel tsd-index-panel">
 <details class="tsd-index-content tsd-accordion" open><summary class="tsd-accordion-summary tsd-index-summary"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden="true"><use href="../assets/icons.svg#icon-chevronDown"></use></svg>
@@ -34,14 +34,18 @@ Wraps SpriteComponent and TransformComponent for ease of use.</p>
 </div></section>
 <section class="tsd-index-section">
 <h3 class="tsd-index-heading tsd-anchor-link" id="properties">Properties<a href="#properties" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></h3>
-<div class="tsd-index-list"><a href="#id" class="tsd-index-link tsd-is-inherited"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Property"><use href="../assets/icons.svg#icon-1024"></use></svg><span>id</span></a>
+<div class="tsd-index-list"><a href="#actions" class="tsd-index-link tsd-is-inherited"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Property"><use href="../assets/icons.svg#icon-1024"></use></svg><span>actions</span></a>
+<a href="#id" class="tsd-index-link tsd-is-inherited"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Property"><use href="../assets/icons.svg#icon-1024"></use></svg><span>id</span></a>
 <a href="#registered" class="tsd-index-link"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Property"><use href="../assets/icons.svg#icon-1024"></use></svg><span>registered</span></a>
 <a href="#_registry" class="tsd-index-link tsd-is-inherited"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Property"><use href="../assets/icons.svg#icon-1024"></use></svg><span>_<wbr/>registry</span></a>
 </div></section>
 <section class="tsd-index-section">
 <h3 class="tsd-index-heading tsd-anchor-link" id="accessors">Accessors<a href="#accessors" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></h3>
-<div class="tsd-index-list"><a href="#bounds" class="tsd-index-link tsd-is-inherited"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Accessor"><use href="../assets/icons.svg#icon-262144"></use></svg><span>bounds</span></a>
+<div class="tsd-index-list"><a href="#animationplaying" class="tsd-index-link"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Accessor"><use href="../assets/icons.svg#icon-262144"></use></svg><span>animation<wbr/>Playing</span></a>
+<a href="#bounds" class="tsd-index-link tsd-is-inherited"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Accessor"><use href="../assets/icons.svg#icon-262144"></use></svg><span>bounds</span></a>
 <a href="#cols" class="tsd-index-link"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Accessor"><use href="../assets/icons.svg#icon-262144"></use></svg><span>cols</span></a>
+<a href="#currentanimation" class="tsd-index-link"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Accessor"><use href="../assets/icons.svg#icon-262144"></use></svg><span>current<wbr/>Animation</span></a>
+<a href="#currentanimationframe" class="tsd-index-link"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Accessor"><use href="../assets/icons.svg#icon-262144"></use></svg><span>current<wbr/>Animation<wbr/>Frame</span></a>
 <a href="#currentframe" class="tsd-index-link"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Accessor"><use href="../assets/icons.svg#icon-262144"></use></svg><span>current<wbr/>Frame</span></a>
 <a href="#endcol" class="tsd-index-link"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Accessor"><use href="../assets/icons.svg#icon-262144"></use></svg><span>end<wbr/>Col</span></a>
 <a href="#flip" class="tsd-index-link"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Accessor"><use href="../assets/icons.svg#icon-262144"></use></svg><span>flip</span></a>
@@ -64,10 +68,13 @@ Wraps SpriteComponent and TransformComponent for ease of use.</p>
 <a href="#hascomponent" class="tsd-index-link tsd-is-inherited"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Method"><use href="../assets/icons.svg#icon-2048"></use></svg><span>has<wbr/>Component</span></a>
 <a href="#off" class="tsd-index-link tsd-is-inherited"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Method"><use href="../assets/icons.svg#icon-2048"></use></svg><span>off</span></a>
 <a href="#on" class="tsd-index-link tsd-is-inherited"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Method"><use href="../assets/icons.svg#icon-2048"></use></svg><span>on</span></a>
+<a href="#pauseanimation" class="tsd-index-link"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Method"><use href="../assets/icons.svg#icon-2048"></use></svg><span>pause<wbr/>Animation</span></a>
 <a href="#play" class="tsd-index-link"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Method"><use href="../assets/icons.svg#icon-2048"></use></svg><span>play</span></a>
+<a href="#playanimation" class="tsd-index-link"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Method"><use href="../assets/icons.svg#icon-2048"></use></svg><span>play<wbr/>Animation</span></a>
 <a href="#registerself" class="tsd-index-link tsd-is-inherited"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Method"><use href="../assets/icons.svg#icon-2048"></use></svg><span>register<wbr/>Self</span></a>
 <a href="#removecomponent" class="tsd-index-link tsd-is-inherited"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Method"><use href="../assets/icons.svg#icon-2048"></use></svg><span>remove<wbr/>Component</span></a>
 <a href="#stop" class="tsd-index-link"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Method"><use href="../assets/icons.svg#icon-2048"></use></svg><span>stop</span></a>
+<a href="#stopanimation" class="tsd-index-link"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Method"><use href="../assets/icons.svg#icon-2048"></use></svg><span>stop<wbr/>Animation</span></a>
 </div></section></div></details></section></section>
 <details class="tsd-panel-group tsd-member-group tsd-accordion" open><summary class="tsd-accordion-summary" data-key="section-Constructors"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden="true"><use href="../assets/icons.svg#icon-chevronDown"></use></svg>
 <h2 class="tsd-anchor-link" id="constructors-1">Constructors<a href="#constructors-1" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></h2></summary>
@@ -89,10 +96,18 @@ Wraps SpriteComponent and TransformComponent for ease of use.</p>
 <h4 class="tsd-returns-title">Returns <a href="" class="tsd-signature-type tsd-kind-class">Sprite</a></h4><aside class="tsd-sources">
 <p>Overrides <a href="core_GameObject.GameObject.html">GameObject</a>.<a href="core_GameObject.GameObject.html#constructor">constructor</a></p>
 <ul>
-<li>Defined in packages/dino-ge/src/objects/Sprite.ts:137</li></ul></aside></div></li></ul></section></section></details>
+<li>Defined in src/objects/Sprite.ts:145</li></ul></aside></div></li></ul></section></section></details>
 <details class="tsd-panel-group tsd-member-group tsd-accordion" open><summary class="tsd-accordion-summary" data-key="section-Properties"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden="true"><use href="../assets/icons.svg#icon-chevronDown"></use></svg>
 <h2 class="tsd-anchor-link" id="properties-1">Properties<a href="#properties-1" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></h2></summary>
 <section>
+<section class="tsd-panel tsd-member tsd-is-inherited">
+<h3 class="tsd-anchor-link" id="actions"><code class="tsd-tag">Readonly</code><span>actions</span><a href="#actions" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></h3>
+<div class="tsd-signature"><span class="tsd-kind-property">actions</span><span class="tsd-signature-symbol">:</span> <a href="core_Actions.ActionQueue.html" class="tsd-signature-type tsd-kind-class">ActionQueue</a><span class="tsd-signature-symbol"> = ...</span></div>
+<div class="tsd-comment tsd-typography"><p>Actions advanced for this object as active game time elapses.</p>
+</div><aside class="tsd-sources">
+<p>Inherited from <a href="core_GameObject.GameObject.html">GameObject</a>.<a href="core_GameObject.GameObject.html#actions">actions</a></p>
+<ul>
+<li>Defined in src/core/GameObject.ts:25</li></ul></aside></section>
 <section class="tsd-panel tsd-member tsd-is-inherited">
 <h3 class="tsd-anchor-link" id="id"><code class="tsd-tag">Readonly</code><span>id</span><a href="#id" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></h3>
 <div class="tsd-signature"><span class="tsd-kind-property">id</span><span class="tsd-signature-symbol">:</span> <span class="tsd-signature-type">string</span><span class="tsd-signature-symbol"> = ...</span></div>
@@ -100,14 +115,14 @@ Wraps SpriteComponent and TransformComponent for ease of use.</p>
 </div><aside class="tsd-sources">
 <p>Inherited from <a href="core_GameObject.GameObject.html">GameObject</a>.<a href="core_GameObject.GameObject.html#id">id</a></p>
 <ul>
-<li>Defined in packages/dino-ge/src/core/GameObject.ts:22</li></ul></aside></section>
+<li>Defined in src/core/GameObject.ts:23</li></ul></aside></section>
 <section class="tsd-panel tsd-member">
 <h3 class="tsd-anchor-link" id="registered"><span>registered</span><a href="#registered" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></h3>
 <div class="tsd-signature"><span class="tsd-kind-property">registered</span><span class="tsd-signature-symbol">:</span> <span class="tsd-signature-type">boolean</span><span class="tsd-signature-symbol"> = false</span></div>
 <div class="tsd-comment tsd-typography"><p>Whether the sprite is currently registered with the engine.</p>
 </div><aside class="tsd-sources">
 <ul>
-<li>Defined in packages/dino-ge/src/objects/Sprite.ts:100</li></ul></aside></section>
+<li>Defined in src/objects/Sprite.ts:107</li></ul></aside></section>
 <section class="tsd-panel tsd-member tsd-is-inherited">
 <h3 class="tsd-anchor-link" id="_registry"><code class="tsd-tag">Static</code><span>_<wbr/>registry</span><a href="#_registry" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></h3>
 <div class="tsd-signature"><span class="tsd-kind-property">_registry</span><span class="tsd-signature-symbol">:</span> <span class="tsd-signature-keyword">typeof</span> <a href="core_Registry.Registry.html" class="tsd-signature-type tsd-kind-class">Registry</a><span class="tsd-signature-symbol"> = Registry</span></div>
@@ -115,10 +130,21 @@ Wraps SpriteComponent and TransformComponent for ease of use.</p>
 </div><aside class="tsd-sources">
 <p>Inherited from <a href="core_GameObject.GameObject.html">GameObject</a>.<a href="core_GameObject.GameObject.html#_registry">_registry</a></p>
 <ul>
-<li>Defined in packages/dino-ge/src/core/GameObject.ts:167</li></ul></aside></section></section></details>
+<li>Defined in src/core/GameObject.ts:170</li></ul></aside></section></section></details>
 <details class="tsd-panel-group tsd-member-group tsd-accordion" open><summary class="tsd-accordion-summary" data-key="section-Accessors"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden="true"><use href="../assets/icons.svg#icon-chevronDown"></use></svg>
 <h2 class="tsd-anchor-link" id="accessors-1">Accessors<a href="#accessors-1" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></h2></summary>
 <section>
+<section class="tsd-panel tsd-member">
+<h3 class="tsd-anchor-link" id="animationplaying"><span>animation<wbr/>Playing</span><a href="#animationplaying" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></h3>
+<ul class="tsd-signatures">
+<li>
+<div class="tsd-signature" id="animationplayinganimationplaying"><span class="tsd-signature-keyword">get</span> <span class="tsd-kind-get-signature">animationPlaying</span><span class="tsd-signature-symbol">()</span><span class="tsd-signature-symbol">:</span> <span class="tsd-signature-type">boolean</span></div>
+<div class="tsd-description">
+<div class="tsd-comment tsd-typography"><p>Whether a named clip is advancing.</p>
+</div>
+<h4 class="tsd-returns-title">Returns <span class="tsd-signature-type">boolean</span></h4><aside class="tsd-sources">
+<ul>
+<li>Defined in src/objects/Sprite.ts:231</li></ul></aside></div></li></ul></section>
 <section class="tsd-panel tsd-member tsd-is-inherited">
 <h3 class="tsd-anchor-link" id="bounds"><span>bounds</span><a href="#bounds" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></h3>
 <ul class="tsd-signatures tsd-is-inherited">
@@ -130,7 +156,7 @@ Wraps SpriteComponent and TransformComponent for ease of use.</p>
 <h4 class="tsd-returns-title">Returns <a href="components_BoundsComponent.BoundsComponent.html" class="tsd-signature-type tsd-kind-class">BoundsComponent</a> <span class="tsd-signature-symbol">|</span> <span class="tsd-signature-type">undefined</span></h4><aside class="tsd-sources">
 <p>Inherited from GameObject.bounds</p>
 <ul>
-<li>Defined in packages/dino-ge/src/core/GameObject.ts:52</li></ul></aside></div></li>
+<li>Defined in src/core/GameObject.ts:55</li></ul></aside></div></li>
 <li>
 <div class="tsd-signature" id="boundsbounds-1"><span class="tsd-signature-keyword">set</span> <span class="tsd-kind-set-signature">bounds</span><span class="tsd-signature-symbol">(</span><span class="tsd-kind-parameter">val</span><span class="tsd-signature-symbol">:</span> <a href="components_BoundsComponent.BoundsComponent.html" class="tsd-signature-type tsd-kind-class">BoundsComponent</a> <span class="tsd-signature-symbol">|</span> <span class="tsd-signature-type">undefined</span><span class="tsd-signature-symbol">)</span><span class="tsd-signature-symbol">:</span> <span class="tsd-signature-type">void</span></div>
 <div class="tsd-description">
@@ -143,7 +169,7 @@ Wraps SpriteComponent and TransformComponent for ease of use.</p>
 <h4 class="tsd-returns-title">Returns <span class="tsd-signature-type">void</span></h4><aside class="tsd-sources">
 <p>Inherited from GameObject.bounds</p>
 <ul>
-<li>Defined in packages/dino-ge/src/core/GameObject.ts:59</li></ul></aside></div></li></ul></section>
+<li>Defined in src/core/GameObject.ts:62</li></ul></aside></div></li></ul></section>
 <section class="tsd-panel tsd-member">
 <h3 class="tsd-anchor-link" id="cols"><span>cols</span><a href="#cols" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></h3>
 <ul class="tsd-signatures">
@@ -154,7 +180,7 @@ Wraps SpriteComponent and TransformComponent for ease of use.</p>
 </div>
 <h4 class="tsd-returns-title">Returns <span class="tsd-signature-type">number</span></h4><aside class="tsd-sources">
 <ul>
-<li>Defined in packages/dino-ge/src/objects/Sprite.ts:80</li></ul></aside></div></li>
+<li>Defined in src/objects/Sprite.ts:87</li></ul></aside></div></li>
 <li>
 <div class="tsd-signature" id="colscols-1"><span class="tsd-signature-keyword">set</span> <span class="tsd-kind-set-signature">cols</span><span class="tsd-signature-symbol">(</span><span class="tsd-kind-parameter">val</span><span class="tsd-signature-symbol">:</span> <span class="tsd-signature-type">number</span><span class="tsd-signature-symbol">)</span><span class="tsd-signature-symbol">:</span> <span class="tsd-signature-type">void</span></div>
 <div class="tsd-description">
@@ -164,18 +190,40 @@ Wraps SpriteComponent and TransformComponent for ease of use.</p>
 <li><span><span class="tsd-kind-parameter">val</span>: <span class="tsd-signature-type">number</span></span></li></ul></div>
 <h4 class="tsd-returns-title">Returns <span class="tsd-signature-type">void</span></h4><aside class="tsd-sources">
 <ul>
-<li>Defined in packages/dino-ge/src/objects/Sprite.ts:81</li></ul></aside></div></li></ul></section>
+<li>Defined in src/objects/Sprite.ts:88</li></ul></aside></div></li></ul></section>
+<section class="tsd-panel tsd-member">
+<h3 class="tsd-anchor-link" id="currentanimation"><span>current<wbr/>Animation</span><a href="#currentanimation" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></h3>
+<ul class="tsd-signatures">
+<li>
+<div class="tsd-signature" id="currentanimationcurrentanimation"><span class="tsd-signature-keyword">get</span> <span class="tsd-kind-get-signature">currentAnimation</span><span class="tsd-signature-symbol">()</span><span class="tsd-signature-symbol">:</span> <span class="tsd-signature-type">string</span> <span class="tsd-signature-symbol">|</span> <span class="tsd-signature-type">undefined</span></div>
+<div class="tsd-description">
+<div class="tsd-comment tsd-typography"><p>The selected named clip, including clips paused or holding their final pose.</p>
+</div>
+<h4 class="tsd-returns-title">Returns <span class="tsd-signature-type">string</span> <span class="tsd-signature-symbol">|</span> <span class="tsd-signature-type">undefined</span></h4><aside class="tsd-sources">
+<ul>
+<li>Defined in src/objects/Sprite.ts:225</li></ul></aside></div></li></ul></section>
+<section class="tsd-panel tsd-member">
+<h3 class="tsd-anchor-link" id="currentanimationframe"><span>current<wbr/>Animation<wbr/>Frame</span><a href="#currentanimationframe" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></h3>
+<ul class="tsd-signatures">
+<li>
+<div class="tsd-signature" id="currentanimationframecurrentanimationframe"><span class="tsd-signature-keyword">get</span> <span class="tsd-kind-get-signature">currentAnimationFrame</span><span class="tsd-signature-symbol">()</span><span class="tsd-signature-symbol">:</span> <span class="tsd-signature-type">number</span> <span class="tsd-signature-symbol">|</span> <span class="tsd-signature-type">undefined</span></div>
+<div class="tsd-description">
+<div class="tsd-comment tsd-typography"><p>The zero-based offset of the displayed frame within the selected clip.</p>
+</div>
+<h4 class="tsd-returns-title">Returns <span class="tsd-signature-type">number</span> <span class="tsd-signature-symbol">|</span> <span class="tsd-signature-type">undefined</span></h4><aside class="tsd-sources">
+<ul>
+<li>Defined in src/objects/Sprite.ts:228</li></ul></aside></div></li></ul></section>
 <section class="tsd-panel tsd-member">
 <h3 class="tsd-anchor-link" id="currentframe"><span>current<wbr/>Frame</span><a href="#currentframe" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></h3>
 <ul class="tsd-signatures">
 <li>
 <div class="tsd-signature" id="currentframecurrentframe"><span class="tsd-signature-keyword">get</span> <span class="tsd-kind-get-signature">currentFrame</span><span class="tsd-signature-symbol">()</span><span class="tsd-signature-symbol">:</span> <span class="tsd-signature-type">number</span></div>
 <div class="tsd-description">
-<div class="tsd-comment tsd-typography"><p>The current frame index being displayed.</p>
+<div class="tsd-comment tsd-typography"><p>The legacy frame index. Assigning it clears the selected named clip.</p>
 </div>
 <h4 class="tsd-returns-title">Returns <span class="tsd-signature-type">number</span></h4><aside class="tsd-sources">
 <ul>
-<li>Defined in packages/dino-ge/src/objects/Sprite.ts:103</li></ul></aside></div></li>
+<li>Defined in src/objects/Sprite.ts:110</li></ul></aside></div></li>
 <li>
 <div class="tsd-signature" id="currentframecurrentframe-1"><span class="tsd-signature-keyword">set</span> <span class="tsd-kind-set-signature">currentFrame</span><span class="tsd-signature-symbol">(</span><span class="tsd-kind-parameter">val</span><span class="tsd-signature-symbol">:</span> <span class="tsd-signature-type">number</span><span class="tsd-signature-symbol">)</span><span class="tsd-signature-symbol">:</span> <span class="tsd-signature-type">void</span></div>
 <div class="tsd-description">
@@ -185,18 +233,18 @@ Wraps SpriteComponent and TransformComponent for ease of use.</p>
 <li><span><span class="tsd-kind-parameter">val</span>: <span class="tsd-signature-type">number</span></span></li></ul></div>
 <h4 class="tsd-returns-title">Returns <span class="tsd-signature-type">void</span></h4><aside class="tsd-sources">
 <ul>
-<li>Defined in packages/dino-ge/src/objects/Sprite.ts:104</li></ul></aside></div></li></ul></section>
+<li>Defined in src/objects/Sprite.ts:111</li></ul></aside></div></li></ul></section>
 <section class="tsd-panel tsd-member">
 <h3 class="tsd-anchor-link" id="endcol"><span>end<wbr/>Col</span><a href="#endcol" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></h3>
 <ul class="tsd-signatures">
 <li>
 <div class="tsd-signature" id="endcolendcol"><span class="tsd-signature-keyword">get</span> <span class="tsd-kind-get-signature">endCol</span><span class="tsd-signature-symbol">()</span><span class="tsd-signature-symbol">:</span> <span class="tsd-signature-type">number</span></div>
 <div class="tsd-description">
-<div class="tsd-comment tsd-typography"><p>The ending column for the current animation loop.</p>
+<div class="tsd-comment tsd-typography"><p>Exclusive end of the legacy animation loop.</p>
 </div>
 <h4 class="tsd-returns-title">Returns <span class="tsd-signature-type">number</span></h4><aside class="tsd-sources">
 <ul>
-<li>Defined in packages/dino-ge/src/objects/Sprite.ts:91</li></ul></aside></div></li>
+<li>Defined in src/objects/Sprite.ts:98</li></ul></aside></div></li>
 <li>
 <div class="tsd-signature" id="endcolendcol-1"><span class="tsd-signature-keyword">set</span> <span class="tsd-kind-set-signature">endCol</span><span class="tsd-signature-symbol">(</span><span class="tsd-kind-parameter">val</span><span class="tsd-signature-symbol">:</span> <span class="tsd-signature-type">number</span><span class="tsd-signature-symbol">)</span><span class="tsd-signature-symbol">:</span> <span class="tsd-signature-type">void</span></div>
 <div class="tsd-description">
@@ -206,7 +254,7 @@ Wraps SpriteComponent and TransformComponent for ease of use.</p>
 <li><span><span class="tsd-kind-parameter">val</span>: <span class="tsd-signature-type">number</span></span></li></ul></div>
 <h4 class="tsd-returns-title">Returns <span class="tsd-signature-type">void</span></h4><aside class="tsd-sources">
 <ul>
-<li>Defined in packages/dino-ge/src/objects/Sprite.ts:92</li></ul></aside></div></li></ul></section>
+<li>Defined in src/objects/Sprite.ts:99</li></ul></aside></div></li></ul></section>
 <section class="tsd-panel tsd-member">
 <h3 class="tsd-anchor-link" id="flip"><span>flip</span><a href="#flip" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></h3>
 <ul class="tsd-signatures">
@@ -217,7 +265,7 @@ Wraps SpriteComponent and TransformComponent for ease of use.</p>
 </div>
 <h4 class="tsd-returns-title">Returns <span class="tsd-signature-type">boolean</span></h4><aside class="tsd-sources">
 <ul>
-<li>Defined in packages/dino-ge/src/objects/Sprite.ts:110</li></ul></aside></div></li>
+<li>Defined in src/objects/Sprite.ts:118</li></ul></aside></div></li>
 <li>
 <div class="tsd-signature" id="flipflip-1"><span class="tsd-signature-keyword">set</span> <span class="tsd-kind-set-signature">flip</span><span class="tsd-signature-symbol">(</span><span class="tsd-kind-parameter">val</span><span class="tsd-signature-symbol">:</span> <span class="tsd-signature-type">boolean</span><span class="tsd-signature-symbol">)</span><span class="tsd-signature-symbol">:</span> <span class="tsd-signature-type">void</span></div>
 <div class="tsd-description">
@@ -227,18 +275,18 @@ Wraps SpriteComponent and TransformComponent for ease of use.</p>
 <li><span><span class="tsd-kind-parameter">val</span>: <span class="tsd-signature-type">boolean</span></span></li></ul></div>
 <h4 class="tsd-returns-title">Returns <span class="tsd-signature-type">void</span></h4><aside class="tsd-sources">
 <ul>
-<li>Defined in packages/dino-ge/src/objects/Sprite.ts:111</li></ul></aside></div></li></ul></section>
+<li>Defined in src/objects/Sprite.ts:119</li></ul></aside></div></li></ul></section>
 <section class="tsd-panel tsd-member">
 <h3 class="tsd-anchor-link" id="frameduration"><span>frame<wbr/>Duration</span><a href="#frameduration" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></h3>
 <ul class="tsd-signatures">
 <li>
 <div class="tsd-signature" id="framedurationframeduration"><span class="tsd-signature-keyword">get</span> <span class="tsd-kind-get-signature">frameDuration</span><span class="tsd-signature-symbol">()</span><span class="tsd-signature-symbol">:</span> <span class="tsd-signature-type">number</span></div>
 <div class="tsd-description">
-<div class="tsd-comment tsd-typography"><p>Duration of each animation frame in milliseconds.</p>
+<div class="tsd-comment tsd-typography"><p>Duration of each legacy animation frame in milliseconds.</p>
 </div>
 <h4 class="tsd-returns-title">Returns <span class="tsd-signature-type">number</span></h4><aside class="tsd-sources">
 <ul>
-<li>Defined in packages/dino-ge/src/objects/Sprite.ts:114</li></ul></aside></div></li>
+<li>Defined in src/objects/Sprite.ts:122</li></ul></aside></div></li>
 <li>
 <div class="tsd-signature" id="framedurationframeduration-1"><span class="tsd-signature-keyword">set</span> <span class="tsd-kind-set-signature">frameDuration</span><span class="tsd-signature-symbol">(</span><span class="tsd-kind-parameter">val</span><span class="tsd-signature-symbol">:</span> <span class="tsd-signature-type">number</span><span class="tsd-signature-symbol">)</span><span class="tsd-signature-symbol">:</span> <span class="tsd-signature-type">void</span></div>
 <div class="tsd-description">
@@ -248,29 +296,29 @@ Wraps SpriteComponent and TransformComponent for ease of use.</p>
 <li><span><span class="tsd-kind-parameter">val</span>: <span class="tsd-signature-type">number</span></span></li></ul></div>
 <h4 class="tsd-returns-title">Returns <span class="tsd-signature-type">void</span></h4><aside class="tsd-sources">
 <ul>
-<li>Defined in packages/dino-ge/src/objects/Sprite.ts:115</li></ul></aside></div></li></ul></section>
+<li>Defined in src/objects/Sprite.ts:123</li></ul></aside></div></li></ul></section>
 <section class="tsd-panel tsd-member">
 <h3 class="tsd-anchor-link" id="frameheight"><span>frame<wbr/>Height</span><a href="#frameheight" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></h3>
 <ul class="tsd-signatures">
 <li>
 <div class="tsd-signature" id="frameheightframeheight"><span class="tsd-signature-keyword">get</span> <span class="tsd-kind-get-signature">frameHeight</span><span class="tsd-signature-symbol">()</span><span class="tsd-signature-symbol">:</span> <span class="tsd-signature-type">number</span></div>
 <div class="tsd-description">
-<div class="tsd-comment tsd-typography"><p>Pixel height of a single animation frame (calculated automatically).</p>
+<div class="tsd-comment tsd-typography"><p>The pixel height of one source grid cell.</p>
 </div>
 <h4 class="tsd-returns-title">Returns <span class="tsd-signature-type">number</span></h4><aside class="tsd-sources">
 <ul>
-<li>Defined in packages/dino-ge/src/objects/Sprite.ts:97</li></ul></aside></div></li></ul></section>
+<li>Defined in src/objects/Sprite.ts:104</li></ul></aside></div></li></ul></section>
 <section class="tsd-panel tsd-member">
 <h3 class="tsd-anchor-link" id="framewidth"><span>frame<wbr/>Width</span><a href="#framewidth" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></h3>
 <ul class="tsd-signatures">
 <li>
 <div class="tsd-signature" id="framewidthframewidth"><span class="tsd-signature-keyword">get</span> <span class="tsd-kind-get-signature">frameWidth</span><span class="tsd-signature-symbol">()</span><span class="tsd-signature-symbol">:</span> <span class="tsd-signature-type">number</span></div>
 <div class="tsd-description">
-<div class="tsd-comment tsd-typography"><p>The pixel width of a single animation frame (calculated automatically).</p>
+<div class="tsd-comment tsd-typography"><p>The pixel width of one source grid cell.</p>
 </div>
 <h4 class="tsd-returns-title">Returns <span class="tsd-signature-type">number</span></h4><aside class="tsd-sources">
 <ul>
-<li>Defined in packages/dino-ge/src/objects/Sprite.ts:95</li></ul></aside></div></li></ul></section>
+<li>Defined in src/objects/Sprite.ts:102</li></ul></aside></div></li></ul></section>
 <section class="tsd-panel tsd-member">
 <h3 class="tsd-anchor-link" id="img"><span>img</span><a href="#img" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></h3>
 <ul class="tsd-signatures">
@@ -281,7 +329,7 @@ Wraps SpriteComponent and TransformComponent for ease of use.</p>
 </div>
 <h4 class="tsd-returns-title">Returns <span class="tsd-signature-type">HTMLImageElement</span></h4><aside class="tsd-sources">
 <ul>
-<li>Defined in packages/dino-ge/src/objects/Sprite.ts:58</li></ul></aside></div></li>
+<li>Defined in src/objects/Sprite.ts:65</li></ul></aside></div></li>
 <li>
 <div class="tsd-signature" id="imgimg-1"><span class="tsd-signature-keyword">set</span> <span class="tsd-kind-set-signature">img</span><span class="tsd-signature-symbol">(</span><span class="tsd-kind-parameter">val</span><span class="tsd-signature-symbol">:</span> <span class="tsd-signature-type">HTMLImageElement</span><span class="tsd-signature-symbol">)</span><span class="tsd-signature-symbol">:</span> <span class="tsd-signature-type">void</span></div>
 <div class="tsd-description">
@@ -291,7 +339,7 @@ Wraps SpriteComponent and TransformComponent for ease of use.</p>
 <li><span><span class="tsd-kind-parameter">val</span>: <span class="tsd-signature-type">HTMLImageElement</span></span></li></ul></div>
 <h4 class="tsd-returns-title">Returns <span class="tsd-signature-type">void</span></h4><aside class="tsd-sources">
 <ul>
-<li>Defined in packages/dino-ge/src/objects/Sprite.ts:59</li></ul></aside></div></li></ul></section>
+<li>Defined in src/objects/Sprite.ts:66</li></ul></aside></div></li></ul></section>
 <section class="tsd-panel tsd-member tsd-is-inherited">
 <h3 class="tsd-anchor-link" id="metadata"><span>metadata</span><a href="#metadata" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></h3>
 <ul class="tsd-signatures tsd-is-inherited">
@@ -303,7 +351,7 @@ Wraps SpriteComponent and TransformComponent for ease of use.</p>
 <h4 class="tsd-returns-title">Returns <a href="components_TagComponent.TagComponent.html" class="tsd-signature-type tsd-kind-class">TagComponent</a></h4><aside class="tsd-sources">
 <p>Inherited from GameObject.metadata</p>
 <ul>
-<li>Defined in packages/dino-ge/src/core/GameObject.ts:40</li></ul></aside></div></li></ul></section>
+<li>Defined in src/core/GameObject.ts:43</li></ul></aside></div></li></ul></section>
 <section class="tsd-panel tsd-member">
 <h3 class="tsd-anchor-link" id="rows"><span>rows</span><a href="#rows" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></h3>
 <ul class="tsd-signatures">
@@ -314,7 +362,7 @@ Wraps SpriteComponent and TransformComponent for ease of use.</p>
 </div>
 <h4 class="tsd-returns-title">Returns <span class="tsd-signature-type">number</span></h4><aside class="tsd-sources">
 <ul>
-<li>Defined in packages/dino-ge/src/objects/Sprite.ts:73</li></ul></aside></div></li>
+<li>Defined in src/objects/Sprite.ts:80</li></ul></aside></div></li>
 <li>
 <div class="tsd-signature" id="rowsrows-1"><span class="tsd-signature-keyword">set</span> <span class="tsd-kind-set-signature">rows</span><span class="tsd-signature-symbol">(</span><span class="tsd-kind-parameter">val</span><span class="tsd-signature-symbol">:</span> <span class="tsd-signature-type">number</span><span class="tsd-signature-symbol">)</span><span class="tsd-signature-symbol">:</span> <span class="tsd-signature-type">void</span></div>
 <div class="tsd-description">
@@ -324,7 +372,7 @@ Wraps SpriteComponent and TransformComponent for ease of use.</p>
 <li><span><span class="tsd-kind-parameter">val</span>: <span class="tsd-signature-type">number</span></span></li></ul></div>
 <h4 class="tsd-returns-title">Returns <span class="tsd-signature-type">void</span></h4><aside class="tsd-sources">
 <ul>
-<li>Defined in packages/dino-ge/src/objects/Sprite.ts:74</li></ul></aside></div></li></ul></section>
+<li>Defined in src/objects/Sprite.ts:81</li></ul></aside></div></li></ul></section>
 <section class="tsd-panel tsd-member">
 <h3 class="tsd-anchor-link" id="scale"><span>scale</span><a href="#scale" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></h3>
 <ul class="tsd-signatures">
@@ -336,7 +384,7 @@ Returns the world-space scale of the transform.</p>
 </div>
 <h4 class="tsd-returns-title">Returns <a href="math_Vector2.Vector2.html" class="tsd-signature-type tsd-kind-class">Vector2</a></h4><aside class="tsd-sources">
 <ul>
-<li>Defined in packages/dino-ge/src/objects/Sprite.ts:121</li></ul></aside></div></li>
+<li>Defined in src/objects/Sprite.ts:129</li></ul></aside></div></li>
 <li>
 <div class="tsd-signature" id="scalescale-1"><span class="tsd-signature-keyword">set</span> <span class="tsd-kind-set-signature">scale</span><span class="tsd-signature-symbol">(</span><span class="tsd-kind-parameter">val</span><span class="tsd-signature-symbol">:</span> <span class="tsd-signature-type">number</span> <span class="tsd-signature-symbol">|</span> <a href="math_Vector2.Vector2.html" class="tsd-signature-type tsd-kind-class">Vector2</a><span class="tsd-signature-symbol">)</span><span class="tsd-signature-symbol">:</span> <span class="tsd-signature-type">void</span></div>
 <div class="tsd-description">
@@ -346,18 +394,18 @@ Returns the world-space scale of the transform.</p>
 <li><span><span class="tsd-kind-parameter">val</span>: <span class="tsd-signature-type">number</span> <span class="tsd-signature-symbol">|</span> <a href="math_Vector2.Vector2.html" class="tsd-signature-type tsd-kind-class">Vector2</a></span></li></ul></div>
 <h4 class="tsd-returns-title">Returns <span class="tsd-signature-type">void</span></h4><aside class="tsd-sources">
 <ul>
-<li>Defined in packages/dino-ge/src/objects/Sprite.ts:125</li></ul></aside></div></li></ul></section>
+<li>Defined in src/objects/Sprite.ts:133</li></ul></aside></div></li></ul></section>
 <section class="tsd-panel tsd-member">
 <h3 class="tsd-anchor-link" id="startcol"><span>start<wbr/>Col</span><a href="#startcol" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></h3>
 <ul class="tsd-signatures">
 <li>
 <div class="tsd-signature" id="startcolstartcol"><span class="tsd-signature-keyword">get</span> <span class="tsd-kind-get-signature">startCol</span><span class="tsd-signature-symbol">()</span><span class="tsd-signature-symbol">:</span> <span class="tsd-signature-type">number</span></div>
 <div class="tsd-description">
-<div class="tsd-comment tsd-typography"><p>The starting column for the current animation loop.</p>
+<div class="tsd-comment tsd-typography"><p>First frame in the legacy animation loop.</p>
 </div>
 <h4 class="tsd-returns-title">Returns <span class="tsd-signature-type">number</span></h4><aside class="tsd-sources">
 <ul>
-<li>Defined in packages/dino-ge/src/objects/Sprite.ts:87</li></ul></aside></div></li>
+<li>Defined in src/objects/Sprite.ts:94</li></ul></aside></div></li>
 <li>
 <div class="tsd-signature" id="startcolstartcol-1"><span class="tsd-signature-keyword">set</span> <span class="tsd-kind-set-signature">startCol</span><span class="tsd-signature-symbol">(</span><span class="tsd-kind-parameter">val</span><span class="tsd-signature-symbol">:</span> <span class="tsd-signature-type">number</span><span class="tsd-signature-symbol">)</span><span class="tsd-signature-symbol">:</span> <span class="tsd-signature-type">void</span></div>
 <div class="tsd-description">
@@ -367,7 +415,7 @@ Returns the world-space scale of the transform.</p>
 <li><span><span class="tsd-kind-parameter">val</span>: <span class="tsd-signature-type">number</span></span></li></ul></div>
 <h4 class="tsd-returns-title">Returns <span class="tsd-signature-type">void</span></h4><aside class="tsd-sources">
 <ul>
-<li>Defined in packages/dino-ge/src/objects/Sprite.ts:88</li></ul></aside></div></li></ul></section>
+<li>Defined in src/objects/Sprite.ts:95</li></ul></aside></div></li></ul></section>
 <section class="tsd-panel tsd-member tsd-is-inherited">
 <h3 class="tsd-anchor-link" id="transform"><span>transform</span><a href="#transform" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></h3>
 <ul class="tsd-signatures tsd-is-inherited">
@@ -379,7 +427,7 @@ Returns the world-space scale of the transform.</p>
 <h4 class="tsd-returns-title">Returns <a href="components_TransformComponent.TransformComponent.html" class="tsd-signature-type tsd-kind-class">TransformComponent</a></h4><aside class="tsd-sources">
 <p>Inherited from GameObject.transform</p>
 <ul>
-<li>Defined in packages/dino-ge/src/core/GameObject.ts:28</li></ul></aside></div></li></ul></section></section></details>
+<li>Defined in src/core/GameObject.ts:31</li></ul></aside></div></li></ul></section></section></details>
 <details class="tsd-panel-group tsd-member-group tsd-accordion" open><summary class="tsd-accordion-summary" data-key="section-Methods"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden="true"><use href="../assets/icons.svg#icon-chevronDown"></use></svg>
 <h2 class="tsd-anchor-link" id="methods-1">Methods<a href="#methods-1" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></h2></summary>
 <section>
@@ -400,7 +448,7 @@ Returns the world-space scale of the transform.</p>
 <h4 class="tsd-returns-title">Returns <span class="tsd-signature-type">void</span></h4><aside class="tsd-sources">
 <p>Inherited from <a href="core_GameObject.GameObject.html">GameObject</a>.<a href="core_GameObject.GameObject.html#addcomponent">addComponent</a></p>
 <ul>
-<li>Defined in packages/dino-ge/src/core/GameObject.ts:115</li></ul></aside></div></li></ul></section>
+<li>Defined in src/core/GameObject.ts:118</li></ul></aside></div></li></ul></section>
 <section class="tsd-panel tsd-member tsd-is-inherited">
 <h3 class="tsd-anchor-link" id="destroyself"><span>destroy<wbr/>Self</span><a href="#destroyself" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></h3>
 <ul class="tsd-signatures tsd-is-inherited">
@@ -412,7 +460,7 @@ Returns the world-space scale of the transform.</p>
 <h4 class="tsd-returns-title">Returns <span class="tsd-signature-type">void</span></h4><aside class="tsd-sources">
 <p>Inherited from <a href="core_GameObject.GameObject.html">GameObject</a>.<a href="core_GameObject.GameObject.html#destroyself">destroySelf</a></p>
 <ul>
-<li>Defined in packages/dino-ge/src/core/GameObject.ts:172</li></ul></aside></div></li></ul></section>
+<li>Defined in src/core/GameObject.ts:175</li></ul></aside></div></li></ul></section>
 <section class="tsd-panel tsd-member tsd-is-inherited">
 <h3 class="tsd-anchor-link" id="emit"><span>emit</span><a href="#emit" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></h3>
 <ul class="tsd-signatures tsd-is-inherited">
@@ -433,7 +481,7 @@ Returns the world-space scale of the transform.</p>
 <h4 class="tsd-returns-title">Returns <span class="tsd-signature-type">void</span></h4><aside class="tsd-sources">
 <p>Inherited from <a href="core_GameObject.GameObject.html">GameObject</a>.<a href="core_GameObject.GameObject.html#emit">emit</a></p>
 <ul>
-<li>Defined in packages/dino-ge/src/core/GameObject.ts:107</li></ul></aside></div></li></ul></section>
+<li>Defined in src/core/GameObject.ts:110</li></ul></aside></div></li></ul></section>
 <section class="tsd-panel tsd-member tsd-is-inherited">
 <h3 class="tsd-anchor-link" id="getcomponent"><span>get<wbr/>Component</span><a href="#getcomponent" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></h3>
 <ul class="tsd-signatures tsd-is-inherited">
@@ -456,7 +504,7 @@ Returns the world-space scale of the transform.</p>
 <aside class="tsd-sources">
 <p>Inherited from <a href="core_GameObject.GameObject.html">GameObject</a>.<a href="core_GameObject.GameObject.html#getcomponent">getComponent</a></p>
 <ul>
-<li>Defined in packages/dino-ge/src/core/GameObject.ts:155</li></ul></aside></div></li></ul></section>
+<li>Defined in src/core/GameObject.ts:158</li></ul></aside></div></li></ul></section>
 <section class="tsd-panel tsd-member tsd-is-inherited">
 <h3 class="tsd-anchor-link" id="hascomponent"><span>has<wbr/>Component</span><a href="#hascomponent" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></h3>
 <ul class="tsd-signatures tsd-is-inherited">
@@ -479,7 +527,7 @@ Returns the world-space scale of the transform.</p>
 <aside class="tsd-sources">
 <p>Inherited from <a href="core_GameObject.GameObject.html">GameObject</a>.<a href="core_GameObject.GameObject.html#hascomponent">hasComponent</a></p>
 <ul>
-<li>Defined in packages/dino-ge/src/core/GameObject.ts:146</li></ul></aside></div></li></ul></section>
+<li>Defined in src/core/GameObject.ts:149</li></ul></aside></div></li></ul></section>
 <section class="tsd-panel tsd-member tsd-is-inherited">
 <h3 class="tsd-anchor-link" id="off"><span>off</span><a href="#off" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></h3>
 <ul class="tsd-signatures tsd-is-inherited">
@@ -500,7 +548,7 @@ Returns the world-space scale of the transform.</p>
 <h4 class="tsd-returns-title">Returns <span class="tsd-signature-type">void</span></h4><aside class="tsd-sources">
 <p>Inherited from <a href="core_GameObject.GameObject.html">GameObject</a>.<a href="core_GameObject.GameObject.html#off">off</a></p>
 <ul>
-<li>Defined in packages/dino-ge/src/core/GameObject.ts:98</li></ul></aside></div></li></ul></section>
+<li>Defined in src/core/GameObject.ts:101</li></ul></aside></div></li></ul></section>
 <section class="tsd-panel tsd-member tsd-is-inherited">
 <h3 class="tsd-anchor-link" id="on"><span>on</span><a href="#on" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></h3>
 <ul class="tsd-signatures tsd-is-inherited">
@@ -521,18 +569,47 @@ Returns the world-space scale of the transform.</p>
 <h4 class="tsd-returns-title">Returns <span class="tsd-signature-type">void</span></h4><aside class="tsd-sources">
 <p>Inherited from <a href="core_GameObject.GameObject.html">GameObject</a>.<a href="core_GameObject.GameObject.html#on">on</a></p>
 <ul>
-<li>Defined in packages/dino-ge/src/core/GameObject.ts:84</li></ul></aside></div></li></ul></section>
+<li>Defined in src/core/GameObject.ts:87</li></ul></aside></div></li></ul></section>
+<section class="tsd-panel tsd-member">
+<h3 class="tsd-anchor-link" id="pauseanimation"><span>pause<wbr/>Animation</span><a href="#pauseanimation" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></h3>
+<ul class="tsd-signatures">
+<li class="">
+<div class="tsd-signature tsd-anchor-link" id="pauseanimation-1"><span class="tsd-kind-call-signature">pauseAnimation</span><span class="tsd-signature-symbol">()</span><span class="tsd-signature-symbol">:</span> <span class="tsd-signature-type">void</span><a href="#pauseanimation-1" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></div>
+<div class="tsd-description">
+<div class="tsd-comment tsd-typography"><p>Pauses the named clip while keeping the sprite registered and visible.</p>
+</div>
+<h4 class="tsd-returns-title">Returns <span class="tsd-signature-type">void</span></h4><aside class="tsd-sources">
+<ul>
+<li>Defined in src/objects/Sprite.ts:246</li></ul></aside></div></li></ul></section>
 <section class="tsd-panel tsd-member">
 <h3 class="tsd-anchor-link" id="play"><span>play</span><a href="#play" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></h3>
 <ul class="tsd-signatures">
 <li class="">
 <div class="tsd-signature tsd-anchor-link" id="play-1"><span class="tsd-kind-call-signature">play</span><span class="tsd-signature-symbol">()</span><span class="tsd-signature-symbol">:</span> <span class="tsd-signature-type">void</span><a href="#play-1" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></div>
 <div class="tsd-description">
-<div class="tsd-comment tsd-typography"><p>Registers the sprite with the engine and starts its animation loop.</p>
+<div class="tsd-comment tsd-typography"><p>Registers the sprite and starts its legacy grid range.</p>
 </div>
 <h4 class="tsd-returns-title">Returns <span class="tsd-signature-type">void</span></h4><aside class="tsd-sources">
 <ul>
-<li>Defined in packages/dino-ge/src/objects/Sprite.ts:209</li></ul></aside></div></li></ul></section>
+<li>Defined in src/objects/Sprite.ts:252</li></ul></aside></div></li></ul></section>
+<section class="tsd-panel tsd-member">
+<h3 class="tsd-anchor-link" id="playanimation"><span>play<wbr/>Animation</span><a href="#playanimation" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></h3>
+<ul class="tsd-signatures">
+<li class="">
+<div class="tsd-signature tsd-anchor-link" id="playanimation-1"><span class="tsd-kind-call-signature">playAnimation</span><span class="tsd-signature-symbol">(</span><span class="tsd-kind-parameter">name</span><span class="tsd-signature-symbol">:</span> <span class="tsd-signature-type">string</span><span class="tsd-signature-symbol">,</span> <span class="tsd-kind-parameter">options</span><span class="tsd-signature-symbol">?:</span> <a href="../interfaces/objects_SpriteAnimation.SpriteAnimationOptions.html" class="tsd-signature-type tsd-kind-interface">SpriteAnimationOptions</a><span class="tsd-signature-symbol">)</span><span class="tsd-signature-symbol">:</span> <span class="tsd-signature-type">void</span><a href="#playanimation-1" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></div>
+<div class="tsd-description">
+<div class="tsd-comment tsd-typography"><p>Starts a named clip on game time and registers the sprite if needed.
+Repeating the same request keeps its progress, resumes a paused clip, or holds a completed pose.
+Changing clips or modes, or setting restart, starts from the first frame.</p>
+</div>
+<div class="tsd-parameters">
+<h4 class="tsd-parameters-title">Parameters</h4>
+<ul class="tsd-parameter-list">
+<li><span><span class="tsd-kind-parameter">name</span>: <span class="tsd-signature-type">string</span></span></li>
+<li><span><span class="tsd-kind-parameter">options</span>: <a href="../interfaces/objects_SpriteAnimation.SpriteAnimationOptions.html" class="tsd-signature-type tsd-kind-interface">SpriteAnimationOptions</a><span class="tsd-signature-symbol"> = {}</span></span></li></ul></div>
+<h4 class="tsd-returns-title">Returns <span class="tsd-signature-type">void</span></h4><aside class="tsd-sources">
+<ul>
+<li>Defined in src/objects/Sprite.ts:238</li></ul></aside></div></li></ul></section>
 <section class="tsd-panel tsd-member tsd-is-inherited">
 <h3 class="tsd-anchor-link" id="registerself"><span>register<wbr/>Self</span><a href="#registerself" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></h3>
 <ul class="tsd-signatures tsd-is-inherited">
@@ -544,7 +621,7 @@ Returns the world-space scale of the transform.</p>
 <h4 class="tsd-returns-title">Returns <span class="tsd-signature-type">void</span></h4><aside class="tsd-sources">
 <p>Inherited from <a href="core_GameObject.GameObject.html">GameObject</a>.<a href="core_GameObject.GameObject.html#registerself">registerSelf</a></p>
 <ul>
-<li>Defined in packages/dino-ge/src/core/GameObject.ts:162</li></ul></aside></div></li></ul></section>
+<li>Defined in src/core/GameObject.ts:165</li></ul></aside></div></li></ul></section>
 <section class="tsd-panel tsd-member tsd-is-inherited">
 <h3 class="tsd-anchor-link" id="removecomponent"><span>remove<wbr/>Component</span><a href="#removecomponent" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></h3>
 <ul class="tsd-signatures tsd-is-inherited">
@@ -566,18 +643,29 @@ Returns the world-space scale of the transform.</p>
 <h4 class="tsd-returns-title">Returns <span class="tsd-signature-type">void</span></h4><aside class="tsd-sources">
 <p>Inherited from <a href="core_GameObject.GameObject.html">GameObject</a>.<a href="core_GameObject.GameObject.html#removecomponent">removeComponent</a></p>
 <ul>
-<li>Defined in packages/dino-ge/src/core/GameObject.ts:131</li></ul></aside></div></li></ul></section>
+<li>Defined in src/core/GameObject.ts:134</li></ul></aside></div></li></ul></section>
 <section class="tsd-panel tsd-member">
 <h3 class="tsd-anchor-link" id="stop"><span>stop</span><a href="#stop" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></h3>
 <ul class="tsd-signatures">
 <li class="">
 <div class="tsd-signature tsd-anchor-link" id="stop-1"><span class="tsd-kind-call-signature">stop</span><span class="tsd-signature-symbol">()</span><span class="tsd-signature-symbol">:</span> <span class="tsd-signature-type">void</span><a href="#stop-1" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></div>
 <div class="tsd-description">
-<div class="tsd-comment tsd-typography"><p>Stops the sprite's animation and removes it from the engine.</p>
+<div class="tsd-comment tsd-typography"><p>Stops sprite playback and removes it from the engine.</p>
 </div>
 <h4 class="tsd-returns-title">Returns <span class="tsd-signature-type">void</span></h4><aside class="tsd-sources">
 <ul>
-<li>Defined in packages/dino-ge/src/objects/Sprite.ts:220</li></ul></aside></div></li></ul></section></section></details></div>
+<li>Defined in src/objects/Sprite.ts:266</li></ul></aside></div></li></ul></section>
+<section class="tsd-panel tsd-member">
+<h3 class="tsd-anchor-link" id="stopanimation"><span>stop<wbr/>Animation</span><a href="#stopanimation" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></h3>
+<ul class="tsd-signatures">
+<li class="">
+<div class="tsd-signature tsd-anchor-link" id="stopanimation-1"><span class="tsd-kind-call-signature">stopAnimation</span><span class="tsd-signature-symbol">()</span><span class="tsd-signature-symbol">:</span> <span class="tsd-signature-type">void</span><a href="#stopanimation-1" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></div>
+<div class="tsd-description">
+<div class="tsd-comment tsd-typography"><p>Stops the named clip and holds its pose. The next play starts from the first frame.</p>
+</div>
+<h4 class="tsd-returns-title">Returns <span class="tsd-signature-type">void</span></h4><aside class="tsd-sources">
+<ul>
+<li>Defined in src/objects/Sprite.ts:249</li></ul></aside></div></li></ul></section></section></details></div>
 <div class="col-sidebar">
 <div class="page-menu">
 <div class="tsd-navigation settings">
@@ -596,11 +684,11 @@ Returns the world-space scale of the transform.</p>
 <details open class="tsd-accordion tsd-page-navigation-section"><summary class="tsd-accordion-summary" data-key="section-Constructors"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden="true"><use href="../assets/icons.svg#icon-chevronDown"></use></svg>Constructors</summary>
 <div><a href="#constructor"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Constructor"><use href="../assets/icons.svg#icon-512"></use></svg><span>constructor</span></a></div></details>
 <details open class="tsd-accordion tsd-page-navigation-section"><summary class="tsd-accordion-summary" data-key="section-Properties"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden="true"><use href="../assets/icons.svg#icon-chevronDown"></use></svg>Properties</summary>
-<div><a href="#id" class="tsd-is-inherited"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Property"><use href="../assets/icons.svg#icon-1024"></use></svg><span>id</span></a><a href="#registered"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Property"><use href="../assets/icons.svg#icon-1024"></use></svg><span>registered</span></a><a href="#_registry" class="tsd-is-inherited"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Property"><use href="../assets/icons.svg#icon-1024"></use></svg><span>_<wbr/>registry</span></a></div></details>
+<div><a href="#actions" class="tsd-is-inherited"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Property"><use href="../assets/icons.svg#icon-1024"></use></svg><span>actions</span></a><a href="#id" class="tsd-is-inherited"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Property"><use href="../assets/icons.svg#icon-1024"></use></svg><span>id</span></a><a href="#registered"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Property"><use href="../assets/icons.svg#icon-1024"></use></svg><span>registered</span></a><a href="#_registry" class="tsd-is-inherited"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Property"><use href="../assets/icons.svg#icon-1024"></use></svg><span>_<wbr/>registry</span></a></div></details>
 <details open class="tsd-accordion tsd-page-navigation-section"><summary class="tsd-accordion-summary" data-key="section-Accessors"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden="true"><use href="../assets/icons.svg#icon-chevronDown"></use></svg>Accessors</summary>
-<div><a href="#bounds" class="tsd-is-inherited"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Accessor"><use href="../assets/icons.svg#icon-262144"></use></svg><span>bounds</span></a><a href="#cols"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Accessor"><use href="../assets/icons.svg#icon-262144"></use></svg><span>cols</span></a><a href="#currentframe"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Accessor"><use href="../assets/icons.svg#icon-262144"></use></svg><span>current<wbr/>Frame</span></a><a href="#endcol"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Accessor"><use href="../assets/icons.svg#icon-262144"></use></svg><span>end<wbr/>Col</span></a><a href="#flip"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Accessor"><use href="../assets/icons.svg#icon-262144"></use></svg><span>flip</span></a><a href="#frameduration"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Accessor"><use href="../assets/icons.svg#icon-262144"></use></svg><span>frame<wbr/>Duration</span></a><a href="#frameheight"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Accessor"><use href="../assets/icons.svg#icon-262144"></use></svg><span>frame<wbr/>Height</span></a><a href="#framewidth"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Accessor"><use href="../assets/icons.svg#icon-262144"></use></svg><span>frame<wbr/>Width</span></a><a href="#img"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Accessor"><use href="../assets/icons.svg#icon-262144"></use></svg><span>img</span></a><a href="#metadata" class="tsd-is-inherited"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Accessor"><use href="../assets/icons.svg#icon-262144"></use></svg><span>metadata</span></a><a href="#rows"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Accessor"><use href="../assets/icons.svg#icon-262144"></use></svg><span>rows</span></a><a href="#scale"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Accessor"><use href="../assets/icons.svg#icon-262144"></use></svg><span>scale</span></a><a href="#startcol"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Accessor"><use href="../assets/icons.svg#icon-262144"></use></svg><span>start<wbr/>Col</span></a><a href="#transform" class="tsd-is-inherited"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Accessor"><use href="../assets/icons.svg#icon-262144"></use></svg><span>transform</span></a></div></details>
+<div><a href="#animationplaying"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Accessor"><use href="../assets/icons.svg#icon-262144"></use></svg><span>animation<wbr/>Playing</span></a><a href="#bounds" class="tsd-is-inherited"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Accessor"><use href="../assets/icons.svg#icon-262144"></use></svg><span>bounds</span></a><a href="#cols"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Accessor"><use href="../assets/icons.svg#icon-262144"></use></svg><span>cols</span></a><a href="#currentanimation"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Accessor"><use href="../assets/icons.svg#icon-262144"></use></svg><span>current<wbr/>Animation</span></a><a href="#currentanimationframe"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Accessor"><use href="../assets/icons.svg#icon-262144"></use></svg><span>current<wbr/>Animation<wbr/>Frame</span></a><a href="#currentframe"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Accessor"><use href="../assets/icons.svg#icon-262144"></use></svg><span>current<wbr/>Frame</span></a><a href="#endcol"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Accessor"><use href="../assets/icons.svg#icon-262144"></use></svg><span>end<wbr/>Col</span></a><a href="#flip"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Accessor"><use href="../assets/icons.svg#icon-262144"></use></svg><span>flip</span></a><a href="#frameduration"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Accessor"><use href="../assets/icons.svg#icon-262144"></use></svg><span>frame<wbr/>Duration</span></a><a href="#frameheight"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Accessor"><use href="../assets/icons.svg#icon-262144"></use></svg><span>frame<wbr/>Height</span></a><a href="#framewidth"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Accessor"><use href="../assets/icons.svg#icon-262144"></use></svg><span>frame<wbr/>Width</span></a><a href="#img"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Accessor"><use href="../assets/icons.svg#icon-262144"></use></svg><span>img</span></a><a href="#metadata" class="tsd-is-inherited"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Accessor"><use href="../assets/icons.svg#icon-262144"></use></svg><span>metadata</span></a><a href="#rows"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Accessor"><use href="../assets/icons.svg#icon-262144"></use></svg><span>rows</span></a><a href="#scale"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Accessor"><use href="../assets/icons.svg#icon-262144"></use></svg><span>scale</span></a><a href="#startcol"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Accessor"><use href="../assets/icons.svg#icon-262144"></use></svg><span>start<wbr/>Col</span></a><a href="#transform" class="tsd-is-inherited"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Accessor"><use href="../assets/icons.svg#icon-262144"></use></svg><span>transform</span></a></div></details>
 <details open class="tsd-accordion tsd-page-navigation-section"><summary class="tsd-accordion-summary" data-key="section-Methods"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden="true"><use href="../assets/icons.svg#icon-chevronDown"></use></svg>Methods</summary>
-<div><a href="#addcomponent" class="tsd-is-inherited"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Method"><use href="../assets/icons.svg#icon-2048"></use></svg><span>add<wbr/>Component</span></a><a href="#destroyself" class="tsd-is-inherited"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Method"><use href="../assets/icons.svg#icon-2048"></use></svg><span>destroy<wbr/>Self</span></a><a href="#emit" class="tsd-is-inherited"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Method"><use href="../assets/icons.svg#icon-2048"></use></svg><span>emit</span></a><a href="#getcomponent" class="tsd-is-inherited"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Method"><use href="../assets/icons.svg#icon-2048"></use></svg><span>get<wbr/>Component</span></a><a href="#hascomponent" class="tsd-is-inherited"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Method"><use href="../assets/icons.svg#icon-2048"></use></svg><span>has<wbr/>Component</span></a><a href="#off" class="tsd-is-inherited"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Method"><use href="../assets/icons.svg#icon-2048"></use></svg><span>off</span></a><a href="#on" class="tsd-is-inherited"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Method"><use href="../assets/icons.svg#icon-2048"></use></svg><span>on</span></a><a href="#play"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Method"><use href="../assets/icons.svg#icon-2048"></use></svg><span>play</span></a><a href="#registerself" class="tsd-is-inherited"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Method"><use href="../assets/icons.svg#icon-2048"></use></svg><span>register<wbr/>Self</span></a><a href="#removecomponent" class="tsd-is-inherited"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Method"><use href="../assets/icons.svg#icon-2048"></use></svg><span>remove<wbr/>Component</span></a><a href="#stop"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Method"><use href="../assets/icons.svg#icon-2048"></use></svg><span>stop</span></a></div></details></div></details></div>
+<div><a href="#addcomponent" class="tsd-is-inherited"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Method"><use href="../assets/icons.svg#icon-2048"></use></svg><span>add<wbr/>Component</span></a><a href="#destroyself" class="tsd-is-inherited"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Method"><use href="../assets/icons.svg#icon-2048"></use></svg><span>destroy<wbr/>Self</span></a><a href="#emit" class="tsd-is-inherited"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Method"><use href="../assets/icons.svg#icon-2048"></use></svg><span>emit</span></a><a href="#getcomponent" class="tsd-is-inherited"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Method"><use href="../assets/icons.svg#icon-2048"></use></svg><span>get<wbr/>Component</span></a><a href="#hascomponent" class="tsd-is-inherited"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Method"><use href="../assets/icons.svg#icon-2048"></use></svg><span>has<wbr/>Component</span></a><a href="#off" class="tsd-is-inherited"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Method"><use href="../assets/icons.svg#icon-2048"></use></svg><span>off</span></a><a href="#on" class="tsd-is-inherited"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Method"><use href="../assets/icons.svg#icon-2048"></use></svg><span>on</span></a><a href="#pauseanimation"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Method"><use href="../assets/icons.svg#icon-2048"></use></svg><span>pause<wbr/>Animation</span></a><a href="#play"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Method"><use href="../assets/icons.svg#icon-2048"></use></svg><span>play</span></a><a href="#playanimation"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Method"><use href="../assets/icons.svg#icon-2048"></use></svg><span>play<wbr/>Animation</span></a><a href="#registerself" class="tsd-is-inherited"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Method"><use href="../assets/icons.svg#icon-2048"></use></svg><span>register<wbr/>Self</span></a><a href="#removecomponent" class="tsd-is-inherited"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Method"><use href="../assets/icons.svg#icon-2048"></use></svg><span>remove<wbr/>Component</span></a><a href="#stop"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Method"><use href="../assets/icons.svg#icon-2048"></use></svg><span>stop</span></a><a href="#stopanimation"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Method"><use href="../assets/icons.svg#icon-2048"></use></svg><span>stop<wbr/>Animation</span></a></div></details></div></details></div>
 <div class="site-menu">
 <nav class="tsd-navigation"><a href="../modules.html">dino-ge</a>
 <ul class="tsd-small-nested-navigation" id="tsd-nav-container">
