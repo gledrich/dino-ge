@@ -6,7 +6,6 @@ import Toolbar from './Toolbar';
 import { ScreenUIOutline } from './ScreenUITools';
 import HostedLibraryPlacement from './HostedLibraryPlacement';
 import { screenUIPreview } from '../utils/screen-ui-preview';
-import Logo from './Logo';
 import { frameSceneObjectEvent, getAssetSource, getDefaultSceneObjectTag, getSceneArrowMovement, getSceneAssetPreviewType, getSceneSelectionBounds, getSceneSource, getSceneSpritePlacement, getSceneSpriteScale, isReplaceableSprite, isSceneFrameShortcut, nudgeSceneSelection, sceneAssetDragEvent, sceneAssetDragType, sceneKeyboardPlacementEvent, sceneObjectDefaults, sceneObjectDragType, sceneObjectKinds, scenePointerDragEvent, type SceneImageAsset, type SceneKeyboardPlacementRequest, type SceneObjectKind, type SceneObjectPlacement, type ScenePointerDrag, type ScenePoint } from '../utils/scene-objects';
 import { browserPreviewUrl, getSpriteImageFileError, importSpriteImage } from '../utils/helpers';
 
@@ -1144,7 +1143,6 @@ const Viewport: React.FC<{
       {isEditingScene && manipulationReadout && (
         <div className="scene-manipulation-readout" role="group" aria-label="Current scene gesture">{manipulationReadout}</div>
       )}
-      <Logo visible={!mobile && arePanelsMinimized && isViewportReady && !isEditingScene} />
       {runtimeError && <div className="game-runtime-error">
         <div role="alert">
           <strong>{{ script: 'Game script failed to run', startup: 'Game setup failed', frame: 'Game stopped running' }[runtimeError.phase]}</strong>
