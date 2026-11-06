@@ -404,7 +404,9 @@
 .dock-rail button { cursor: pointer; }
 .dock-rail-left, .dock-rail-right { width: 20px; flex: 0 0 20px; }
 .dock-rail-bottom, .dock-rail-mobile { width: 100%; min-height: 24px; }
-.dock-move { flex: none; max-width: 66px; color: var(--text-primary); background: var(--bg-primary); border: 1px solid var(--border-color); border-radius: 4px; padding: 3px; font: inherit; text-transform: none; }
+.dock-move { position: relative; display: grid; place-items: center; margin-inline-start: auto; padding: 2px 6px; }
+.dock-move select { position: absolute; inset: 0; width: 100%; height: 100%; opacity: 0; cursor: pointer; }
+.dock-move:focus-within { outline: 2px solid currentColor; outline-offset: 2px; }
 .playground-tabs [draggable='true'] { cursor: grab; }
 .workspace-dock[data-dock-drop], .dock-rail[data-dock-drop] { outline: 2px solid var(--accent-primary); outline-offset: -2px; }
 .dock-rail[data-dock-ready] { background-color: var(--bg-tertiary); }

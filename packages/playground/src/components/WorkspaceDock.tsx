@@ -96,20 +96,23 @@ export default function WorkspaceDock({ id, tabs, active, visible, slots, onSele
           ))}
         </div>
         {moves && active && id !== 'mobile' && (
-          <select className="dock-move" aria-label={`Move ${toolLabels[active]}`} value=""
-            onChange={event => {
-              const destination = event.currentTarget.value;
-              if (destination === 'reset') moves.reset();
-              else if (destination === 'earlier' || destination === 'later') {
-                moves.move(active, id, activeIndex + (destination === 'earlier' ? -1 : 1));
-              } else if (dockIds.some(dock => dock === destination)) moves.move(active, destination as DockId, Infinity);
-            }}>
-            <option value="" disabled>Move…</option>
-            {dockIds.filter(dock => dock !== id).map(dock => <option key={dock} value={dock}>Move to {dock} dock</option>)}
-            {activeIndex > 0 && <option value="earlier">Move one tab left</option>}
-            {activeIndex < tabs.length - 1 && <option value="later">Move one tab right</option>}
-            <option value="reset">Reset dock layout</option>
-          </select>
+          <span className="dock-move editor-panel-toggle">
+            <i className="fa-solid fa-arrows-up-down-left-right" aria-hidden="true" />
+            <select aria-label={`Move ${toolLabels[active]}`} title={`Move ${toolLabels[active]}`} value=""
+              onChange={event => {
+                const destination = event.currentTarget.value;
+                if (destination === 'reset') moves.reset();
+                else if (destination === 'earlier' || destination === 'later') {
+                  moves.move(active, id, activeIndex + (destination === 'earlier' ? -1 : 1));
+                } else if (dockIds.some(dock => dock === destination)) moves.move(active, destination as DockId, Infinity);
+              }}>
+              <option value="" disabled>Move…</option>
+              {dockIds.filter(dock => dock !== id).map(dock => <option key={dock} value={dock}>Move to {dock} dock</option>)}
+              {activeIndex > 0 && <option value="earlier">Move one tab left</option>}
+              {activeIndex < tabs.length - 1 && <option value="later">Move one tab right</option>}
+              <option value="reset">Reset dock layout</option>
+            </select>
+          </span>
         )}
         <button type="button" className="editor-panel-toggle" aria-label={`Collapse ${title.toLowerCase()}`} onClick={onCollapse}>
           <i className="fa-solid fa-chevron-down" aria-hidden="true" />
