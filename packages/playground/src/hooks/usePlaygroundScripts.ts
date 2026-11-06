@@ -10,7 +10,7 @@ import { screenUIPreview } from '../utils/screen-ui-preview';
 import { findScreenUICall, resolveScreenUISource } from '../utils/screen-ui-source';
 import { usePlayground } from '../context/PlaygroundContext';
 
-const { Engine, Loader } = Dino;
+const { Engine, Input, Loader } = Dino;
 
 type RunChange = { kind: 'reset' } | { kind: 'switch'; scriptId: string };
 export type GameRunError = Dino.EngineRuntimeError | { phase: 'script'; error: unknown };
@@ -101,6 +101,7 @@ export const usePlaygroundScripts = () => {
     Engine.camera.reset();
     Engine.selectedObject = null;
     Loader.clear();
+    Input.setActions({});
     
     retireScript.current?.();
     

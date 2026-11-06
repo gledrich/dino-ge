@@ -159,13 +159,13 @@ export async function importGameFolder(folder: GameFolder, entry: string): Promi
   return result.id;
 }
 
-export async function createScript(id: string): Promise<void> {
+export async function createScript(id: string, source = ''): Promise<void> {
   if (!id || id.includes('/') || id.includes('\\')) throw new Error('Enter a script name without directories.');
-  if (browserPreviewUrl) return browserWorkspace.writeScript(id, '', 'create');
+  if (browserPreviewUrl) return browserWorkspace.writeScript(id, source, 'create');
   const response = await fetch(scriptEndpoint(id), {
     method: 'PUT',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ data: '', create: true }),
+    body: JSON.stringify({ data: source, create: true }),
   });
   if (!response.ok) {
     const body = await response.json().catch(() => ({}));

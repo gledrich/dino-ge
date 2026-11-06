@@ -1,3 +1,4 @@
+import { engineExamples } from '../examples/catalogue';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import Editor from '@monaco-editor/react';
 import { typescript, type editor } from 'monaco-editor';
@@ -65,6 +66,7 @@ const CodeEditor: React.FC<EditorProps> = ({ currentScriptId, onSave, onSelectSc
   const [folder, setFolder] = useState<GameFolder>();
   const [entryFile, setEntryFile] = useState('');
   const [importing, setImporting] = useState(false);
+  const [example, setExample] = useState('');
   const [importError, setImportError] = useState('');
   const [projectFiles, setProjectFiles] = useState<{
     scriptId: string; request?: ProjectObjectSourceRequest; screenUI?: OpenScreenUISource['location'];
@@ -888,6 +890,32 @@ const CodeEditor: React.FC<EditorProps> = ({ currentScriptId, onSave, onSelectSc
     }
   };
 
+  const openExample = async () => {
+    const selected = engineExamples.find(item => item.id === example);
+    if (!selected || importing) return;
+    const scriptId = selected.assets ? selected.id + '/game' : selected.id;
+    setImportError('');
+    if (scripts.includes(scriptId)) {
+      onSelectScript(scriptId);
+      return;
+    }
+    setImporting(true);
+    try {
+      if (selected.assets) {
+        const entry = 'game.js';
+        const files = [{ path: entry, file: new File([selected.source], entry, { type: 'text/javascript' }) }, ...selected.assets()];
+        selectNewScript(await importGameFolder({ name: selected.id, files }, entry));
+      } else {
+        await createScript(selected.id, selected.source);
+        selectNewScript(selected.id);
+      }
+    } catch (error) {
+      setImportError(error instanceof Error ? error.message : 'Could not open the example.');
+    } finally {
+      setImporting(false);
+    }
+  };
+
   const selectFolder = (event: React.ChangeEvent<HTMLInputElement>) => {
     const selection = event.target.files;
     if (!selection?.length) return;
@@ -1015,6 +1043,13 @@ const CodeEditor: React.FC<EditorProps> = ({ currentScriptId, onSave, onSelectSc
               <option key={s} value={s}>{s}</option>
             ))}
           </select>
+          <select className="engine-example-selector" aria-label="Engine example" value={example}
+            onChange={event => setExample(event.target.value)}>
+            <option value="">Choose example</option>
+            {engineExamples.map(({ id, label }) => <option key={id} value={id}>{label}</option>)}
+          </select>
+          <button type="button" className="import-game-button" disabled={!example || importing}
+            onClick={openExample}>Open example</button>
           {currentScriptId.includes('/') && <button type="button" className="import-game-button"
             disabled={importing} onClick={event => setProjectFiles({ scriptId: currentScriptId, trigger: event.currentTarget })}>Project files</button>}
           <button type="button" className="import-game-button" disabled={importing}

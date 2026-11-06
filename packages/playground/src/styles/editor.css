@@ -76,7 +76,8 @@
 
 .import-game-button,
 .import-game-options button,
-.import-game-options select {
+.import-game-options select,
+.engine-example-selector {
   background: var(--bg-primary);
   color: var(--text-primary);
   border: 1px solid var(--border-color);
