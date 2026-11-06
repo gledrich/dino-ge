@@ -2,6 +2,8 @@ import GameObject from '../core/GameObject.js';
 import Vector2 from '../math/Vector2.js';
 import ResourceLoader from '../core/Loader.js';
 import TilemapComponent from '../components/TilemapComponent.js';
+import VisibilityComponent from '../components/VisibilityComponent.js';
+import { importTiledMap, type TiledImportOptions, type TiledMap } from './TiledMap.js';
 
 /**
  * Properties for creating a new Tilemap.
@@ -25,6 +27,10 @@ export interface TilemapProps {
   zIndex?: number;
   /** Set to false to keep pixel art sharp when scaled. Defaults to the canvas setting. */
   imageSmoothing?: boolean;
+  /** Canvas opacity multiplier between 0 and 1. */
+  opacity?: number;
+  /** Whether the tilemap is drawn. Defaults to true. */
+  visible?: boolean;
 }
 
 const defaultProps = {
@@ -94,6 +100,17 @@ export default class Tilemap extends GameObject {
     return new Tilemap({ ...options, data, tileSize, tilesetCols: columns });
   }
 
+  /**
+   * Imports a finite orthogonal Tiled JSON map with square, numeric tile layers
+   * and point or rectangle object layers. Each tile layer produces one Tilemap
+   * per atlas used by its cells. Load atlas images and any external JSON tileset
+   * descriptors before calling this method. Objects and tile properties are
+   * returned as metadata for the game to interpret.
+   */
+  static importTiled(map: unknown, options: TiledImportOptions): TiledMap {
+    return importTiledMap(map, options, props => new Tilemap(props));
+  }
+
   /** The source image for the tileset. */
   public tileset: HTMLImageElement;
   /** 2D array of tile indices. */
@@ -131,6 +148,11 @@ export default class Tilemap extends GameObject {
     );
     component.imageSmoothing = props.imageSmoothing;
     this.addComponent(component);
+    if (props.visible === false || props.opacity !== undefined) {
+      const visibility = new VisibilityComponent(props.visible);
+      visibility.opacity = props.opacity ?? 1;
+      this.addComponent(visibility);
+    }
 
     this.registerSelf();
   }
