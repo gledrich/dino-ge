@@ -63,6 +63,36 @@
   pointer-events: none;
 }
 
+.scene-edit-controls[role='group'] {
+  --panel-left: min(var(--scene-controls-left), max(0px, 100% - 80px));
+  --panel-top: min(var(--scene-controls-top), max(0px, 100% - 56px));
+  left: var(--panel-left);
+  top: var(--panel-top);
+  max-width: calc(100% - var(--panel-left));
+  max-height: calc(100% - var(--panel-top));
+  box-sizing: border-box;
+  align-content: start;
+  overflow: auto;
+  resize: both;
+  pointer-events: auto;
+}
+
+.scene-controls-drag {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  background: var(--bg-secondary);
+  color: inherit;
+  border: 1px solid var(--border-color);
+  border-radius: 4px;
+  cursor: grab;
+  touch-action: none;
+}
+
+.scene-controls-drag:active {
+  cursor: grabbing;
+}
+
 .scene-object-options {
   display: flex;
   align-items: center;

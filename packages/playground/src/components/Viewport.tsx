@@ -172,6 +172,19 @@ const Viewport: React.FC<{
 
   const viewportContainerRef = useRef<HTMLDivElement>(null);
   const sceneControlsRef = useRef<HTMLDivElement>(null);
+  const [sceneControlsPosition, setSceneControlsPosition] = useState({ x: 12, y: 12 });
+  const sceneControlsDrag = useRef<{ x: number; y: number } | null>(null);
+
+  const moveSceneControls = (x: number, y: number) => {
+    const panel = sceneControlsRef.current;
+    const parent = panel?.parentElement;
+    if (!panel || !parent) return;
+    setSceneControlsPosition({
+      x: Math.max(0, Math.min(x, parent.clientWidth - panel.offsetWidth)),
+      y: Math.max(0, Math.min(y, parent.clientHeight - panel.offsetHeight)),
+    });
+  };
+
   const isEditingScreenUI = useSyncExternalStore(screenUIPreview.subscribe, () => screenUIPreview.getSnapshot().editing);
   const isEditingScene = !isEditingScreenUI && !browserPreviewUrl && isPaused && isDebug;
   const savedCamera = useRef<{ canvas: HTMLCanvasElement; scene: typeof Engine.currentScene;
@@ -992,8 +1005,37 @@ const Viewport: React.FC<{
       />
       {(isEditingScene || keyboardPlacement || placementStatus?.error || placementStatus?.pending) && (
         <div className="scene-edit-controls" ref={sceneControlsRef} role={isEditingScene ? 'group' : undefined}
-          aria-label={isEditingScene ? 'Scene editing' : undefined}>
+          aria-label={isEditingScene ? 'Scene editing' : undefined}
+          style={isEditingScene ? {
+            '--scene-controls-left': `${sceneControlsPosition.x}px`,
+            '--scene-controls-top': `${sceneControlsPosition.y}px`,
+          } as React.CSSProperties : undefined}>
           {isEditingScene && <>
+            <button type="button" className="scene-controls-drag" aria-label="Move scene controls"
+              title="Drag to move scene controls or use the arrow keys"
+              onPointerDown={event => {
+                if (!event.isPrimary || event.button !== 0) return;
+                const panel = sceneControlsRef.current;
+                if (!panel) return;
+                event.currentTarget.setPointerCapture(event.pointerId);
+                sceneControlsDrag.current = { x: event.clientX - panel.offsetLeft, y: event.clientY - panel.offsetTop };
+              }}
+              onPointerMove={event => {
+                const drag = sceneControlsDrag.current;
+                if (!drag || !event.currentTarget.hasPointerCapture(event.pointerId)) return;
+                moveSceneControls(event.clientX - drag.x, event.clientY - drag.y);
+              }}
+              onLostPointerCapture={() => { sceneControlsDrag.current = null; }}
+              onKeyDown={event => {
+                const direction = getSceneArrowMovement(event);
+                const panel = sceneControlsRef.current;
+                if (!direction || !panel) return;
+                event.preventDefault();
+                event.stopPropagation();
+                moveSceneControls(panel.offsetLeft + direction.x * 12, panel.offsetTop + direction.y * 12);
+              }}>
+              <i className="fa-solid fa-grip-lines" aria-hidden="true" />
+            </button>
             <div className="scene-object-options">
               <div className="scene-object-options" role="group" aria-label="Edit history">
                 {(['undo', 'redo'] as const).map(action => {
