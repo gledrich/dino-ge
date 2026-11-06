@@ -197,7 +197,9 @@ app.put('/api/scripts/:id', async (req, res) => {
     const { create, data, upsert } = req.body ?? {};
     if (typeof data !== 'string') return res.status(400).json({ error: 'Script contents must be text.' });
     const filePath = await projects.scriptPath(req.params.id, { entryOnly: true });
-    const existing = await fs.lstat(filePath, { throwIfNoEntry: false });
+    const existing = await fs.lstat(filePath).catch(error => {
+      if (error.code !== 'ENOENT') throw error;
+    });
     if (existing && !existing.isFile()) return res.sendStatus(404);
     const mode = create === true ? constants.O_EXCL : upsert ? constants.O_APPEND : constants.O_TRUNC;
     await fs.writeFile(filePath, data, { flag: constants.O_WRONLY | constants.O_CREAT | mode | noFollow });
