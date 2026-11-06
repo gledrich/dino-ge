@@ -3,6 +3,8 @@ import GameObject from '../core/GameObject.js';
 import type Scene from '../core/Scene.js';
 import EventBusComponent from '../components/EventBusComponent.js';
 import PhysicsComponent from '../components/PhysicsComponent.js';
+import ColliderComponent from '../components/ColliderComponent.js';
+import { getColliderBounds } from '../physics/ColliderGeometry.js';
 import BoundsComponent from '../components/BoundsComponent.js';
 import Physics, { type CollisionManifold } from '../physics/Physics.js';
 import ShapeComponent from '../components/ShapeComponent.js';
@@ -50,6 +52,8 @@ export default class PhysicsSystem extends System {
     const emit = (type: string, object: GameObject, other: GameObject, manifold: CollisionManifold) => {
       if (worldIsActive() && entities.has(object)) object.emit(type, { other, manifold });
     };
+    const isCollidable = (object: GameObject, physics: PhysicsComponent | undefined) =>
+      object.hasComponent(ColliderComponent) || (physics && object.hasComponent(BoundsComponent));
     const collidables: GameObject[] = [];
     const cachedOrder = state?.sortedObjects;
     let processingList: Iterable<GameObject>;
@@ -65,23 +69,13 @@ export default class PhysicsSystem extends System {
       if (!entities.has(object)) continue;
 
       const physics = object.getComponent(PhysicsComponent);
-      if (physics) {
-        // 1. Integration Phase (Movement)
-        if (!physics.isStatic) {
-          // Apply acceleration to velocity
-          physics.velocity.x += physics.acceleration.x * fixedDelta;
-          physics.velocity.y += physics.acceleration.y * fixedDelta;
-
-          // Apply velocity to local position
-          object.transform.position.x += physics.velocity.x * fixedDelta;
-          object.transform.position.y += physics.velocity.y * fixedDelta;
-        }
-
-        // Collect collidables for the next phase
-        if (object.getComponent(BoundsComponent)) {
-          collidables.push(object);
-        }
+      if (physics && !physics.isStatic) {
+        physics.velocity.x += physics.acceleration.x * fixedDelta;
+        physics.velocity.y += physics.acceleration.y * fixedDelta;
+        object.transform.position.x += physics.velocity.x * fixedDelta;
+        object.transform.position.y += physics.velocity.y * fixedDelta;
       }
+      if (isCollidable(object, physics)) collidables.push(object);
     }
 
     let index = this.buildIndex(collidables, entities);
@@ -107,10 +101,10 @@ export default class PhysicsSystem extends System {
         for (const second of candidates) {
           const other = collidables[second];
           if (!worldIsActive()) return;
-          if (!entities.has(other) || !other.bounds || !object.bounds) continue;
+          if (!entities.has(other)) continue;
           const a = object.getComponent(PhysicsComponent);
           const b = other.getComponent(PhysicsComponent);
-          if (!a || !b) continue;
+          if (!isCollidable(object, a) || !isCollidable(other, b)) continue;
           const canRunHandlers = [object, other].some(body =>
             body.emit !== GameObject.prototype.emit || body.hasComponent(EventBusComponent));
           const manifold = Physics.resolveContact(object, other);
@@ -130,7 +124,7 @@ export default class PhysicsSystem extends System {
             emit(type, other, object, manifold);
           }
           if (!worldIsActive()) return;
-          if (!canRunHandlers && (a.isSensor || b.isSensor || (a.isStatic && b.isStatic))) continue;
+          if (!canRunHandlers && (a?.isSensor || b?.isSensor || ((a?.isStatic ?? true) && (b?.isStatic ?? true)))) continue;
 
           // User handlers can move unrelated objects. Without handlers, only
           // the participants and their transform descendants can have moved.
@@ -200,6 +194,10 @@ export default class PhysicsSystem extends System {
   }
 
   private collisionBounds(object: GameObject, index: number): CollisionEntry | undefined {
+    if (object.hasComponent(ColliderComponent)) {
+      const bounds = getColliderBounds(object);
+      return bounds && { index, ...bounds };
+    }
     if (object.getComponent(ShapeComponent)?.type === 'circle') {
       const circle = object as Circle;
       const centre = circle.centre;

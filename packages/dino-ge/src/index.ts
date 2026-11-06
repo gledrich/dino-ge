@@ -8,6 +8,7 @@ export { default as GameObject } from './core/GameObject.js';
 export { default as Actions, ActionQueue, type Action } from './core/Actions.js';
 export { default as Group } from './core/Group.js';
 export { default as Component } from './core/Component.js';
+export { default as ColliderComponent, type ColliderFixture } from './components/ColliderComponent.js';
 export { default as PhysicsComponent } from './components/PhysicsComponent.js';
 export { default as TransformComponent } from './components/TransformComponent.js';
 export { default as TagComponent } from './components/TagComponent.js';

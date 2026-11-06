@@ -2,6 +2,8 @@ import Vector2 from '../math/Vector2.js';
 import GameObject from '../core/GameObject.js';
 import Circle from '../objects/Circle.js';
 import PhysicsComponent from '../components/PhysicsComponent.js';
+import ColliderComponent from '../components/ColliderComponent.js';
+import { getFixtureContact, transformDisplacement } from './ColliderGeometry.js';
 import ShapeComponent from '../components/ShapeComponent.js';
 import { getEngineState } from '../core/EngineState.js';
 
@@ -17,6 +19,9 @@ export interface CollisionManifold {
   normal: Vector2;
   /** Penetration depth in world space. */
   depth: number;
+  /** Fixture indexes for explicit contacts. Legacy geometry occupies index zero. */
+  fixtureIndex1?: number;
+  fixtureIndex2?: number;
 }
 
 /** Detail for a collision event on either participant. */
@@ -37,6 +42,10 @@ export default class Physics {
    * @returns A manifold if colliding, else null.
    */
   static getCollisionManifold(obj1: GameObject, obj2: GameObject): CollisionManifold | null {
+    if (obj1.hasComponent(ColliderComponent) || obj2.hasComponent(ColliderComponent)) {
+      const contact = getFixtureContact(obj1, obj2);
+      return contact ? { obj1, obj2, ...contact } : null;
+    }
     const shape1 = obj1.getComponent(ShapeComponent);
     const shape2 = obj2.getComponent(ShapeComponent);
     const isCircle1 = shape1?.type === 'circle';
@@ -233,14 +242,19 @@ export default class Physics {
     const correctionMagnitude = (Math.max(depth - slop, 0) / ((isStatic1 ? 0 : 1) + (isStatic2 ? 0 : 1))) * percent;
     const correction = normal.clone().multiply(correctionMagnitude);
 
-    // Apply correction to LOCAL position based on world normal
-    if (!isStatic1) obj1.transform.position.subtract(correction);
-    if (!isStatic2) obj2.transform.position.add(correction);
+    const explicit = manifold.fixtureIndex1 !== undefined;
+    const toLocal = (object: GameObject, displacement: Vector2) =>
+      explicit ? transformDisplacement(object, displacement, false) : displacement;
+    const toWorld = (object: GameObject, velocity: Vector2) =>
+      explicit ? transformDisplacement(object, velocity, true) : velocity;
+
+    if (!isStatic1) obj1.transform.position.subtract(toLocal(obj1, correction));
+    if (!isStatic2) obj2.transform.position.add(toLocal(obj2, correction));
 
     // 2. Impulse-based Velocity Response
     if (phys1 && phys2) {
       // Relative velocity along normal
-      const rv = phys2.velocity.clone().subtract(phys1.velocity);
+      const rv = toWorld(obj2, phys2.velocity).clone().subtract(toWorld(obj1, phys1.velocity));
       const velAlongNormal = Vector2.dot(rv, normal);
 
       // Do not resolve if velocities are separating
@@ -258,17 +272,18 @@ export default class Physics {
 
       // Apply impulse
       const impulse = normal.clone().multiply(j);
-      if (!isStatic1) phys1.velocity.subtract(impulse.clone().multiply(invMass1));
-      if (!isStatic2) phys2.velocity.add(impulse.clone().multiply(invMass2));
+      if (!isStatic1) phys1.velocity.subtract(toLocal(obj1, impulse.clone().multiply(invMass1)));
+      if (!isStatic2) phys2.velocity.add(toLocal(obj2, impulse.clone().multiply(invMass2)));
     } else {
       // Exactly one object has physics, treat the other as static infinity mass
       // Note: we know one of them has physics because of the caller's guard (!static1 || !static2)
       const activePhys = (phys1 || phys2)!;
+      const activeObject = phys1 ? obj1 : obj2;
       // Direction FROM active TO static
       const n = phys1 ? normal : normal.clone().multiply(-1);
 
       // Relative velocity (static - active)
-      const rv = activePhys.velocity.clone().multiply(-1);
+      const rv = toWorld(activeObject, activePhys.velocity).clone().multiply(-1);
       const velAlongNormal = Vector2.dot(rv, n);
 
       // Do not resolve if velocities are separating
@@ -279,7 +294,7 @@ export default class Physics {
       j /= (1 / activePhys.mass);
 
       const impulse = n.clone().multiply(j);
-      activePhys.velocity.subtract(impulse.clone().multiply(1 / activePhys.mass));
+      activePhys.velocity.subtract(toLocal(activeObject, impulse.clone().multiply(1 / activePhys.mass)));
     }
   }
 }
