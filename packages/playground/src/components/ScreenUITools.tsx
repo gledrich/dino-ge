@@ -1,6 +1,7 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore, type ReactNode } from 'react';
 import { Engine, type GameObject, type ScreenUIControl } from 'dino-ge';
 import { usePlayground } from '../context/PlaygroundContext';
+import { useScreenUIEditing } from '../hooks/useScreenUIEditing';
 import { getScreenUIBounds, openScreenUISourceEvent, screenUIArrowOffsets, screenUIPreview, type OpenScreenUISource, type ScreenUIBounds, type ScreenUIMove } from '../utils/screen-ui-preview';
 import { applyScreenUIMoveEvent, prepareScreenUIEdits, type ApplyScreenUIMove } from '../utils/screen-ui-source';
 import { ScreenUIFields, screenUIControlKinds, screenUIControlName } from './ScreenUIFields';
@@ -35,8 +36,8 @@ export function ScreenUIExplorer() {
 }
 
 export function ScreenUIInspector({ children }: { children: ReactNode }) {
-  const { editing, frame, selected, source, moves, wasPaused } = useSyncExternalStore(screenUIPreview.subscribe, screenUIPreview.getSnapshot);
-  const { isPaused, setIsPaused } = usePlayground();
+  const { editing, frame, selected, source, moves } = useSyncExternalStore(screenUIPreview.subscribe, screenUIPreview.getSnapshot);
+  const { start, finish } = useScreenUIEditing();
   const control = selected === undefined ? undefined : frame?.controls[selected];
   const move = moves.find(item => item.index === selected);
   const pending = moves.some(item => !item.applied);
@@ -60,18 +61,7 @@ export function ScreenUIInspector({ children }: { children: ReactNode }) {
   return <>
     <div style={{ display: control || editing ? 'none' : 'contents' }}>{children}</div>
     {(control || editing) && <ScreenUIProperties key={selected} control={control} source={source} move={move} editing={editing} pending={pending}
-      onStart={() => {
-        const previousFocus = document.activeElement;
-        if (!screenUIPreview.beginEditing(isPaused)) return;
-        setIsPaused(true);
-        requestAnimationFrame(() => {
-          if (document.activeElement === previousFocus || document.activeElement === document.body) {
-            document.querySelector<HTMLButtonElement>('.screen-ui-drag-handle[aria-pressed="true"]')
-              ?.focus({ preventScroll: true });
-          }
-        });
-      }}
-      onFinish={() => { if (screenUIPreview.finishEditing()) setIsPaused(wasPaused); }} />}
+      onStart={start} onFinish={finish} />}
   </>;
 }
 
@@ -136,10 +126,19 @@ function ScreenUIProperties({ control, source, move, editing, pending, onStart, 
 export function ScreenUIOutline() {
   const { frame, canvas, selected, editing, moves } = useSyncExternalStore(screenUIPreview.subscribe, screenUIPreview.getSnapshot);
   const origin = useRef<HTMLDivElement>(null);
-  const drag = useRef<{ pointer: number; index: number; clientX: number; clientY: number; x: number; y: number } | undefined>(undefined);
+  const drag = useRef<{ pointer: number; index: number; clientX: number; clientY: number; x: number; y: number;
+    finish: (cancel?: boolean) => void } | undefined>(undefined);
   const [bounds, setBounds] = useState<ScreenUIBounds>();
   const active = selected !== undefined || editing;
   const hosted = canvas !== undefined;
+
+  useEffect(() => {
+    const current = drag.current;
+    if (!current || (editing && current.index === selected)) return;
+    drag.current = undefined;
+    current.finish(true);
+  }, [editing, selected]);
+  useEffect(() => () => drag.current?.finish(true), []);
 
   useLayoutEffect(() => {
     if (!active) return;
@@ -188,8 +187,10 @@ export function ScreenUIOutline() {
           if (event.button !== 0 || !event.isPrimary) return;
           screenUIPreview.select(index);
           if (offset?.applied) return;
+          const finish = screenUIPreview.beginGesture();
+          if (!finish) return;
           drag.current = { pointer: event.pointerId, index, clientX: event.clientX, clientY: event.clientY,
-            x: offset?.x ?? 0, y: offset?.y ?? 0 };
+            x: offset?.x ?? 0, y: offset?.y ?? 0, finish };
           event.currentTarget.setPointerCapture(event.pointerId);
         }}
         onPointerMove={event => {
@@ -199,13 +200,15 @@ export function ScreenUIOutline() {
             start.y + Math.round((event.clientY - start.clientY) / scaleY));
         }}
         onPointerUp={event => {
-          if (drag.current?.pointer === event.pointerId) drag.current = undefined;
+          if (drag.current?.pointer !== event.pointerId) return;
+          drag.current.finish();
+          drag.current = undefined;
         }}
         onLostPointerCapture={event => {
           const start = drag.current;
           if (start?.pointer !== event.pointerId) return;
           drag.current = undefined;
-          if (start.index === screenUIPreview.getSnapshot().selected) screenUIPreview.move(start.x, start.y);
+          start.finish(true);
         }}
         onClick={() => screenUIPreview.select(index)}
         onKeyDown={event => {

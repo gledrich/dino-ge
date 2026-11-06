@@ -142,6 +142,7 @@ export default function ProjectFilesDialog({ scriptId, initialSource, screenUISo
                 const model = editor.getModel();
                 const value = model?.getValue();
                 const edits = location.writeVerified && screenUIPreview.getSnapshot().source === location &&
+                  screenUIPreview.canApplyMove(offset) &&
                   loaded.value === location.source && value !== undefined &&
                   value.replace(/\r\n/g, '\n') === location.source.replace(/\r\n/g, '\n')
                   ? getScreenUIMoveEdits(value, location.kind, location, offset, location.source) : undefined;

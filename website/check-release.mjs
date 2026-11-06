@@ -346,11 +346,14 @@ try {
   assert.ok(game);
   const canvas = game.locator('#playground-canvas-container canvas');
   await canvas.waitFor();
+  const toolbar = page.locator('.viewport-panel .toolbar');
+  await toolbar.getByRole('button', { name: 'Edit Screen UI', exact: true }).tap();
+  const editControls = page.getByRole('group', { name: 'Screen UI editing', exact: true });
+  await editControls.getByText('Select a control on the canvas.').waitFor();
   await page.getByRole('tab', { name: 'Explorer', exact: true }).click();
   await page.getByRole('region', { name: 'Screen UI', exact: true })
     .getByRole('button', { name: 'AMBER RUINS', exact: true }).click();
   const properties = page.getByRole('region', { name: 'Screen UI properties' });
-  await properties.getByRole('button', { name: 'Edit Screen UI', exact: true }).click();
   const handle = page.getByRole('button', { name: 'Move AMBER RUINS', exact: true });
   const start = await handle.boundingBox();
   assert.ok(start);
@@ -359,6 +362,10 @@ try {
   await page.mouse.down();
   await page.mouse.move(start.x + start.width / 2 + 20, start.y + start.height / 2, { steps: 4 });
   await page.mouse.up();
+  assert.equal(Math.round((await handle.boundingBox()).x - start.x), 20);
+  await editControls.getByRole('button', { name: 'Undo Screen UI edit' }).click();
+  assert.equal((await handle.boundingBox()).x, start.x);
+  await editControls.getByRole('button', { name: 'Redo Screen UI edit' }).click();
   assert.equal(Math.round((await handle.boundingBox()).x - start.x), 20);
   await properties.getByRole('button', { name: 'Discard move', exact: true }).click();
   assert.equal((await handle.boundingBox()).x, start.x);
@@ -370,7 +377,6 @@ try {
   await properties.getByRole('button', { name: 'Discard changes', exact: true }).click();
   await handle.waitFor();
   await properties.getByRole('button', { name: 'Finish editing Screen UI', exact: true }).click();
-  const toolbar = page.locator('.viewport-panel .toolbar');
   const drawer = page.locator('.mobile-dock-resize');
   const openToolbarBounds = await toolbar.boundingBox();
   const gap = (await drawer.boundingBox()).y - (openToolbarBounds.y + openToolbarBounds.height);

@@ -1,4 +1,4 @@
-import { useRef } from 'react';
+import { useEffect, useRef } from 'react';
 import type { ScreenUIControl } from 'dino-ge';
 import { getScreenUIBounds, screenUIArrowOffsets, screenUIPreview, type ScreenUIMove } from '../utils/screen-ui-preview';
 import { screenUIControlName } from './ScreenUIFields';
@@ -10,7 +10,7 @@ const corners = [
   { label: 'bottom right', x: 1, y: 1 },
 ] as const;
 type Corner = typeof corners[number];
-type Start = { pointer: number; clientX: number; clientY: number; move?: ScreenUIMove };
+type Start = { pointer: number; clientX: number; clientY: number; move?: ScreenUIMove; finish: (cancel?: boolean) => void };
 
 export function ScreenUIResizeHandles({ control, move, projection, scaleX, scaleY }: {
   control: ScreenUIControl; move?: ScreenUIMove;
@@ -18,6 +18,7 @@ export function ScreenUIResizeHandles({ control, move, projection, scaleX, scale
   scaleX: number; scaleY: number;
 }) {
   const start = useRef<Start>(undefined);
+  useEffect(() => () => start.current?.finish(true), []);
   const changeSize = (corner: Corner, initial: ScreenUIMove | undefined, dx: number, dy: number) => {
     const bounds = getScreenUIBounds(control, initial);
     const width = Math.max(1, bounds.width + corner.x * dx);
@@ -36,7 +37,9 @@ export function ScreenUIResizeHandles({ control, move, projection, scaleX, scale
       cursor: corner.x === corner.y ? 'nwse-resize' : 'nesw-resize' }}
     onPointerDown={event => {
       if (event.button !== 0 || !event.isPrimary) return;
-      start.current = { pointer: event.pointerId, clientX: event.clientX, clientY: event.clientY, move };
+      const finish = screenUIPreview.beginGesture();
+      if (!finish) return;
+      start.current = { pointer: event.pointerId, clientX: event.clientX, clientY: event.clientY, move, finish };
       event.currentTarget.setPointerCapture(event.pointerId);
     }}
     onPointerMove={event => {
@@ -45,14 +48,16 @@ export function ScreenUIResizeHandles({ control, move, projection, scaleX, scale
       changeSize(corner, initial.move, Math.round((event.clientX - initial.clientX) / scaleX),
         Math.round((event.clientY - initial.clientY) / scaleY));
     }}
-    onPointerUp={event => { if (start.current?.pointer === event.pointerId) start.current = undefined; }}
+    onPointerUp={event => {
+      if (start.current?.pointer !== event.pointerId) return;
+      start.current.finish();
+      start.current = undefined;
+    }}
     onLostPointerCapture={event => {
       const initial = start.current;
       if (initial?.pointer !== event.pointerId) return;
       start.current = undefined;
-      const original = initial.move;
-      screenUIPreview.resize(original?.x ?? 0, original?.y ?? 0,
-        original?.properties?.width ?? 0, original?.properties?.height ?? 0);
+      initial.finish(true);
     }}
     onKeyDown={event => {
       if (event.altKey || event.ctrlKey || event.metaKey) return;

@@ -2,14 +2,14 @@ import { parse, type AnyNode, type CallExpression, type Position, type Property 
 import type { ScreenUIPropertyChanges } from 'dino-ge';
 import type { editor } from 'monaco-editor';
 import type { Edit } from './ast-utils';
-import type { ScreenUISource } from './screen-ui-preview';
+import type { ScreenUIMove, ScreenUISource } from './screen-ui-preview';
 
 export type ScreenUIControlKind = 'panel' | 'label' | 'image' | 'button' | 'progressBar';
 
 export const applyScreenUIMoveEvent = 'playground-apply-screen-ui-move';
 export type ApplyScreenUIMove = {
   location: ScreenUISource;
-  offset: ScreenUIEdit;
+  offset: ScreenUIMove;
   trigger: HTMLButtonElement;
   applied: () => void;
   reverted?: () => void;

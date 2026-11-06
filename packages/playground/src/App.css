@@ -77,6 +77,19 @@
   pointer-events: auto;
 }
 
+.screen-ui-edit-controls { z-index: 25; }
+.screen-ui-edit-controls[data-default-position] {
+  --screen-controls-clearance: 72px;
+  top: auto;
+  bottom: var(--screen-controls-clearance);
+  max-height: calc(100% - var(--screen-controls-clearance));
+}
+@media (pointer: coarse) {
+  .mobile-workspace .viewport-panel:has(.browser-game-preview) .screen-ui-edit-controls[data-default-position] {
+    --screen-controls-clearance: max(58px, calc(160px - (100cqh - 100%)));
+  }
+}
+
 .scene-controls-drag {
   position: sticky;
   top: 0;
@@ -518,6 +531,26 @@
   stroke-linecap: round;
   stroke-linejoin: round;
 }
+
+.toolbar-edit-group { position: relative; display: flex; align-items: center; }
+.toolbar-edit-popover {
+  position: absolute;
+  bottom: 100%;
+  left: 0;
+  padding-bottom: 8px;
+}
+.toolbar .toolbar-edit-popover button {
+  border: 1px solid var(--border-color);
+  background: var(--bg-secondary);
+  border-radius: 8px;
+}
+.toolbar .toolbar-edit-disclosure { display: none; }
+@media (hover: none), (pointer: coarse) {
+  .toolbar .toolbar-edit-disclosure { display: grid; width: 24px; min-height: 32px; }
+  .toolbar .toolbar-edit-disclosure svg { width: 12px; }
+  .toolbar .toolbar-edit-popover button { width: 40px; height: 40px; }
+}
+.viewport-panel:has([data-playground-game]) .toolbar-edit-popover button { height: 30px; }
 
 .toolbar button[aria-pressed='true'] {
   color: var(--accent-secondary);

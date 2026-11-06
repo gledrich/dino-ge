@@ -6,6 +6,7 @@ import Toolbar from './Toolbar';
 import { ScreenUIOutline } from './ScreenUITools';
 import HostedLibraryPlacement from './HostedLibraryPlacement';
 import { screenUIPreview } from '../utils/screen-ui-preview';
+import { useScreenUIEditing } from '../hooks/useScreenUIEditing';
 import { frameSceneObjectEvent, getAssetSource, getDefaultSceneObjectTag, getSceneArrowMovement, getSceneAssetPreviewType, getSceneSelectionBounds, getSceneSource, getSceneSpritePlacement, getSceneSpriteScale, isReplaceableSprite, isSceneFrameShortcut, nudgeSceneSelection, sceneAssetDragEvent, sceneAssetDragType, sceneKeyboardPlacementEvent, sceneObjectDefaults, sceneObjectDragType, sceneObjectKinds, scenePointerDragEvent, type SceneImageAsset, type SceneKeyboardPlacementRequest, type SceneObjectKind, type SceneObjectPlacement, type ScenePointerDrag, type ScenePoint } from '../utils/scene-objects';
 import { browserPreviewUrl, getSpriteImageFileError, importSpriteImage } from '../utils/helpers';
 
@@ -172,20 +173,29 @@ const Viewport: React.FC<{
   const viewportContainerRef = useRef<HTMLDivElement>(null);
   const sceneControlsRef = useRef<HTMLDivElement>(null);
   const [sceneControlsPosition, setSceneControlsPosition] = useState({ x: 12, y: 12 });
+  const [screenControlsPosition, setScreenControlsPosition] = useState<ScenePoint>();
   const sceneControlsDrag = useRef<{ x: number; y: number } | null>(null);
 
   const moveSceneControls = (x: number, y: number) => {
     const panel = sceneControlsRef.current;
     const parent = panel?.parentElement;
     if (!panel || !parent) return;
-    setSceneControlsPosition({
+    const setPosition = isEditingScreenUI ? setScreenControlsPosition : setSceneControlsPosition;
+    setPosition({
       x: Math.max(0, Math.min(x, parent.clientWidth - panel.offsetWidth)),
       y: Math.max(0, Math.min(y, parent.clientHeight - panel.offsetHeight)),
     });
   };
 
   const isEditingScreenUI = useSyncExternalStore(screenUIPreview.subscribe, () => screenUIPreview.getSnapshot().editing);
+  const hasScreenUI = useSyncExternalStore(screenUIPreview.subscribe, () => !!screenUIPreview.getSnapshot().frame?.controls.length);
+  const screenUISelected = useSyncExternalStore(screenUIPreview.subscribe, () => screenUIPreview.getSnapshot().selected !== undefined);
+  const canUndoScreenUI = useSyncExternalStore(screenUIPreview.subscribe, () => !!screenUIPreview.getSnapshot().canUndo);
+  const canRedoScreenUI = useSyncExternalStore(screenUIPreview.subscribe, () => !!screenUIPreview.getSnapshot().canRedo);
+  const { start: startScreenUIEditing, finish: finishScreenUIEditing } = useScreenUIEditing();
   const isEditingScene = !isEditingScreenUI && !browserPreviewUrl && isPaused && isDebug;
+  const showEditingControls = isEditingScene || isEditingScreenUI;
+  const controlsPosition = isEditingScreenUI ? screenControlsPosition : sceneControlsPosition;
   const savedCamera = useRef<{ canvas: HTMLCanvasElement; scene: typeof Engine.currentScene;
     x: number; y: number; zoom: number } | null>(null);
   const pan = useRef<CameraPan | null>(null);
@@ -619,6 +629,10 @@ const Viewport: React.FC<{
   }, [currentScriptId, placeLoadedImage, isEditingScene]);
 
   const toggleSceneEditing = () => {
+    if (isEditingScreenUI && !finishScreenUIEditing()) {
+      openTool('inspector');
+      return;
+    }
     const editing = !isEditingScene;
     if (!editing) restoreCamera();
     setIsPaused(editing);
@@ -845,8 +859,25 @@ const Viewport: React.FC<{
     return () => observer.disconnect();
   }, [setIsViewportReady]);
 
+  const toggleScreenUIEditing = () => {
+    if (isEditingScreenUI) {
+      if (!finishScreenUIEditing()) openTool('inspector');
+    } else if (startScreenUIEditing() && !mobile) {
+      openTool('inspector');
+    }
+  };
+
   return (
-    <div className="viewport-panel">
+    <div className="viewport-panel" onKeyDownCapture={event => {
+      if (!isEditingScreenUI || event.altKey || !(event.ctrlKey || event.metaKey)) return;
+      const key = event.key.toLowerCase();
+      if (key !== 'z' && !(key === 'y' && event.ctrlKey && !event.metaKey && !event.shiftKey)) return;
+      event.preventDefault();
+      event.stopPropagation();
+      if (event.repeat) return;
+      if (key === 'y' || event.shiftKey) screenUIPreview.redo();
+      else screenUIPreview.undo();
+    }}>
       {!isViewportReady && (
         <div style={{
           position: 'absolute',
@@ -1002,16 +1033,18 @@ const Viewport: React.FC<{
           if (event.key === ' ' && isSpacePan) setIsSpacePan(false);
         }}
       />
-      {(isEditingScene || keyboardPlacement || placementStatus?.error || placementStatus?.pending) && (
-        <div className="scene-edit-controls" ref={sceneControlsRef} role={isEditingScene ? 'group' : undefined}
-          aria-label={isEditingScene ? 'Scene editing' : undefined}
-          style={isEditingScene ? {
-            '--scene-controls-left': `${sceneControlsPosition.x}px`,
-            '--scene-controls-top': `${sceneControlsPosition.y}px`,
+      {(showEditingControls || keyboardPlacement || placementStatus?.error || placementStatus?.pending) && (
+        <div className={`scene-edit-controls${isEditingScreenUI ? ' screen-ui-edit-controls' : ''}`}
+          ref={sceneControlsRef} role={showEditingControls ? 'group' : undefined}
+          data-default-position={isEditingScreenUI && !screenControlsPosition || undefined}
+          aria-label={isEditingScreenUI ? 'Screen UI editing' : isEditingScene ? 'Scene editing' : undefined}
+          style={showEditingControls ? {
+            '--scene-controls-left': controlsPosition ? `${controlsPosition.x}px` : 'max(12px, 100% - 240px)',
+            '--scene-controls-top': `${controlsPosition?.y ?? 12}px`,
           } as React.CSSProperties : undefined}>
-          {isEditingScene && <>
-            <button type="button" className="scene-controls-drag" aria-label="Move scene controls"
-              title="Drag to move scene controls or use the arrow keys"
+          {showEditingControls && <button type="button" className="scene-controls-drag"
+              aria-label={isEditingScreenUI ? 'Move Screen UI controls' : 'Move scene controls'}
+              title="Drag to move editing controls or use the arrow keys"
               onPointerDown={event => {
                 if (!event.isPrimary || event.button !== 0) return;
                 const panel = sceneControlsRef.current;
@@ -1034,7 +1067,23 @@ const Viewport: React.FC<{
                 moveSceneControls(panel.offsetLeft + direction.x * 12, panel.offsetTop + direction.y * 12);
               }}>
               <i className="fa-solid fa-grip-lines" aria-hidden="true" />
-            </button>
+            </button>}
+          {isEditingScreenUI && <>
+            <div className="scene-object-options" role="group" aria-label="Screen UI edit history">
+              <button type="button" className="scene-control" aria-label="Undo Screen UI edit"
+                disabled={!canUndoScreenUI} onClick={screenUIPreview.undo}>
+                <i className="fa-solid fa-rotate-left" aria-hidden="true" /> Undo
+              </button>
+              <button type="button" className="scene-control" aria-label="Redo Screen UI edit"
+                disabled={!canRedoScreenUI} onClick={screenUIPreview.redo}>
+                <i className="fa-solid fa-rotate-right" aria-hidden="true" /> Redo
+              </button>
+              <button type="button" className="scene-control" onClick={toggleScreenUIEditing}>Done</button>
+            </div>
+            <span className="scene-edit-hint">{!screenUISelected ? 'Select a control on the canvas.' :
+              'Drag to move or resize. Apply changes in Inspector.'}</span>
+          </>}
+          {isEditingScene && <>
             <div className="scene-object-options">
               <div className="scene-object-options" role="group" aria-label="Edit history">
                 {(['undo', 'redo'] as const).map(action => {
@@ -1164,13 +1213,15 @@ const Viewport: React.FC<{
         isPaused={isPaused}
         isDebug={isDebug}
         isEditingScene={isEditingScene}
+        isEditingScreenUI={isEditingScreenUI}
         arePanelsMinimized={arePanelsMinimized}
         onTogglePause={isEditingScreenUI ? () => {
           if (screenUIPreview.finishEditing()) setIsPaused(false);
           else openTool('inspector');
         } : isEditingScene ? toggleSceneEditing : togglePause}
         onToggleDebug={toggleDebug}
-        onToggleSceneEditing={browserPreviewUrl || isEditingScreenUI ? undefined : toggleSceneEditing}
+        onToggleSceneEditing={browserPreviewUrl ? undefined : toggleSceneEditing}
+        onToggleScreenUIEditing={isEditingScreenUI || hasScreenUI ? toggleScreenUIEditing : undefined}
         onTogglePanels={togglePanels}
         onRefresh={() => window.dispatchEvent(new CustomEvent('playground-refresh'))}
       />

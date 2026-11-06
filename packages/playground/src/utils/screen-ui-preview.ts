@@ -55,7 +55,11 @@ type ScreenUIView = {
   editing: boolean;
   wasPaused: boolean;
   moves: readonly ScreenUIMove[];
+  canUndo?: boolean;
+  canRedo?: boolean;
 };
+
+type ScreenUIEdit = { frame: ScreenUIFrame; index: number; before?: ScreenUIMove; after?: ScreenUIMove };
 
 const emptyView: ScreenUIView = { editing: false, wasPaused: false, moves: [] };
 const dimensionKeys = ['width', 'height'] as const;
@@ -93,6 +97,7 @@ function matchesControl(left: ScreenUIControl, right: ScreenUIControl) {
 
 function followControl(previous: ScreenUIFrame | undefined, previousIndex: number | undefined, controls: readonly ScreenUIControl[]) {
   if (previousIndex === undefined || !previous) return;
+  if (previous.controls === controls) return previousIndex;
   const original = previous.controls[previousIndex];
   const same = previous.controls.filter(control => matchesControl(control, original));
   if (same.length !== 1) return;
@@ -109,17 +114,49 @@ export function createScreenUIPreview() {
   let connection: object | undefined;
   let appliedMoveId = 0;
   let frameKey = '';
+  let gesture: ScreenUIEdit | undefined;
+  const undoStack: ScreenUIEdit[] = [];
+  const redoStack: ScreenUIEdit[] = [];
+  const clearHistory = () => { gesture = undefined; undoStack.length = redoStack.length = 0; };
   const listeners = new Set<() => void>();
   const update = (next: ScreenUIView) => {
     const editingChanged = view.editing !== next.editing || view.moves !== next.moves;
-    view = next;
+    view = { ...next, canUndo: !gesture && undoStack.length > 0, canRedo: !gesture && redoStack.length > 0 };
     if (editingChanged) sendEditing?.(view.editing ? { positions: view.moves } : undefined);
     listeners.forEach(listener => listener());
   };
   const hasPendingMoves = () => view.moves.some(move => !move.applied);
+  const canApplyMove = (move: ScreenUIMove) => !gesture && !move.applied && view.moves.includes(move);
   const selectedMove = () => view.moves.find(move => move.index === view.selected);
+  const record = (edit: ScreenUIEdit) => {
+    if (edit.before?.x === edit.after?.x && edit.before?.y === edit.after?.y &&
+        JSON.stringify(edit.before?.properties) === JSON.stringify(edit.after?.properties)) return;
+    undoStack.push(edit);
+    redoStack.length = 0;
+  };
+  const replaceMove = (index: number, move?: ScreenUIMove) => {
+    const moves = view.moves.filter(item => item.index !== index);
+    if (move) moves.push({ ...move, index });
+    update({ ...view, moves });
+  };
+  const changeHistory = (from: ScreenUIEdit[], to: ScreenUIEdit[], field: 'before' | 'after') => {
+    if (!view.editing || !view.frame || gesture) return;
+    const edit = from.pop();
+    if (!edit) return;
+    const index = followControl(edit.frame, edit.index, view.frame.controls);
+    if (index === undefined) { update(view); return; }
+    to.push(edit);
+    replaceMove(index, edit[field]);
+  };
+  const removeControlHistory = (frame: ScreenUIFrame, index: number) => {
+    for (const stack of [undoStack, redoStack]) {
+      for (let i = stack.length - 1; i >= 0; i--) {
+        if (followControl(stack[i].frame, stack[i].index, frame.controls) === index) stack.splice(i, 1);
+      }
+    }
+  };
   const changeSelected = (x: number, y: number, changes?: ScreenUIPropertyChanges) => {
-    const { selected, frame, editing, moves } = view;
+    const { selected, frame, editing } = view;
     if (!editing || selected === undefined || !frame || !Number.isFinite(x) || !Number.isFinite(y)) return;
     const current = selectedMove();
     if (current?.applied) return;
@@ -139,11 +176,11 @@ export function createScreenUIPreview() {
     if (current?.x === x && current.y === y &&
         JSON.stringify(current.properties) === JSON.stringify(hasProperties ? properties : undefined)) return;
     if (!current && !x && !y && !hasProperties) return;
-    const next = moves.filter(move => move !== current);
-    if (x || y || hasProperties) next.push({
+    const after = x || y || hasProperties ? {
       index: selected, control, x, y, ...(hasProperties ? { properties } : {}),
-    });
-    update({ ...view, moves: next });
+    } : undefined;
+    if (!gesture) record({ frame, index: selected, before: current, after });
+    replaceMove(selected, after);
   };
 
   return {
@@ -154,16 +191,38 @@ export function createScreenUIPreview() {
     getSnapshot: () => view,
     getEditing: (): ScreenUIEditing | undefined => view.editing ? { positions: view.moves } : undefined,
     hasPendingMoves,
+    canApplyMove,
     beginEditing(wasPaused = false) {
-      if (!connection || view.editing || view.selected === undefined) return false;
+      if (!connection || view.editing || !view.frame?.controls.length) return false;
       update({ ...view, editing: true, wasPaused });
       return true;
     },
     finishEditing() {
-      if (hasPendingMoves()) return false;
+      if (gesture || hasPendingMoves()) return false;
+      clearHistory();
       update({ ...view, editing: false, moves: emptyView.moves });
       return true;
     },
+    beginGesture() {
+      const { frame, selected } = view;
+      if (!view.editing || !frame || selected === undefined || gesture) return;
+      const edit = { frame, index: selected, before: selectedMove() };
+      gesture = edit;
+      update(view);
+      return (cancel = false) => {
+        if (gesture !== edit) return;
+        gesture = undefined;
+        const index = view.frame && followControl(frame, selected, view.frame.controls);
+        if (index === undefined) { update(view); return; }
+        if (cancel) replaceMove(index, edit.before);
+        else {
+          record({ ...edit, after: view.moves.find(move => move.index === index) });
+          update(view);
+        }
+      };
+    },
+    undo() { changeHistory(undoStack, redoStack, 'before'); },
+    redo() { changeHistory(redoStack, undoStack, 'after'); },
     move(x: number, y: number) {
       changeSelected(x, y);
     },
@@ -175,13 +234,17 @@ export function createScreenUIPreview() {
       changeSelected(x, y, { width, height });
     },
     discardMove() {
-      const moves = view.moves.filter(move => move.index !== view.selected || move.applied);
-      if (moves.length !== view.moves.length) update({ ...view, moves });
+      const move = selectedMove();
+      if (!view.frame || !move || move.applied || gesture) return;
+      record({ frame: view.frame, index: move.index, before: move });
+      replaceMove(move.index);
     },
     markApplied(move: ScreenUIMove) {
-      if (!view.moves.includes(move)) return;
+      if (!canApplyMove(move)) return;
       const owner = connection;
       const origin = view.frame;
+      if (!origin) return;
+      removeControlHistory(origin, move.index);
       const applied = { ...move, applied: ++appliedMoveId };
       update({ ...view, moves: view.moves.map(item => item === move ? applied : item) });
       return {
@@ -193,17 +256,20 @@ export function createScreenUIPreview() {
         restore() {
           if (connection !== owner || !view.editing || !view.frame) return;
           const index = followControl(origin, move.index, view.frame.controls);
-          if (index === undefined || view.moves.some(item => item.index === index)) return;
-          update({ ...view, moves: [...view.moves, { ...applied, index }] });
+          if (index === undefined) return;
+          if (gesture && followControl(gesture.frame, gesture.index, view.frame.controls) === index) gesture = undefined;
+          removeControlHistory(view.frame, index);
+          replaceMove(index, applied);
         },
       };
     },
     select(index: number | undefined) {
-      if (index === view.selected || (index !== undefined && !view.frame?.controls[index])) return;
+      if (gesture || index === view.selected || (index !== undefined && !view.frame?.controls[index])) return;
       update({ ...view, selected: index, source: undefined });
       if (index !== undefined) requestSource?.(index);
     },
     start(lookup: (index: number) => void, edit?: (editing: ScreenUIEditing | undefined) => void) {
+      clearHistory();
       update(emptyView);
       const owner = {};
       connection = owner;
@@ -217,6 +283,11 @@ export function createScreenUIPreview() {
           const key = JSON.stringify([width, height, controls, canvas]);
           if (key === frameKey) return;
           frameKey = key;
+          for (const stack of [undoStack, redoStack]) {
+            for (let i = stack.length - 1; i >= 0; i--) {
+              if (followControl(stack[i].frame, stack[i].index, controls) === undefined) stack.splice(i, 1);
+            }
+          }
           const selected = followControl(view.frame, view.selected, controls);
           const same = selected === view.selected;
           const followed = view.moves.flatMap(move => {
@@ -235,6 +306,7 @@ export function createScreenUIPreview() {
           if (connection !== owner) return;
           connection = undefined;
           requestSource = undefined;
+          clearHistory();
           update(emptyView);
           sendEditing = undefined;
         },

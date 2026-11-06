@@ -703,7 +703,7 @@ const CodeEditor: React.FC<EditorProps> = ({ currentScriptId, onSave, onSelectSc
     const applyScreenUIMove = (event: Event) => {
       const request = (event as CustomEvent<ApplyScreenUIMove>).detail;
       const { location, trigger, offset } = request;
-      if (!location.writeVerified || location.scriptId !== currentScriptId ||
+      if (!location.writeVerified || location.scriptId !== currentScriptId || !screenUIPreview.canApplyMove(offset) ||
           screenUIPreview.getSnapshot().source !== location) return;
       openTool('editor');
       if (!location.entry) {

@@ -5,6 +5,82 @@ const control = (id?: string) => ({ kind: 'button' as const, id, text: 'Play', x
 const frame = (...controls: ReturnType<typeof control>[]) => ({ width: 100, height: 100, controls });
 
 describe('Screen UI preview selection', () => {
+  it('enters without a selection and groups a gesture into one undoable edit', () => {
+    const preview = createScreenUIPreview();
+    const run = preview.start(jest.fn());
+    run.publish(frame(control('play'), control('quit')));
+    expect(preview.beginEditing()).toBe(true);
+    preview.select(0);
+    const finish = preview.beginGesture();
+    preview.move(4, 0);
+    preview.move(10, 0);
+    const move = preview.getSnapshot().moves[0];
+    expect(preview.canApplyMove(move)).toBe(false);
+    finish?.();
+    expect(preview.canApplyMove(move)).toBe(true);
+    run.publish(frame(control('quit'), control('play')));
+    preview.undo();
+    expect(preview.getSnapshot().moves).toEqual([]);
+    expect(preview.canApplyMove(move)).toBe(false);
+    preview.redo();
+    expect(preview.getSnapshot().moves[0]).toMatchObject({ index: 1, x: 10 });
+    const cancel = preview.beginGesture();
+    preview.resize(2, 0, 10, 0);
+    cancel?.(true);
+    expect(preview.getSnapshot().moves[0]).toMatchObject({ index: 1, x: 10 });
+    preview.undo();
+    expect(preview.getSnapshot().moves).toEqual([]);
+  });
+
+  it('keeps other controls undoable after applying a change', () => {
+    const preview = createScreenUIPreview();
+    const run = preview.start(jest.fn());
+    run.publish(frame(control('play'), control('quit')));
+    preview.beginEditing();
+    preview.select(0);
+    preview.move(10, 0);
+    preview.select(1);
+    preview.setProperties({ text: 'Exit' });
+    preview.markApplied(preview.getSnapshot().moves[1]);
+    preview.undo();
+    expect(preview.getSnapshot().moves).toHaveLength(1);
+    expect(preview.getSnapshot().moves[0]).toMatchObject({ index: 1, applied: 1 });
+  });
+
+  it('undoes and cancels edits to an anonymous control while its frame is unchanged', () => {
+    const preview = createScreenUIPreview();
+    preview.start(jest.fn()).publish(frame(control(), control()));
+    preview.beginEditing();
+    preview.select(1);
+    const finish = preview.beginGesture();
+    preview.move(10, 0);
+    finish?.();
+    expect(preview.getSnapshot().canUndo).toBe(true);
+    const cancel = preview.beginGesture();
+    preview.move(20, 0);
+    cancel?.(true);
+    expect(preview.getSnapshot().moves[0]).toMatchObject({ index: 1, x: 10 });
+    preview.undo();
+    expect(preview.getSnapshot().moves).toEqual([]);
+  });
+
+  it('restores code redo even after a new preview edit to the same control', () => {
+    const preview = createScreenUIPreview();
+    preview.start(jest.fn()).publish(frame(control('play'), control('quit')));
+    preview.beginEditing();
+    preview.select(0);
+    preview.move(10, 0);
+    const applied = preview.markApplied(preview.getSnapshot().moves[0]);
+    applied?.remove();
+    preview.move(20, 0);
+    preview.select(1);
+    preview.move(30, 0);
+    applied?.restore();
+    preview.undo();
+    expect(preview.getSnapshot().moves).toMatchObject([{ index: 0, x: 10, applied: 1 }]);
+    expect(preview.getSnapshot().canUndo).toBe(false);
+  });
+
   it('follows an explicit ID through a redraw and clears it when the control disappears', () => {
     const preview = createScreenUIPreview();
     const requestSource = jest.fn();

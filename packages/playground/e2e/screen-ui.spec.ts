@@ -51,6 +51,48 @@ async function pressGameButton(page: Page) {
   await page.mouse.click(point.x, point.y);
 }
 
+test('switches from the paintbrush to Screen UI and undoes preview edits', async ({ page }) => {
+  await openGame(page);
+  const toolbar = page.locator('.toolbar');
+  const brush = toolbar.getByRole('button', { name: 'Edit scene', exact: true });
+  const screen = toolbar.getByRole('button', { name: 'Edit Screen UI', exact: true });
+  await brush.focus();
+  await brush.press('ArrowUp');
+  await expect(screen).toBeFocused();
+  await page.keyboard.press('Escape');
+  await expect(brush).toBeFocused();
+  await expect(screen).toBeHidden();
+  await brush.click();
+  await expect(brush).toHaveAttribute('aria-pressed', 'true');
+  await page.getByRole('button', { name: 'Zoom in', exact: true }).click();
+  await expect(page.getByText('Zoom 125%', { exact: true })).toBeVisible();
+  await brush.hover();
+  const brushBounds = await brush.boundingBox();
+  const screenBounds = await screen.boundingBox();
+  expect(screenBounds!.y + screenBounds!.height).toBeLessThan(brushBounds!.y);
+  await screen.hover();
+  await screen.click();
+  await expect(brush).toHaveAttribute('aria-pressed', 'false');
+  await expect(toolbar.getByRole('button', { name: 'Play', exact: true })).toBeVisible();
+  const tools = page.getByRole('group', { name: 'Screen UI editing', exact: true });
+  await expect(tools.getByText('Select a control on the canvas.')).toBeVisible();
+  const handle = page.getByRole('button', { name: 'Move Hide meter', exact: true });
+  const original = (await handle.boundingBox())!.x;
+  await handle.press('Shift+ArrowRight');
+  await expect.poll(async () => (await handle.boundingBox())!.x).toBe(original + 10);
+  await tools.getByRole('button', { name: 'Done' }).click();
+  await expect(tools).toBeVisible();
+  await tools.getByRole('button', { name: 'Undo Screen UI edit' }).click();
+  await expect.poll(async () => (await handle.boundingBox())!.x).toBe(original);
+  await tools.getByRole('button', { name: 'Redo Screen UI edit' }).click();
+  await expect.poll(async () => (await handle.boundingBox())!.x).toBe(original + 10);
+  await handle.press('ControlOrMeta+z');
+  await tools.getByRole('button', { name: 'Done' }).click();
+  await expect(tools).toBeHidden();
+  await brush.click();
+  await expect(page.getByText('Zoom 100%', { exact: true })).toBeVisible();
+});
+
 test('inspects a live Screen UI button and opens its exact draw call', async ({ page }) => {
   await openGame(page);
   const explorer = page.getByRole('region', { name: 'Screen UI', exact: true });
@@ -382,6 +424,15 @@ test('previews computed text without replacing it and keeps progress values read
 test.describe('Screen UI touch editing', () => {
   test.use({ hasTouch: true });
   test.skip(({ browserName }) => browserName !== 'chromium', 'Touch dragging uses Chromium input emulation.');
+
+  test('opens Screen UI through the paintbrush disclosure by touch', async ({ page }) => {
+    await openGame(page, gameScript, { width: 390, height: 844 });
+    const toolbar = page.locator('.toolbar');
+    await toolbar.getByRole('button', { name: 'More editing tools', exact: true }).tap();
+    await toolbar.getByRole('button', { name: 'Edit Screen UI', exact: true }).tap();
+    await expect(page.getByRole('group', { name: 'Screen UI editing', exact: true })).toBeVisible();
+    await expect(toolbar.getByRole('button', { name: 'Edit scene', exact: true })).toHaveAttribute('aria-pressed', 'false');
+  });
 
   test('drags a Screen UI control on a touch layout', async ({ page }) => {
     await openGame(page, gameScript, { width: 390, height: 844 });
