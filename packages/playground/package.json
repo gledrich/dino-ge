@@ -1,6 +1,6 @@
 {
   "name": "dino-ge-playground",
-  "version": "1.15.0-beta.6",
+  "version": "1.16.0-beta.1",
   "description": "Interactive, live-editing playground and inspector for Dino GE",
   "bin": {
     "dino-ge-playground": "server.js"
@@ -22,7 +22,7 @@
     "dist/"
   ],
   "dependencies": {
-    "dino-ge": "1.15.0-beta.6",
+    "dino-ge": "1.16.0-beta.1",
     "express": "^5.3.0"
   },
   "devDependencies": {

@@ -1,7 +1,7 @@
 GitHub Pages publishes the docs directory on main through GitHub's generated
 pages-build-deployment workflow. The chapter Markdown has Jekyll front matter.
 The demo import maps pin the public npm engine and Amber Ruins release assets
-to v1.15.0-beta.6, so the standard Pages build can run them without a Node step.
+to v1.16.0-beta.1, so the standard Pages build can run them without a Node step.
 Update those pins and the install command in the first chapter together after
 checking that a new release has been published.
 

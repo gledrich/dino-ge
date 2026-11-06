@@ -1,6 +1,6 @@
 {
   "name": "dino-ge",
-  "version": "1.15.0-beta.6",
+  "version": "1.16.0-beta.1",
   "description": "Lightweight, performant 2D game engine built with TypeScript",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",

@@ -15,7 +15,7 @@ The explorer moves across the canvas. Select **Pause** to freeze it, then **Resu
 In a browser project with a bundler, install the guide's engine version:
 
 ```sh
-npm install dino-ge@1.15.0-beta.6
+npm install dino-ge@1.16.0-beta.1
 ```
 
 Add a container such as `<div id="game" style="width: 100%; height: 220px"></div>` to your HTML and load your game script as a module. The bundler resolves the bare import `dino-ge`. The browser demos use an import map for the same import. Serve modules over HTTP when working locally.
