@@ -398,12 +398,17 @@ export const makeExternal = () => new Rectangle({ tag: 'External platform', posi
   await page.getByRole('button', { name: 'Deferred label', exact: true }).click();
   await source.click({ timeout: 3000 });
   await expect(dialog.getByLabel('JavaScript module')).toHaveValue(modulePath);
+  await expect(dialog.locator('.monaco-editor')).toContainText('Deferred label');
   await dialog.locator('.monaco-editor').evaluate(element => {
     const { monaco } = window as typeof window & { monaco: Monaco };
     const editor = monaco.editor.getEditors().find(item => item.getDomNode() === element)!;
-    editor.setValue('// Edited after this run\n' + editor.getValue());
+    editor.setPosition({ lineNumber: 1, column: 1 });
+    editor.focus();
   });
-  await dialog.getByRole('button', { name: 'Save module', exact: true }).click();
+  await page.keyboard.insertText('// Edited after this run\n');
+  const saveModule = dialog.getByRole('button', { name: 'Save module', exact: true });
+  await expect(saveModule).toBeEnabled();
+  await saveModule.click();
   await expect(dialog.getByRole('status')).toContainText('Saved');
   await dialog.getByRole('button', { name: 'Close', exact: true }).click();
   await page.getByRole('tab', { name: 'Inspector', exact: true }).click();

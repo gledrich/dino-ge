@@ -1,6 +1,16 @@
-import { expect, test } from '@playwright/test';
+import { expect, test, type Page } from '@playwright/test';
 
 type Monaco = typeof import('monaco-editor');
+
+async function moveSceneControlsAwayFromCanvasTargets(page: Page) {
+  const handle = page.getByRole('button', { name: 'Move scene controls' });
+  const start = (await handle.boundingBox())!;
+  const viewport = (await page.locator('.viewport-panel').boundingBox())!;
+  await page.mouse.move(start.x + start.width / 2, start.y + start.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(viewport.x + viewport.width - 20, viewport.y + viewport.height - 20, { steps: 5 });
+  await page.mouse.up();
+}
 
 test('keeps Monaco clipboard diagnostics in the browser console', async ({ page, browserName }) => {
   test.skip(browserName !== 'webkit', 'Monaco uses this clipboard workaround in WebKit.');
@@ -769,6 +779,7 @@ new Engine({
   await edit.click();
   await expect(edit).toHaveAttribute('aria-pressed', 'true');
   await expect(page.getByRole('button', { name: 'Play', exact: true })).toBeVisible();
+  await moveSceneControlsAwayFromCanvasTargets(page);
   const canvas = page.locator('#canvas');
   // Keep this exact-coordinate test at 1:1 scale. The overlap test covers CSS scaling.
   await canvas.evaluate((element: HTMLCanvasElement) => {
@@ -2125,6 +2136,7 @@ new Engine({ onLoad() {
   const circle = page.getByRole('button', { name: 'top circle', exact: true });
   await expect(circle).toBeVisible();
   await page.getByRole('button', { name: 'Edit scene' }).click();
+  await moveSceneControlsAwayFromCanvasTargets(page);
   const canvas = page.locator('#canvas');
   await canvas.click({ position: { x: 185, y: 165 } });
   await expect(circle).toHaveAttribute('aria-pressed', 'true');
