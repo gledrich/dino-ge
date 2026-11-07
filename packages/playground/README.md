@@ -2,6 +2,8 @@
 
 Edit Dino GE scripts, inspect scene objects and try changes in the browser.
 
+![Amber Ruins running in the Dino GE Playground](./assets/preview.png)
+
 ## Install and run
 
 Use Node.js 24.22.1 or later on the 24.x line, or 26.13.0 or later on the 26.x line.
@@ -18,6 +20,12 @@ Run the command from the directory where you want to work and open [the Playgrou
 On desktop, drag tabs between docks or use a tab's **Move** menu. The browser remembers the layout. Use **Reset dock layout** to restore the defaults. On narrow screens, drag the drawer handle to reveal more of the game. To place an object from the Library, drag its grip onto the exposed canvas.
 
 Save script changes with the editor's **Save** button. Use the toolbar to play, pause, reset the game or toggle debug overlays.
+
+![The Amber Ruins script open in the Monaco editor](./assets/editor.png)
+
+![The property inspector showing a selected object in Amber Ruins](./assets/inspector.png)
+
+<img src="./assets/mobile.png" alt="The mobile editor drawer over the lower part of Amber Ruins" width="390">
 
 ## Try an engine example
 
