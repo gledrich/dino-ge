@@ -2,7 +2,7 @@
 
 Edit Dino GE scripts, inspect scene objects and try changes in the browser.
 
-![Amber Ruins running in the Dino GE Playground](./assets/preview.png)
+![Amber Ruins running in the Dino GE Playground](https://raw.githubusercontent.com/gledrich/dino-ge/f087deef5c6ecaeac7896fd20ff1e57e804ec7ae/packages/playground/assets/preview.png)
 
 ## Install and run
 
@@ -21,11 +21,11 @@ On desktop, drag tabs between docks or use a tab's **Move** menu. The browser re
 
 Save script changes with the editor's **Save** button. Use the toolbar to play, pause, reset the game or toggle debug overlays.
 
-![The Amber Ruins script open in the Monaco editor](./assets/editor.png)
+![The Amber Ruins script open in the Monaco editor](https://raw.githubusercontent.com/gledrich/dino-ge/f087deef5c6ecaeac7896fd20ff1e57e804ec7ae/packages/playground/assets/editor.png)
 
-![The property inspector showing a selected object in Amber Ruins](./assets/inspector.png)
+![The property inspector showing a selected object in Amber Ruins](https://raw.githubusercontent.com/gledrich/dino-ge/f087deef5c6ecaeac7896fd20ff1e57e804ec7ae/packages/playground/assets/inspector.png)
 
-<img src="./assets/mobile.png" alt="The mobile editor drawer over the lower part of Amber Ruins" width="390">
+<img src="https://raw.githubusercontent.com/gledrich/dino-ge/f087deef5c6ecaeac7896fd20ff1e57e804ec7ae/packages/playground/assets/mobile.png" alt="The mobile editor drawer over the lower part of Amber Ruins" width="390">
 
 ## Try an engine example
 
