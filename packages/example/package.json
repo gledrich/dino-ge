@@ -1,6 +1,6 @@
 {
   "name": "dino-ge-example",
-  "version": "1.16.1",
+  "version": "1.16.2",
   "description": "Minimal example for Dino GE",
   "private": true,
   "type": "module",
@@ -10,7 +10,7 @@
   },
   "dependencies": {
     "express": "^5.3.0",
-    "dino-ge": "1.16.1"
+    "dino-ge": "1.16.2"
   },
   "author": "Rich <richgled25@gmail.com>",
   "license": "MIT",
