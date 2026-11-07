@@ -16,6 +16,7 @@ class Rooms extends Scene {
     }
     this.explorer = new Circle({ position: new Vector2(80, 110), radius: 12, colour: '#ffc46f', zIndex: 2 });
     this.add(this.explorer);
+    cross.disabled = false;
     status.textContent = 'Gatehouse';
   }
 
@@ -40,7 +41,6 @@ const game = new Engine({
   },
 }, { containerId: 'game', width: '100%', height: '100%', backgroundColour: '#183035' });
 
-exit.disabled = true;
 cross.addEventListener('click', () => {
   rooms.explorer.transform.position.x = 440;
   cameraTarget = 360;

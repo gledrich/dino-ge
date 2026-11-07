@@ -43,7 +43,9 @@ new Engine({
       body.velocity.set(155, 0);
       status.textContent = 'Ball launched';
     };
-    document.querySelector('#launch').addEventListener('click', launch);
+    const launchButton = document.querySelector('#launch');
+    launchButton.addEventListener('click', launch);
+    launchButton.disabled = false;
     launch();
   },
   fixedUpdate() {

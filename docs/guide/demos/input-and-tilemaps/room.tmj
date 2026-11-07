@@ -6,6 +6,8 @@
   "tilewidth": 32,
   "tileheight": 32,
   "layers": [{
+    "id": 1,
+    "name": "Ground",
     "type": "tilelayer",
     "width": 6,
     "height": 5,

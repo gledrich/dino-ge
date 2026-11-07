@@ -32,6 +32,7 @@ const game = new Engine({
     new Rectangle({ position: new Vector2(0, 0), width: 540, height: 220, colour: '#203f40' });
     relic = new Circle({ position: new Vector2(105, 105), radius: 10, colour: '#ffc46f', zIndex: 1 });
     particles = new ParticleEmitter({ zIndex: 2 });
+    collect.disabled = false;
     status.textContent = 'Relic ready';
   },
   update() {
@@ -40,8 +41,8 @@ const game = new Engine({
   drawUI(ui) {
     const anchor = ui.anchor('left', 'top', 12, 12);
     ui.panel({ x: anchor.x, y: anchor.y, width: 150, height: 54 }, '#111d20');
-    ui.label({ x: 22, y: 32, text: `Relics: ${Number(collected)}/1`, colour: '#edf5f3' });
-    ui.progressBar({ x: 22, y: 44, width: 128, height: 8, value: Number(collected) });
+    ui.label({ x: anchor.x + 10, y: anchor.y + 20, text: `Relics: ${Number(collected)}/1`, colour: '#edf5f3' });
+    ui.progressBar({ x: anchor.x + 10, y: anchor.y + 32, width: 128, height: 8, value: Number(collected) });
     ui.button({
       id: 'canvas-hazard', x: 12, y: 76, width: 150, height: 32,
       text: 'Trigger hazard', onPress: triggerHazard,

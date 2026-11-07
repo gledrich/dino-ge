@@ -4,7 +4,7 @@
 
 [Documentation](../index.html)
 
-Build a small 2D game one idea at a time. Start with an empty canvas and finish by tracing how Amber Ruins ties the systems together. You need basic JavaScript, including modules, functions and classes. The browser demos require no installation.
+Learn how Dino GE runs a small 2D game, one idea at a time. Start with an empty canvas and finish by tracing how Amber Ruins ties the systems together. You need basic JavaScript, including modules, functions and classes. The browser demos require no installation.
 
 1. [Build a first scene](first-scene.html)
 2. [Compose objects with components](objects-and-components.html)
@@ -16,4 +16,6 @@ Build a small 2D game one idea at a time. Start with an empty canvas and finish 
 8. [Debug and inspect a scene](debugging-and-tools.html)
 9. [Read and play Amber Ruins](amber-ruins.html)
 
-Each example runs independently. Open the source next to the demo, change one value, and see what it does. For exact signatures and configuration options, use the [API reference](../api/index.html).
+Each demo can run on its own. To follow along locally, start with the two-file setup in [Build a first scene](first-scene.html). For another small demo, copy that setup to a new folder, keep the import map and module script, and replace the page body and `main.js` with the chapter's listings. Copy any assets the chapter names beside those files, and serve the folder over HTTP. The final chapter shows where to make changes in the full Amber Ruins game.
+
+Try the demos first to see what each example does. Then change one value in your local copy and reload to see what changed. For exact method signatures and configuration options, use the [API reference](../api/index.html).

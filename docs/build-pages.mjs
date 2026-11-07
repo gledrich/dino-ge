@@ -22,6 +22,17 @@ function renderPage(source, css) {
 `;
 }
 
+async function renderFile(dir, file, css) {
+  const source = await readFile(join(dir, file), 'utf8');
+  let body = source;
+  // Expand the same demo scripts that Jekyll inserts on GitHub Pages.
+  for (const [directive, path] of source.matchAll(/{% include_relative ((?:demos\/[a-z-]+\/)?main\.js) %}/g)) {
+    const script = await readFile(join(dir, path), 'utf8');
+    body = body.replace(directive, () => script.trimEnd());
+  }
+  return renderPage(body, css);
+}
+
 execFileSync('npm', ['run', 'build', '-w', 'dino-ge'], { cwd: root, stdio: 'inherit' });
 await rm(output, { recursive: true, force: true });
 await mkdir(guide, { recursive: true });
@@ -33,9 +44,8 @@ for (const dir of ['', 'guide']) {
   const source = join(docs, dir);
   for (const file of await readdir(source)) {
     if (!file.endsWith('.md')) continue;
-    const body = await readFile(join(source, file), 'utf8');
     const css = dir ? 'guide.css' : 'guide/guide.css';
-    await writeFile(join(output, dir, file.replace(/\.md$/, '.html')), renderPage(body, css));
+    await writeFile(join(output, dir, file.replace(/\.md$/, '.html')), await renderFile(source, file, css));
   }
 }
 await cp(join(docs, 'guide/guide.css'), join(guide, 'guide.css'));
@@ -62,10 +72,8 @@ const gameAssets = release + '/packages/example/amber-ruins';
 const releaseEngine = 'https://cdn.jsdelivr.net/npm/dino-ge@' + version + '/dist/index.js';
 for (const slug of await readdir(join(docs, 'guide/demos'), { withFileTypes: true })) {
   if (!slug.isDirectory()) continue;
-  const source = await readFile(join(docs, 'guide/demos', slug.name, 'source.md'), 'utf8');
-  const script = await readFile(join(demos, slug.name, 'main.js'), 'utf8');
-  const body = source.replace('{% include_relative main.js %}', () => script.trimEnd());
-  await writeFile(join(demos, slug.name, 'source.html'), renderPage(body, '../../guide.css'));
+  const source = join(docs, 'guide/demos', slug.name);
+  await writeFile(join(demos, slug.name, 'source.html'), await renderFile(source, 'source.md', '../../guide.css'));
   const file = join(demos, slug.name, 'index.html');
   const html = await readFile(file, 'utf8');
   if (!html.includes(releaseEngine)) {

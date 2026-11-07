@@ -10,51 +10,54 @@ A camera chooses which part of the world is visible. A scene owns a set of objec
 
 Select **Cross room** to pan from the Gatehouse to the Amber Vault. Select **Enter exit** to fade into a new scene.
 
+## Pan between rooms and open an exit
+
+Keep the `<head>` from the [first scene](first-scene.html). Replace the contents of `<body>` with:
+
+```html
+<div id="game" style="width: 360px; max-width: 100%; height: 220px"></div>
+<button id="cross" disabled>Cross room</button>
+<button id="exit" disabled>Enter exit</button>
+<p id="status" role="status"></p>
+```
+
+Save this as `main.js`:
+
+```js
+{% include_relative demos/camera-and-scenes/main.js %}
+```
+
+The two room backgrounds live side by side in `Rooms`. **Cross room** moves the explorer to x = 440 and sets `cameraTarget` to 360, the left edge of the vault. Each update closes a fraction of the gap between the camera and that target. The explorer and rooms keep their world positions as the view pans. This short demo eases per frame, so the speed depends on the refresh rate.
+
+**Enter exit** calls `game.transitionTo(new BeyondTheRuins(), { type: 'fade', duration: 0.5 })`. Halfway through the half-second fade, the engine activates the destination scene. It resets the camera and calls the destination's `onLoad()`, which adds the new text. The room objects belong to `Rooms`, so they are no longer drawn. Use `Engine.currentScene = new BeyondTheRuins()` in the click handler if you want an immediate switch.
+
+## Follow the explorer instead of a fixed target
+
+In the example above, replace `Rooms.update()` with the method below. Remove `let cameraTarget = 0` and `cameraTarget = 360`; the camera now follows `this.explorer` directly. Read `game.width` and `game.height` each time so the camera uses the current viewport size after a resize.
+
 ```js
 update() {
-  const position = Engine.camera.position;
-  position.x += (cameraTarget - position.x) * 0.12;
+  const world = { x: 0, y: 0, width: 720, height: 220 };
+  Engine.camera.follow(this.explorer, game.width, game.height, world);
 }
 ```
 
-When the explorer crosses the boundary, the game updates the target to the vault's world x coordinate. Each frame closes a fraction of the remaining distance. The camera never moves the world objects themselves. This short demo eases per frame. For timing that stays consistent across refresh rates, use an elapsed-time interpolation or the fixed update.
+Reload and select **Cross room**. The camera jumps to the explorer's rendered centre, as far as the bounds allow. The fourth argument is the world rectangle, in pixels. If the viewport is larger than the world along one axis, the camera centres that axis. Call `Engine.camera.getViewportBounds(game.width, game.height)` to read the visible rectangle in world coordinates.
 
-Use `Engine.camera.follow(player, game.width, game.height)` to centre on a moving character. Pass the current viewport dimensions, especially after resizing. For a finite world, pass its rectangle in world units as the fourth argument.
-
-```js
-const world = { x: -120, y: -40, width: 760, height: 280 };
-Engine.camera.follow(player, game.width, game.height, world);
-```
-
-Bounded follow uses the target's rendered centre. It clamps the visible area to the rectangle at the current zoom. If the viewport is larger than the world on either axis, the camera centres that axis so the space on both sides is equal. `Engine.camera.getViewportBounds(width, height)` gives the resulting visible region in world coordinates.
-
-Use `followSmooth()` to ease the camera using elapsed game time. Pass seconds
-since the last follow step and an optional response rate. A higher rate
-approaches the target faster, with a default of 8 per second. For a stationary
-target, splitting the same elapsed time across more updates produces the same
-position.
+To ease into the new position, remove the `Rooms.update()` method and add the following `fixedUpdate()` next to `onLoad()` in the callbacks passed to `new Engine()`. The guard limits following to the rooms scene, so the camera stays at the origin after you use the exit.
 
 ```js
 fixedUpdate() {
-  Engine.camera.followSmooth(player, game.width, game.height, 1 / 60, {
+  if (Engine.currentScene !== rooms) return;
+  Engine.camera.followSmooth(rooms.explorer, game.width, game.height, 1 / 60, {
     response: 5,
-    bounds: world,
+    bounds: { x: 0, y: 0, width: 720, height: 220 },
   });
-}
+},
 ```
 
-Smooth follow uses the target's rendered world centre with or without bounds.
-If you pass bounds, the camera first projects its current position into the
-valid range. This corrects the viewport immediately after a resize or zoom,
-then easing continues from the corrected position. An axis larger than the
-world remains centred.
+`1 / 60` is the elapsed simulation time in seconds for one fixed step. A higher `response` approaches the target faster. With bounds, the camera first moves any out-of-range position back inside the valid range, for example after a resize or zoom, then eases towards the explorer.
 
 To try the bounded follow demo from a repository checkout, run `npm run build -w dino-ge` and `npm run example`, then open [Bounded camera follow](http://localhost:3001/camera-bounds.html). Select **Jump surveyor** with **Smooth follow** on and off to compare the movement. Toggle the bounds at an edge, then zoom out to see how the larger viewport is centred.
-
-```js
-game.transitionTo(new BeyondTheRuins(), { type: 'fade', duration: 0.5 });
-```
-
-Populate objects in the scene's `onLoad()` and use `this.add()` to make ownership explicit. `Engine.currentScene = scene` activates a scene immediately. `transitionTo()` uses an effect and takes its duration in seconds. The destination scene resets the camera so its text starts on screen.
 
 [Camera](../api/classes/core_Camera.Camera.html) · [Scene](../api/classes/core_Scene.Scene.html) · [Engine](../api/classes/core_Engine.Engine.html)

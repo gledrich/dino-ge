@@ -21,23 +21,55 @@ Start the expedition. Move with WASD, the arrow keys, a gamepad's left stick or 
 
 ## Follow a single input
 
-Once movement updates the current cell, `collectRelic(now)` looks for a relic at those coordinates. The first few lines of its pickup branch show how one state change drives the feedback:
+Open `packages/example/amber-ruins/game.js` in a repository checkout. In
+`move(now)`, find the assignments to `column` and `row`. They run only after
+the destination passes the wall and gate checks. Then `move(now)` calls
+`collectRelic(now)` to check the new cell. Here is the full pickup function from
+that file, where `relicCells` holds the map coordinates, `relics` holds the
+matching sprite objects and `collected` is the running count:
 
 ```js
-const relicIndex = relicCells.findIndex(
-  ([relicX, relicY]) => relicX === column && relicY === row,
-);
-const visibility = relics[relicIndex]?.getComponent(VisibilityComponent);
-if (visibility?.visible) {
-  visibility.visible = false;
-  collected++;
-  sounds.pickup?.play();
-  emitBurst('#ffcf64');
-  // The full game also updates the HUD pulse and checks the exit.
+function collectRelic(now) {
+  const relicIndex = relicCells.findIndex(
+    ([relicX, relicY]) => relicX === column && relicY === row,
+  );
+  const visibility = relics[relicIndex]?.getComponent(VisibilityComponent);
+  if (visibility?.visible) {
+    visibility.visible = false;
+    collected++;
+    sounds.pickup?.play();
+    emitBurst('#ffcf64');
+    relicPulse = now + 260;
+    if (collected === relicCells.length) {
+      tilemap.data[exitRow][exitColumn] = floorTile;
+      hint = 'The gate is open. Head to the far side of the Amber Vault.';
+      sounds.unlock?.play();
+    } else {
+      hint = 'Amber relic recovered. Keep exploring.';
+    }
+  }
 }
 ```
 
-Put a breakpoint inside `collectRelic(now)` and move onto a relic. Inspect the current row and column, then step through the count change. Continue execution and compare the HUD to that count. The HUD draws the result of the game rule. You can change the pickup rule in one place without rewriting the interface.
+`findIndex()` returns `-1` when the cell has no relic, so there is no sprite to
+look up. If you revisit a relic's cell, its sprite exists but is no longer
+visible. In both cases the count stays the same. On the final pickup, the game
+also replaces the gate tile with a floor tile so it can be crossed.
+
+To follow the state change in your own run, add this line immediately after
+`collected++` in `collectRelic()`:
+
+```js
+console.log('Relic picked up', { column, row, collected, total: relicCells.length });
+```
+
+From the repository root, run `npm run build -w dino-ge` and `npm run example`.
+Open [Amber Ruins locally](http://localhost:3001/?expedition),
+start the expedition, and open the browser console. Tap Right twice, Up once
+and Right once to reach the first relic. Tap Left and Right to revisit its
+cell. The console logs one pickup and the HUD shows the same count.
+Find the `Relics` label in `drawHud()` to see where the interface
+reads that value.
 
 ## See how the larger chapter saves progress
 
